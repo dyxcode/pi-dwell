@@ -1,0 +1,30 @@
+node_modules/
+coverage/
+dist/
+*.tsbuildinfo
+*.log
+*.tgz
+.DS_Store
+
+# Local agent guidance and execution records.
+AGENTS.md
+CLAUDE.md
+agent-docs/
+.claude/
+.codex/
+.pi/
+.opencode/
+.agents/
+.local/
+
+# Runtime data belongs outside the checkout; exclude accidental copies.
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+sessions/
+state/
+credentials/

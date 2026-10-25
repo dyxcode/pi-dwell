@@ -5,6 +5,9 @@ export interface HostStatus {
   protocolVersion: 1;
   phase: "scaffold";
   startedAt: string;
+  processId: number;
+  instanceId: string;
+  mode: "production" | "development";
   capabilities: { sessions: false; tasks: false };
 }
 
@@ -20,6 +23,15 @@ export function isHostStatus(value: unknown): value is HostStatus {
     !("startedAt" in value) ||
     typeof value.startedAt !== "string" ||
     !Number.isFinite(Date.parse(value.startedAt)) ||
+    !("processId" in value) ||
+    typeof value.processId !== "number" ||
+    !Number.isSafeInteger(value.processId) ||
+    value.processId <= 0 ||
+    !("instanceId" in value) ||
+    typeof value.instanceId !== "string" ||
+    !/^[a-f0-9-]{36}$/.test(value.instanceId) ||
+    !("mode" in value) ||
+    (value.mode !== "production" && value.mode !== "development") ||
     !("capabilities" in value)
   )
     return false;

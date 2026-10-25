@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "start": "node src/cli.ts serve",
-    "dev": "node --watch src/cli.ts serve",
+    "dev": "node --watch src/cli.ts serve --dev",
     "dwell": "node src/cli.ts",
     "lint": "biome lint --error-on-warnings",
     "format:check": "biome ci --linter-enabled=false --assist-enabled=false",

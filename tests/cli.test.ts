@@ -1,57 +1,85 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
+import { mkdtemp, readFile, rm, access } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { startHost } from "../src/server/http.ts";
+import { dataDirectory } from "../src/local/paths.ts";
 
 const exec = promisify(execFile);
 const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
+const fixture = fileURLToPath(new URL("./fixtures/cli.ts", import.meta.url));
+async function directory(t: TestContext): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "dwell-cli-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  return root;
+}
 
-test("help works without a running host", async () => {
+test("help is read-only and development data is separate", async () => {
   const result = await exec(process.execPath, [cli, "--help"]);
   assert.match(result.stdout, /serve/);
-  assert.match(result.stdout, /status/);
+  assert.match(result.stdout, /pair/);
+  assert.match(result.stdout, /service/);
   assert.equal(result.stderr, "");
+  assert.notEqual(dataDirectory("production"), dataDirectory("development"));
 });
 
-test("CLI status connects to the host through HTTP", async (t) => {
-  const host = await startHost({ port: 0 });
+test("CLI status, pair and revoke use authenticated HTTP and do not print the long-lived credential", async (t) => {
+  const dataDir = await directory(t);
+  const host = await startHost({ port: 0, dataDir });
   t.after(() => host.close());
-  const result = await exec(process.execPath, [cli, "status", "--port", new URL(host.url).port]);
-  const output: unknown = JSON.parse(result.stdout);
+  const prefix = [fixture, dataDir, new URL(host.url).port];
+  const status = await exec(process.execPath, [...prefix, "status"]);
+  const output: unknown = JSON.parse(status.stdout);
   assert.ok(output && typeof output === "object" && "service" in output);
   assert.equal(output.service, "pi-dwell");
-  assert.equal(result.stderr, "");
+  const pairing = await exec(process.execPath, [...prefix, "pair"]);
+  assert.match(pairing.stdout, /Pairing code: [a-f0-9]{32}/);
+  const token = (await readFile(join(dataDir, "auth-token"), "utf8")).trim();
+  assert.ok(!`${status.stdout}${status.stderr}${pairing.stdout}${pairing.stderr}`.includes(token));
+  const revoked = await exec(process.execPath, [...prefix, "auth", "revoke"]);
+  assert.match(revoked.stdout, /revoked/);
 });
 
-test("CLI status explains how to start an unavailable host", async () => {
-  const host = await startHost({ port: 0 });
+test("CLI reports missing credentials and unreachable hosts without writing state", async (t) => {
+  const dataDir = join(await directory(t), "absent");
+  await assert.rejects(
+    exec(process.execPath, [fixture, dataDir, "1", "status"]),
+    (error: unknown) => {
+      assert.ok(error instanceof Error && "stderr" in error);
+      assert.match(String(error.stderr), /credential is missing/);
+      return true;
+    },
+  );
+  await assert.rejects(access(dataDir));
+  const host = await startHost({ port: 0, dataDir });
   const port = new URL(host.url).port;
   await host.close();
   await assert.rejects(
-    exec(process.execPath, [cli, "status", "--port", port]),
+    exec(process.execPath, [fixture, dataDir, port, "status"]),
     (error: unknown) => {
-      assert.ok(error instanceof Error && "code" in error && "stderr" in error);
-      assert.equal(error.code, 1);
-      assert.ok(String(error.stderr).includes(`Cannot reach pi-dwell at http://127.0.0.1:${port}`));
-      assert.ok(String(error.stderr).includes(`npm start -- --port ${port}`));
+      assert.ok(error instanceof Error && "stderr" in error);
+      assert.match(String(error.stderr), /Cannot reach pi-dwell/);
       return true;
     },
   );
 });
 
-test("invalid CLI arguments fail clearly before starting a server", async () => {
+test("public CLI rejects multi-instance options and malformed commands", async () => {
   for (const args of [
     ["unknown"],
+    ["serve", "--port", "9000"],
+    ["serve", "--data-dir", "/tmp/example"],
     ["serve", "--host", "0.0.0.0"],
-    ["serve", "--port", "0"],
-    ["serve", "--port", "65536"],
-    ["serve", "--port", "12junk"],
-    ["serve", "--port"],
-    ["serve", "--port", "9000", "--port", "9001"],
+    ["serve", "--dev", "--dev"],
+    ["service", "start", "--dev"],
+    ["auth"],
+    ["revoke"],
   ]) {
     await assert.rejects(
       exec(process.execPath, [cli, ...args], { timeout: 3000 }),
@@ -65,13 +93,14 @@ test("invalid CLI arguments fail clearly before starting a server", async () => 
   }
 });
 
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  test(`CLI serve releases its port on ${signal}`, async (t) => {
-    const reservation = await startHost({ port: 0 });
+for (const signal of ["SIGINT", "SIGTERM", "SIGKILL"] as const) {
+  test(`a real server process releases its port after ${signal} and preserves credentials`, async (t) => {
+    const dataDir = await directory(t);
+    const reservation = await startHost({ port: 0, dataDir });
     const port = new URL(reservation.url).port;
+    const before = await readFile(join(dataDir, "auth-token"), "utf8");
     await reservation.close();
-
-    const child = spawn(process.execPath, [cli, "serve", "--port", port], {
+    const child = spawn(process.execPath, [fixture, dataDir, port, "serve"], {
       stdio: ["ignore", "pipe", "pipe"],
     });
     const exited = once(child, "exit");
@@ -87,12 +116,16 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
         break;
       }
     }
-    assert.ok(ready, "CLI must report successful startup");
+    assert.ok(ready);
     assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`)).status, 200);
+    // A competing CLI must fail without altering the running host.
+    await assert.rejects(exec(process.execPath, [fixture, dataDir, port, "serve"]), /occupied/);
     child.kill(signal);
     const [code, exitSignal] = await exited;
-    assert.equal(code, 0);
-    assert.equal(exitSignal, null);
-    await assert.rejects(fetch(`http://127.0.0.1:${port}/healthz`));
+    assert.equal(code, signal === "SIGKILL" ? null : 0);
+    assert.equal(exitSignal, signal === "SIGKILL" ? "SIGKILL" : null);
+    assert.equal(await readFile(join(dataDir, "auth-token"), "utf8"), before);
+    const restarted = await startHost({ port: Number(port), dataDir });
+    await restarted.close();
   });
 }

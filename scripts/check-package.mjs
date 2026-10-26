@@ -38,6 +38,7 @@ try {
   for (const required of [
     "src/cli.ts",
     "src/server/http.ts",
+    "src/server/access.ts",
     "src/server/sse.ts",
     "src/runtime/pi-process.ts",
     "src/runtime/pi-rpc.ts",

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { HOST_PAGE, STYLE } from "../clients/web/page.ts";
+import { prepareDataDirectory } from "../local/files.ts";
 import { BROWSER_ASSETS } from "../clients/web/script.ts";
 import { dataDirectory, type HostMode } from "../local/paths.ts";
 import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
@@ -8,6 +9,7 @@ import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
 import { isRuntimeConfiguration } from "../shared/sessions.ts";
 import { isTurnCreateRequest } from "../shared/turns.ts";
 import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
+import { browserCookie, readBrowserOrigin, requestAccess } from "./access.ts";
 import { createSseConnection, type SseConnection, SseStartError } from "./sse.ts";
 
 export interface HostOptions {
@@ -38,7 +40,7 @@ function cookieToken(request: IncomingMessage, name: string): string | undefined
 }
 function browserRequest(request: IncomingMessage, origin: string): void {
   if (request.headers.origin !== origin || request.headers["x-dwell-request"] !== "1") {
-    fail(403, "forbidden_origin", "Open Dwell at its local address to perform this operation.");
+    fail(403, "forbidden_origin", "Open Dwell at the address used to connect this browser.");
   }
 }
 async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
@@ -121,9 +123,7 @@ export async function startHost({
   let sessions: SessionService | undefined;
   let url = "";
   let stopping = false;
-  const cookieName = `dwell_browser_${mode}`;
-  const cookie = (token: string, maxAge: number) =>
-    `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
+  let browserOrigin: string | undefined;
   const active = new Set<Promise<void>>();
   const eventStreams = new Set<SseConnection>();
 
@@ -136,6 +136,7 @@ export async function startHost({
     response: ServerResponse,
     sessionId: string,
     cursor: string | undefined,
+    cookieName: string,
   ): void {
     if (!auth || !sessions) fail(503, "unavailable", "Session service is starting.");
     let stream: SseConnection | undefined;
@@ -189,10 +190,12 @@ export async function startHost({
         )
           fail(400, "duplicate_header", "Duplicate request header.");
       }
-      if (request.headers.host !== url.slice("http://".length))
-        fail(403, "forbidden_host", "Use the canonical Dwell loopback address.");
-      if (request.headers.origin !== undefined && request.headers.origin !== url)
+      const access = requestAccess(request.headers, url, browserOrigin, mode);
+      const { cookieName } = access;
+      if (request.headers.origin !== undefined && request.headers.origin !== access.origin)
         fail(403, "forbidden_origin", "Cross-origin requests are not allowed.");
+      if (access.secure && request.headers.authorization !== undefined)
+        fail(403, "local_credential_required", "Use the local address for CLI credentials.");
       if (!auth || stopping)
         fail(503, "unavailable", "Dwell is starting or stopping. Try again shortly.");
       const requestTarget = request.url ?? "";
@@ -285,7 +288,7 @@ export async function startHost({
             "cli_required",
             "Pi executable configuration requires the local CLI credential.",
           );
-        if (method === "POST" && !cli) browserRequest(request, url);
+        if (method === "POST" && !cli) browserRequest(request, access.origin);
         const body = method === "POST" ? await readJson(request) : {};
         if (stopping) fail(503, "unavailable", "Dwell is stopping.");
         // Body/header deadlines remain bounded; admitted RPC work has its own deadlines.
@@ -338,7 +341,7 @@ export async function startHost({
           const cursorHeader = request.headers["last-event-id"];
           if (cursorHeader !== undefined && typeof cursorHeader !== "string")
             fail(400, "invalid_cursor", "Last-Event-ID must contain one event cursor.");
-          openEventStream(request, response, id, cursorHeader);
+          openEventStream(request, response, id, cursorHeader, cookieName);
           return;
         } else if (turnMatch) {
           const id = turnMatch[1];
@@ -413,7 +416,7 @@ export async function startHost({
         if (!auth.isCli(request.headers.authorization))
           fail(401, "unauthenticated", "This operation requires the local CLI credential.");
       } else {
-        browserRequest(request, url);
+        browserRequest(request, access.origin);
       }
       const body = await readJson(request);
       if (stopping) fail(503, "unavailable", "Dwell is stopping.");
@@ -427,7 +430,7 @@ export async function startHost({
         )
           fail(400, "invalid_input", "Enter the 32-character pairing code from the local CLI.");
         const token = await auth.redeem(body.code, body.browserKey);
-        response.setHeader("Set-Cookie", cookie(token, SESSION_MS / 1000));
+        response.setHeader("Set-Cookie", browserCookie(access, token, SESSION_MS / 1000));
       } else {
         if (Object.keys(body).length !== 0)
           fail(400, "invalid_input", "This operation expects an empty JSON object.");
@@ -444,7 +447,7 @@ export async function startHost({
             fail(401, "unauthenticated", "This browser session has expired or been revoked.");
           await auth.logout(token);
           revalidateEventStreams();
-          response.setHeader("Set-Cookie", cookie("", 0));
+          response.setHeader("Set-Cookie", browserCookie(access, "", 0));
         }
       }
       send(response, 200, { ok: true });
@@ -516,6 +519,12 @@ export async function startHost({
     return closing;
   };
   try {
+    const root = await prepareDataDirectory(dataDir);
+    browserOrigin = await readBrowserOrigin(root, mode);
+    if (browserOrigin && new URL(browserOrigin).host === new URL(url).host)
+      throw new Error(
+        "The HTTPS browserOrigin must use a different authority from the local listener.",
+      );
     auth = await LocalAuth.open(dataDir, now);
     sessions = await SessionService.create({ dataDir, ...sessionOptions, now });
   } catch (error) {

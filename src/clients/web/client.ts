@@ -53,6 +53,8 @@ let controller: AbortController | null = null,
   generation = 0,
   authenticated = false;
 let reconnectTimer: number | undefined, pollTimer: number | undefined;
+let polling = false,
+  suspended = false;
 let historyPending = false,
   historyAgain = false,
   sending = false;
@@ -70,6 +72,7 @@ let authAttempt = 0,
 let hostMode = "",
   historyError = "",
   streamConnected = false;
+let noticeSource: "action" | "stream" | undefined;
 const localPreferences: Record<string, string> = {};
 try {
   const value: unknown = JSON.parse(localStorage.getItem("dwell.web.preferences.v1") ?? "{}");
@@ -116,15 +119,18 @@ function glyph(value: string): string {
         ? "!"
         : "○";
 }
-function showError(error: unknown): void {
+function showError(error: unknown, source: "action" | "stream" = "action"): void {
   if (error instanceof ApiError && error.status === 401) {
     disconnect("This browser needs pairing again. Your host-owned work continues.");
     return;
   }
+  if (source === "stream" && noticeSource === "action") return;
+  noticeSource = source;
   notice.textContent = message(error);
   notice.hidden = false;
 }
 function clearNotice(): void {
+  noticeSource = undefined;
   notice.hidden = true;
   notice.textContent = "";
 }
@@ -288,7 +294,7 @@ function renderConversation(): void {
   if (atBottom) scroll.scrollTop = scroll.scrollHeight;
 }
 async function loadHistory(more = false): Promise<void> {
-  if (!selected) return;
+  if (!selected || !authenticated || suspended) return;
   if (historyPending) {
     if (!more) historyAgain = true;
     return;
@@ -342,7 +348,7 @@ function stopStream(): void {
   window.clearTimeout(reconnectTimer);
 }
 async function stream(id: string, epoch: number): Promise<void> {
-  if (epoch !== generation || !authenticated) return;
+  if (epoch !== generation || !authenticated || suspended) return;
   const abort = new AbortController();
   controller = abort;
   try {
@@ -355,11 +361,13 @@ async function stream(id: string, epoch: number): Promise<void> {
       cache: "no-store",
       signal: abort.signal,
     });
+    if (epoch !== generation || abort.signal.aborted) return;
     if (!response.ok) throw await responseError(response);
     if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream"))
       throw new Error("Invalid event stream.");
     streamConnected = true;
     connection("Connected");
+    if (noticeSource === "stream") clearNotice();
     const reader = response.body.getReader(),
       text = new TextDecoder(),
       decoder = new SSEDecoder();
@@ -387,7 +395,7 @@ async function stream(id: string, epoch: number): Promise<void> {
             pendingSend = null;
           }
           if (frame.type === "stream.error") {
-            showError(new Error(frame.payload.message));
+            showError(new Error(frame.payload.message), "stream");
             renderConversation();
             throw new Error(frame.payload.message);
           }
@@ -410,7 +418,7 @@ async function stream(id: string, epoch: number): Promise<void> {
     if (abort.signal.aborted || epoch !== generation) return;
     streamConnected = false;
     connection("Reconnecting…");
-    showError(error);
+    showError(error, "stream");
     state = { ...state, cursor: null };
     if (error instanceof ApiError && error.status === 401) {
       showError(error);
@@ -476,18 +484,26 @@ async function refresh(): Promise<void> {
   if (attempt === authAttempt && authenticated) navigation();
 }
 async function poll(): Promise<void> {
-  if (!authenticated) return;
+  if (!authenticated || polling || suspended) return;
+  polling = true;
+  const attempt = authAttempt;
   try {
     await refresh();
-    if (!selected) connection("Connected");
+    if (attempt === authAttempt && !selected) connection("Connected");
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) showError(error);
-    else connection("Connection lost");
+    if (attempt === authAttempt) {
+      if (error instanceof ApiError && error.status === 401) showError(error);
+      else connection("Connection lost");
+    }
+  } finally {
+    polling = false;
+    if (authenticated && !suspended) {
+      window.clearTimeout(pollTimer);
+      pollTimer = window.setTimeout(() => {
+        void poll();
+      }, 5000);
+    }
   }
-  if (authenticated)
-    pollTimer = window.setTimeout(() => {
-      void poll();
-    }, 5000);
 }
 function disconnect(reason: string): void {
   authenticated = false;
@@ -839,7 +855,33 @@ window.addEventListener("storage", (event) => {
   }
 });
 window.addEventListener("pagehide", () => {
+  suspended = true;
+  generation++;
+  streamConnected = false;
   stopStream();
   window.clearTimeout(pollTimer);
+});
+function resume(): void {
+  suspended = false;
+  if (!authenticated) return;
+  window.clearTimeout(pollTimer);
+  stopStream();
+  generation++;
+  streamConnected = false;
+  connection("Reconnecting…");
+  state = { ...state, cursor: null };
+  if (selected) {
+    void stream(selected, generation);
+    void loadHistory();
+  }
+  void poll();
+  composer.resize();
+}
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) resume();
+});
+window.addEventListener("online", resume);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") resume();
 });
 void connect();

@@ -16,7 +16,9 @@ async function options(t: TestContext, mode: string) {
     sessionDirectory: environment.sessionDir,
     provider: "dwell-test",
     model: "dwell-test",
-    requestTimeoutMs: 500,
+    // Let the 9 MiB fixture reach the size guard under concurrent process load.
+    // Dedicated timeout scenarios retain their short deadline.
+    requestTimeoutMs: mode === "oversized" ? 5_000 : 500,
     shutdownTimeoutMs: 50,
   };
 }

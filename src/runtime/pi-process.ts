@@ -7,7 +7,7 @@ import { type RuntimeConfiguration, SESSION_ID } from "../shared/sessions.ts";
 import { isRecord, PiRpc, type RpcRecord } from "./pi-rpc.ts";
 
 const exec = promisify(execFile);
-export const SUPPORTED_PI_VERSION = "1.3.0";
+export const SUPPORTED_PI_VERSION = "1.4.0";
 export type RuntimeState = "starting" | "ready" | "running" | "stopping" | "exited" | "failed";
 export interface PiOptions {
   executable: string;

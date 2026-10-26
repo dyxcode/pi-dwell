@@ -30,7 +30,7 @@ try {
   });
   for (const path of paths) {
     assert.ok(
-      /^src\/[a-z/]+\.ts$/.test(path) ||
+      /^src\/(?:[a-z-]+\/)*[a-z-]+\.ts$/.test(path) ||
         ["package.json", "README.md", "docs/i18n/README.zh-CN.md"].includes(path),
       `Unexpected package file: ${path}`,
     );
@@ -38,6 +38,8 @@ try {
   for (const required of [
     "src/cli.ts",
     "src/server/http.ts",
+    "src/runtime/pi-process.ts",
+    "src/runtime/pi-rpc.ts",
     "README.md",
     "docs/i18n/README.zh-CN.md",
   ]) {

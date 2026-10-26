@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { PiProcess } from "../src/runtime/pi-process.ts";
+import { RpcCommandError } from "../src/runtime/pi-rpc.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
 async function options(t: TestContext, mode: string) {
@@ -39,6 +40,45 @@ test("readiness waits for a response and JSONL preserves fragmented Unicode and 
   assert.equal((await pi.run("hello")).outcome, "completed");
 });
 
+test("a known Pi command rejection is typed and leaves the runtime ready", async (t) => {
+  const pi = await PiProcess.start(await options(t, "reject-prompt"));
+  t.after(() => pi.stop());
+
+  const run = pi.startRun("hello");
+  await assert.rejects(
+    run.accepted,
+    (error: unknown) =>
+      error instanceof RpcCommandError &&
+      error.command === "prompt" &&
+      /synthetic prompt rejection/.test(error.message),
+  );
+  await assert.rejects(run.settled, RpcCommandError);
+  assert.equal(pi.state, "ready");
+  assert.equal((await pi.run("hello")).outcome, "completed");
+});
+
+test("startRun keeps events that settle before Pi acknowledges prompt acceptance", async (t) => {
+  const pi = await PiProcess.start(await options(t, "settle-before-acceptance"));
+  t.after(() => pi.stop());
+  const observed: string[] = [];
+  pi.subscribe((event) => {
+    observed.push(event.type);
+  });
+
+  const run = pi.startRun("hello");
+  assert.equal((await run.settled).outcome, "completed");
+  assert.equal(await run.accepted, "started");
+  assert.ok(observed.includes("agent_settled"));
+  assert.equal(pi.state, "ready");
+});
+
+test("malformed get_entries data fails the runtime", async (t) => {
+  const pi = await PiProcess.start(await options(t, "invalid-entries"));
+  t.after(() => pi.stop());
+  await assert.rejects(pi.getEntries(), /invalid session entries/i);
+  assert.equal(pi.state, "failed");
+});
+
 for (const mode of ["timeout", "crash"]) {
   test(`a ${mode} rejects the active run, does not replay, and leaves the owner alive`, async (t) => {
     const pi = await PiProcess.start(await options(t, mode));
@@ -49,6 +89,20 @@ for (const mode of ["timeout", "crash"]) {
     await pi.stop();
   });
 }
+
+test("startRun reports transport timeout as uncertain, not a command rejection", async (t) => {
+  const pi = await PiProcess.start(await options(t, "timeout"));
+  t.after(() => pi.stop());
+  const run = pi.startRun("hello");
+  const isUncertain = (error: unknown) =>
+    error instanceof Error &&
+    !(error instanceof RpcCommandError) &&
+    /unknown|timed out/i.test(error.message);
+  await assert.rejects(run.accepted, isUncertain);
+  await assert.rejects(run.settled, isUncertain);
+  assert.equal(pi.state, "failed");
+  await pi.stop();
+});
 
 test("shutdown escalates for an unresponsive Pi and observes its actual exit", async (t) => {
   const pi = await PiProcess.start(await options(t, "stubborn"));

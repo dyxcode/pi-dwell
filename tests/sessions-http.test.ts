@@ -141,6 +141,14 @@ test("paired browsers can read sessions but cannot configure executables or bypa
     body: JSON.stringify(body),
   });
   assert.equal(created.status, 201);
+  const createdSession: unknown = await created.json();
+  assert.ok(isSessionInfo(createdSession));
+  const turnDenied = await fetch(`${host.url}/api/v1/sessions/${createdSession.id}/turns`, {
+    method: "POST",
+    headers: { ...browser, "Content-Type": "application/json" },
+    body: JSON.stringify({ requestId: randomUUID(), message: "hello" }),
+  });
+  assert.equal(turnDenied.status, 403);
 });
 
 test("HTTP create/list/open/close/context preserve one session across host restart", async (t) => {
@@ -150,6 +158,8 @@ test("HTTP create/list/open/close/context preserve one session across host resta
   assert.equal(response.status, 201);
   const created: unknown = await response.json();
   assert.ok(isSessionInfo(created));
+  assert.equal(created.activeTurnId, null);
+  assert.equal(created.latestTurnId, null);
   const duplicate: unknown = await (await request("/sessions", body)).json();
   assert.ok(isSessionInfo(duplicate));
   assert.equal(created.id, duplicate.id);
@@ -161,6 +171,8 @@ test("HTTP create/list/open/close/context preserve one session across host resta
   const listed: unknown = await (await request("/sessions", undefined, restarted.url)).json();
   assert.ok(Array.isArray(listed) && listed.length === 1 && isSessionInfo(listed[0]));
   assert.equal(listed[0].runtimeState, "closed");
+  assert.equal(listed[0].activeTurnId, null);
+  assert.equal(listed[0].latestTurnId, null);
   const opened: unknown = await (
     await request(`/sessions/${created.id}/open`, {}, restarted.url)
   ).json();

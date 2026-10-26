@@ -24,6 +24,8 @@ export interface SessionInfo {
   runtimeState: "closed" | "opening" | "ready" | "failed" | "closing";
   historyState: "empty" | "available" | "unavailable";
   error: string | null;
+  activeTurnId: string | null;
+  latestTurnId: string | null;
 }
 
 export function isRuntimeConfiguration(value: unknown): value is RuntimeConfiguration {
@@ -70,6 +72,12 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
     typeof value.historyState === "string" &&
     ["empty", "available", "unavailable"].includes(value.historyState) &&
     "error" in value &&
-    (value.error === null || typeof value.error === "string")
+    (value.error === null || typeof value.error === "string") &&
+    "activeTurnId" in value &&
+    (value.activeTurnId === null ||
+      (typeof value.activeTurnId === "string" && SESSION_ID.test(value.activeTurnId))) &&
+    "latestTurnId" in value &&
+    (value.latestTurnId === null ||
+      (typeof value.latestTurnId === "string" && SESSION_ID.test(value.latestTurnId)))
   );
 }

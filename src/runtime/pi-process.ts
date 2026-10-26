@@ -38,6 +38,11 @@ export interface RunResult {
   outcome: "completed" | "failed" | "aborted" | "handled";
   error?: string;
 }
+export type PiEntry = Record<string, unknown> & {
+  id: string;
+  type: string;
+  parentId: string | null;
+};
 type Listener = (event: RpcRecord) => void | Promise<void>;
 interface Run {
   resolve(result: RunResult): void;
@@ -81,6 +86,35 @@ function sessionState(value: unknown): SessionState {
       ? { model: { provider: value.model.provider, id: value.model.id } }
       : {}),
   };
+}
+
+function sessionEntries(value: unknown): { entries: PiEntry[]; leafId: string | null } {
+  if (!isRecord(value) || !Array.isArray(value.entries))
+    throw new Error("Pi returned invalid session entries.");
+  const entries: PiEntry[] = [];
+  const ids = new Set<string>();
+  for (const candidate of value.entries) {
+    if (!isRecord(candidate)) throw new Error("Pi returned invalid session entries.");
+    const { id, type, parentId } = candidate;
+    if (
+      typeof id !== "string" ||
+      id.length === 0 ||
+      typeof type !== "string" ||
+      type.length === 0 ||
+      (typeof parentId !== "string" && parentId !== null) ||
+      (typeof parentId === "string" && parentId.length === 0) ||
+      ids.has(id)
+    )
+      throw new Error("Pi returned invalid session entries.");
+    ids.add(id);
+    entries.push({ ...candidate, id, type, parentId });
+  }
+  let leafId: string | null;
+  if (value.leafId === null) leafId = null;
+  else if (typeof value.leafId === "string" && value.leafId.length > 0 && ids.has(value.leafId))
+    leafId = value.leafId;
+  else throw new Error("Pi returned invalid session entries.");
+  return { entries, leafId };
 }
 
 export async function verifyPiConfiguration(
@@ -315,39 +349,69 @@ export class PiProcess {
     return data.messages.filter(isRecord);
   }
 
-  async run(message: string): Promise<RunResult> {
+  async getEntries(): Promise<{ entries: PiEntry[]; leafId: string | null }> {
+    try {
+      return sessionEntries(await this.#rpc.request("get_entries"));
+    } catch (error) {
+      if (error instanceof Error && error.message === "Pi returned invalid session entries.")
+        this.#rpc.fail(error);
+      throw error;
+    }
+  }
+
+  startRun(message: string): {
+    accepted: Promise<"started" | "handled">;
+    settled: Promise<RunResult>;
+  } {
     if (this.#state === "running" || this.#run) throw new Error("Pi session is busy.");
     if (this.#state !== "ready") throw this.#error ?? new Error("Pi runtime is not ready.");
     if (Buffer.byteLength(message) > 1024 * 1024) throw new Error("Pi prompt exceeds 1 MiB.");
     if (message.trim().length === 0) throw new Error("Pi prompt must not be empty.");
-    let resolveRun!: (result: RunResult) => void;
-    let rejectRun!: (error: Error) => void;
-    const result = new Promise<RunResult>((resolve, reject) => {
-      resolveRun = resolve;
-      rejectRun = reject;
+
+    let resolveAccepted!: (disposition: "started" | "handled") => void;
+    let rejectAccepted!: (error: Error) => void;
+    const accepted = new Promise<"started" | "handled">((resolve, reject) => {
+      resolveAccepted = resolve;
+      rejectAccepted = reject;
     });
-    // A process may fail while awaiting prompt acceptance. Observe rejection immediately.
-    void result.catch(() => {});
-    const run: Run = { resolve: resolveRun, reject: rejectRun, aborted: false };
+    let resolveSettled!: (result: RunResult) => void;
+    let rejectSettled!: (error: Error) => void;
+    const settled = new Promise<RunResult>((resolve, reject) => {
+      resolveSettled = resolve;
+      rejectSettled = reject;
+    });
+    // Callers may observe acceptance before settlement; keep either rejection handled meanwhile.
+    void accepted.catch(() => {});
+    void settled.catch(() => {});
+    // Install run state before sending: Pi can emit events before its prompt response.
+    const run: Run = { resolve: resolveSettled, reject: rejectSettled, aborted: false };
     this.#run = run;
     this.#state = "running";
-    try {
-      const data = await this.#rpc.request("prompt", { message });
-      if (!isRecord(data) || (data.disposition !== "started" && data.disposition !== "handled")) {
-        const error = new Error("Pi returned an unexpected prompt disposition.");
-        this.#rpc.fail(error);
-        throw error;
-      }
-      if (data.disposition === "handled") this.#finish(run, { outcome: "handled" });
-    } catch (error) {
-      if (this.#run === run)
-        this.#finish(run, {
-          outcome: "failed",
-          error: error instanceof Error ? error.message : "Pi rejected the prompt.",
-        });
-      throw error;
-    }
-    return result;
+
+    void this.#rpc.request("prompt", { message }).then(
+      (data) => {
+        if (!isRecord(data) || (data.disposition !== "started" && data.disposition !== "handled")) {
+          const error = new Error("Pi returned an unexpected prompt disposition.");
+          this.#rpc.fail(error);
+          rejectAccepted(error);
+          return;
+        }
+        resolveAccepted(data.disposition);
+        if (data.disposition === "handled") this.#finish(run, { outcome: "handled" });
+      },
+      (error: unknown) => {
+        const failure = error instanceof Error ? error : new Error("Pi rejected the prompt.");
+        rejectAccepted(failure);
+        if (this.#run === run) this.#rejectRun(run, failure);
+      },
+    );
+    return { accepted, settled };
+  }
+
+  async run(message: string): Promise<RunResult> {
+    const run = this.startRun(message);
+    await run.accepted;
+    return run.settled;
   }
 
   async abort(): Promise<void> {
@@ -407,6 +471,14 @@ export class PiProcess {
     this.#clearDialogs();
     if (this.#state === "running") this.#state = "ready";
     run.resolve(result);
+  }
+
+  #rejectRun(run: Run, error: Error): void {
+    if (this.#run !== run) return;
+    this.#run = undefined;
+    this.#clearDialogs();
+    if (this.#state === "running") this.#state = "ready";
+    run.reject(error);
   }
 
   #fail(error: Error): void {

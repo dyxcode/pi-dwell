@@ -43,6 +43,7 @@ try {
     "src/sessions/service.ts",
     "src/storage/catalog.ts",
     "src/shared/sessions.ts",
+    "src/shared/turns.ts",
     "src/clients/cli/runtime.ts",
     "README.md",
     "docs/i18n/README.zh-CN.md",

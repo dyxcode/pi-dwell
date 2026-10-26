@@ -3,6 +3,19 @@ import { StringDecoder } from "node:string_decoder";
 
 export type RpcRecord = Record<string, unknown> & { type: string };
 
+/** Pi returned a correlated `success: false` response for a command. */
+export class RpcCommandError extends Error {
+  readonly command: string;
+  readonly rejection: string;
+
+  constructor(command: string, rejection: string) {
+    super(`Pi rejected ${command}: ${rejection}`);
+    this.name = "RpcCommandError";
+    this.command = command;
+    this.rejection = rejection;
+  }
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -149,11 +162,15 @@ export class PiRpc {
     }
     const pending = this.#pending.get(value.id);
     if (!pending || pending.command !== value.command) throw new Error("Unmatched Pi response.");
-    if (!value.success && typeof value.error !== "string")
-      throw new Error("Invalid Pi error response.");
+    if (value.success) {
+      this.#pending.delete(value.id);
+      clearTimeout(pending.timer);
+      pending.resolve(value.data);
+      return;
+    }
+    if (typeof value.error !== "string") throw new Error("Invalid Pi error response.");
     this.#pending.delete(value.id);
     clearTimeout(pending.timer);
-    if (value.success) pending.resolve(value.data);
-    else pending.reject(new Error(`Pi rejected ${pending.command}: ${String(value.error)}`));
+    pending.reject(new RpcCommandError(pending.command, value.error));
   }
 }

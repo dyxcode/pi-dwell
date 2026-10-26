@@ -4,15 +4,16 @@ import { open, readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
 import { prepareDataDirectory } from "../local/files.ts";
 import { hasCode } from "../local/paths.ts";
-import { PiProcess, verifyPiConfiguration } from "../runtime/pi-process.ts";
-import { isRecord } from "../runtime/pi-rpc.ts";
+import { type PiEntry, PiProcess, verifyPiConfiguration } from "../runtime/pi-process.ts";
+import { isRecord, RpcCommandError } from "../runtime/pi-rpc.ts";
+import { isTurnCreateRequest, type TurnCreateRequest, type TurnInfo } from "../shared/turns.ts";
 import {
   type RuntimeConfiguration,
   SESSION_ID,
   type SessionCreateRequest,
   type SessionInfo,
 } from "../shared/sessions.ts";
-import { SessionCatalog, type StoredSession } from "../storage/catalog.ts";
+import { SessionCatalog, type StoredSession, type StoredTurn } from "../storage/catalog.ts";
 
 export class SessionError extends Error {
   readonly status: number;
@@ -30,6 +31,11 @@ export interface SessionServiceOptions {
   env?: NodeJS.ProcessEnv;
   extensions?: readonly string[];
   now?: () => number;
+  /** Internal deterministic fault-test barrier; never exposed to clients. */
+  turnCheckpoint?: (
+    point: "accepted" | "dispatching" | "running" | "settled",
+    turn: TurnInfo,
+  ) => Promise<void>;
 }
 
 const HISTORY_UNAVAILABLE = "Saved session history is unavailable.";
@@ -51,7 +57,26 @@ function validateStored(stored: StoredSession): void {
   }
 }
 
-/** Durable session identities and live runtime ownership; no turn submission yet. */
+interface ActiveTurn {
+  sessionId: string;
+  runId: string;
+  done: Promise<void>;
+  runtime?: PiProcess;
+  dispatched: boolean;
+  abort?: Promise<void>;
+  abortFailed: boolean;
+}
+
+function turnView(turn: StoredTurn): TurnInfo {
+  const { payloadIdentity: _identity, ...view } = turn;
+  return view;
+}
+
+function active(turn: TurnInfo): boolean {
+  return ["accepted", "dispatching", "running"].includes(turn.status);
+}
+
+/** Durable session/turn identities and host-owned runtime execution. */
 export class SessionService {
   readonly #catalog: SessionCatalog;
   readonly #dataDir: string;
@@ -59,6 +84,9 @@ export class SessionService {
   readonly #extensions: readonly string[];
   readonly #now: () => number;
   readonly #runtimes = new Map<string, PiProcess>();
+  readonly #turns = new Map<string, ActiveTurn>();
+  readonly #storageFaults = new Set<string>();
+  readonly #checkpoint: SessionServiceOptions["turnCheckpoint"];
   #queue: Promise<void> = Promise.resolve();
   #stopping = false;
   #shutdown: Promise<void> | undefined;
@@ -69,6 +97,7 @@ export class SessionService {
     this.#env = { ...(options.env ?? process.env), PI_OFFLINE: "1" };
     this.#extensions = options.extensions ?? [];
     this.#now = options.now ?? Date.now;
+    this.#checkpoint = options.turnCheckpoint;
   }
 
   static async create(options: SessionServiceOptions): Promise<SessionService> {
@@ -76,7 +105,9 @@ export class SessionService {
     const catalog = await SessionCatalog.open(dataDir);
     try {
       for (const stored of catalog.list()) validateStored(stored);
+      catalog.listTurns(); // Validate durable turn identities before recovery.
       catalog.interruptCreating((options.now ?? Date.now)());
+      catalog.interruptTurns((options.now ?? Date.now)());
     } catch (error) {
       catalog.close();
       throw error;
@@ -90,7 +121,7 @@ export class SessionService {
 
   configure(configuration: RuntimeConfiguration): Promise<RuntimeConfiguration> {
     return this.#mutate(async () => {
-      if (this.#runtimes.size > 0)
+      if (this.#runtimes.size > 0 || this.#turns.size > 0)
         throw new SessionError(
           409,
           "runtime_busy",
@@ -199,6 +230,12 @@ export class SessionService {
   closeSession(id: string): Promise<SessionInfo> {
     return this.#mutate(async () => {
       const stored = this.#stored(id);
+      if (this.#turns.has(id))
+        throw new SessionError(
+          409,
+          "session_busy",
+          "Abort active work before closing its runtime.",
+        );
       const runtime = this.#runtimes.get(id);
       if (runtime) {
         if (runtime.state === "running")
@@ -227,24 +264,351 @@ export class SessionService {
     });
   }
 
+  submitTurn(
+    id: string,
+    request: TurnCreateRequest,
+  ): Promise<{ turn: TurnInfo; created: boolean }> {
+    return this.#mutate(async () => {
+      this.#stored(id);
+      if (!isTurnCreateRequest(request))
+        throw new SessionError(
+          400,
+          "invalid_input",
+          "Provide a request UUID and a nonempty plain-text message (no slash commands).",
+        );
+      const identity = createHash("sha256").update(request.message).digest("hex");
+      const existing = this.#catalog.findTurnRequest(id, request.requestId);
+      if (existing) {
+        if (existing.payloadIdentity !== identity)
+          throw new SessionError(
+            409,
+            "request_conflict",
+            "This request ID was used with different content.",
+          );
+        this.#checkStorage(id);
+        return { turn: turnView(existing), created: false };
+      }
+      this.#checkStorage(id);
+      if (this.#turns.has(id) || this.#catalog.activeTurn(id))
+        throw new SessionError(409, "session_busy", "The session is busy with another turn.");
+      this.#configuration();
+      const now = this.#now();
+      const turn: StoredTurn = {
+        runId: randomUUID(),
+        sessionId: id,
+        requestId: request.requestId,
+        payloadIdentity: identity,
+        status: "accepted",
+        cancellationRequested: false,
+        createdAt: now,
+        updatedAt: now,
+        error: null,
+        entryIds: [],
+      };
+      this.#catalog.insertTurn(turn);
+      let finish!: () => void;
+      const done = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const slot: ActiveTurn = {
+        sessionId: id,
+        runId: turn.runId,
+        done,
+        dispatched: false,
+        abortFailed: false,
+      };
+      this.#turns.set(id, slot);
+      setImmediate(() => {
+        void this.#executeTurn(slot, request.message)
+          .catch(() => {
+            this.#storageFaults.add(id);
+          })
+          .finally(finish);
+      });
+      return { turn: turnView(turn), created: true };
+    });
+  }
+
+  getTurn(id: string, runId: string): TurnInfo {
+    this.#admit();
+    this.#checkStorage(id);
+    return turnView(this.#storedTurn(id, runId));
+  }
+
+  getTurnResult(id: string, runId: string): Promise<{ runId: string; entries: PiEntry[] }> {
+    return this.#mutate(async () => {
+      this.#checkStorage(id);
+      const turn = this.#storedTurn(id, runId);
+      if (active(turn))
+        throw new SessionError(409, "turn_pending", "The turn has not settled yet.");
+      const stored = this.#stored(id);
+      if (!turn.entryIds.length || !(await this.#history(stored)))
+        throw new SessionError(410, "result_unavailable", "Saved turn result is unavailable.");
+      let runtime = this.#runtimes.get(id);
+      if (!runtime || (runtime.state !== "ready" && runtime.state !== "running")) {
+        await this.#open(this.#stored(id));
+        runtime = this.#runtimes.get(id);
+      }
+      if (!runtime)
+        throw new SessionError(503, "runtime_unavailable", "Pi runtime is unavailable.");
+      const { entries } = await runtime.getEntries();
+      const byId = new Map(entries.map((entry) => [entry.id, entry]));
+      const selected: PiEntry[] = [];
+      for (const entryId of turn.entryIds) {
+        const entry = byId.get(entryId);
+        if (!entry)
+          throw new SessionError(410, "result_unavailable", "Saved turn entries are unavailable.");
+        selected.push(entry);
+      }
+      return { runId, entries: selected };
+    });
+  }
+
+  async abortTurn(id: string, runId: string): Promise<TurnInfo> {
+    this.#admit();
+    const slot = this.#turns.get(id);
+    try {
+      this.#checkStorage(id);
+      const turn = this.#storedTurn(id, runId);
+      if (!active(turn)) return turnView(turn);
+      if (!slot || slot.runId !== runId)
+        throw new SessionError(409, "turn_interrupted", "The turn has no live execution owner.");
+      this.#writeTurn({
+        ...turn,
+        cancellationRequested: true,
+        status: slot.dispatched ? turn.status : "aborted",
+        updatedAt: this.#now(),
+      });
+      if (slot.dispatched) await this.#abortRuntime(slot);
+      return turnView(this.#storedTurn(id, runId));
+    } catch (error) {
+      // Persistence failure must not strand work behind a now-unusable cancel endpoint.
+      if (
+        slot?.runId === runId &&
+        (!(error instanceof SessionError) || error.code === "storage_unavailable")
+      ) {
+        this.#storageFaults.add(id);
+        try {
+          await slot.runtime?.stop();
+        } catch {
+          /* Preserve the storage error. */
+        }
+      }
+      throw error;
+    }
+  }
+
+  #storedTurn(id: string, runId: string): StoredTurn {
+    this.#stored(id);
+    if (!SESSION_ID.test(runId)) throw new SessionError(400, "invalid_input", "Invalid run ID.");
+    const turn = this.#catalog.getTurn(id, runId);
+    if (!turn) throw new SessionError(404, "turn_not_found", "Unknown turn in this session.");
+    return turn;
+  }
+
+  #checkStorage(id: string): void {
+    if (this.#storageFaults.has(id))
+      throw new SessionError(
+        503,
+        "storage_unavailable",
+        "Turn state could not be saved. Restart the host after repairing storage; execution will not be replayed.",
+      );
+  }
+
+  #writeTurn(turn: StoredTurn): void {
+    try {
+      this.#catalog.updateTurn(turn);
+    } catch {
+      this.#storageFaults.add(turn.sessionId);
+      throw new SessionError(
+        503,
+        "storage_unavailable",
+        "Turn state could not be saved. Execution will not be replayed.",
+      );
+    }
+  }
+
+  #abortRuntime(slot: ActiveTurn): Promise<void> {
+    if (slot.abort) return slot.abort;
+    slot.abort = (async () => {
+      try {
+        await slot.runtime?.abort();
+      } catch {
+        slot.abortFailed = true;
+        await slot.runtime?.stop();
+      }
+    })();
+    // Observe immediately, including when shutdown requests cancellation without awaiting it.
+    void slot.abort.catch(() => {});
+    return slot.abort;
+  }
+
+  async #executeTurn(slot: ActiveTurn, message: string): Promise<void> {
+    const id = slot.sessionId;
+    let markedHistory = false;
+    let historyWasExpected = false;
+    try {
+      await this.#checkpoint?.("accepted", turnView(this.#storedTurn(id, slot.runId)));
+      this.#checkStorage(id);
+      if (!active(this.#storedTurn(id, slot.runId))) return;
+      await this.#mutate(() => this.#open(this.#stored(id)));
+      const runtime = this.#runtimes.get(id);
+      if (!runtime)
+        throw new SessionError(503, "runtime_unavailable", "Pi runtime is unavailable.");
+      slot.runtime = runtime;
+      this.#checkStorage(id);
+      const source = this.#stored(id);
+      if (source.historyExpected && !(await this.#history(source))) {
+        this.#catalog.update({ ...source, error: HISTORY_UNAVAILABLE, updatedAt: this.#now() });
+        throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+      }
+      const before = new Set((await runtime.getEntries()).entries.map((entry) => entry.id));
+      let turn = this.#storedTurn(id, slot.runId);
+      if (!active(turn)) return;
+      const stored = this.#stored(id);
+      historyWasExpected = stored.historyExpected;
+      turn = { ...turn, status: "dispatching", updatedAt: this.#now() };
+      this.#catalog.markTurnDispatching(turn, {
+        ...stored,
+        historyExpected: true,
+        updatedAt: this.#now(),
+      });
+      markedHistory = true;
+      await this.#checkpoint?.("dispatching", turnView(turn));
+      turn = this.#storedTurn(id, slot.runId);
+      this.#checkStorage(id);
+      if (!active(turn)) return;
+      if (this.#stopping || turn.cancellationRequested) {
+        this.#writeTurn({
+          ...turn,
+          status: "aborted",
+          cancellationRequested: true,
+          updatedAt: this.#now(),
+        });
+        return;
+      }
+      slot.dispatched = true;
+      const run = runtime.startRun(message);
+      const disposition = await run.accepted;
+      if (disposition === "handled") {
+        await runtime.stop();
+        throw new SessionError(
+          409,
+          "unsupported_prompt",
+          "An extension handled the prompt; its execution outcome is not tracked by this plain-text turn API.",
+        );
+      }
+      this.#writeTurn({
+        ...this.#storedTurn(id, slot.runId),
+        status: "running",
+        updatedAt: this.#now(),
+      });
+      await this.#checkpoint?.("running", turnView(this.#storedTurn(id, slot.runId)));
+      const result = await run.settled;
+      await this.#checkpoint?.("settled", turnView(this.#storedTurn(id, slot.runId)));
+      if (slot.abort) await slot.abort;
+      if (slot.abortFailed) throw new Error("Cancellation outcome is uncertain.");
+      const entries = (await runtime.getEntries()).entries.filter((entry) => !before.has(entry.id));
+      await this.#rememberHistory(this.#stored(id), runtime);
+      this.#writeTurn({
+        ...this.#storedTurn(id, slot.runId),
+        status: result.outcome === "handled" ? "interrupted" : result.outcome,
+        entryIds: entries.map((entry) => entry.id),
+        updatedAt: this.#now(),
+        error:
+          result.outcome === "failed"
+            ? { code: "provider_error", message: result.error ?? "Pi execution failed." }
+            : null,
+      });
+    } catch (error) {
+      const rejectedPrompt = error instanceof RpcCommandError && error.command === "prompt";
+      try {
+        const turn = this.#storedTurn(id, slot.runId);
+        if (active(turn))
+          this.#writeTurn({
+            ...turn,
+            status: slot.dispatched && !rejectedPrompt ? "interrupted" : "failed",
+            updatedAt: this.#now(),
+            error: {
+              code:
+                error instanceof SessionError
+                  ? error.code
+                  : slot.dispatched && !rejectedPrompt
+                    ? "outcome_unknown"
+                    : "execution_rejected",
+              message:
+                error instanceof SessionError
+                  ? error.message
+                  : "Execution did not complete reliably. No automatic retry was performed.",
+            },
+          });
+      } catch {
+        this.#storageFaults.add(id);
+      }
+      if (slot.dispatched || this.#storageFaults.has(id)) {
+        try {
+          await slot.runtime?.stop();
+        } catch {
+          /* Slot remains held through cleanup. */
+        }
+      }
+    } finally {
+      // A known cancellation before sending cannot have created a new transcript.
+      if (markedHistory && !slot.dispatched && !historyWasExpected) {
+        try {
+          this.#catalog.update({
+            ...this.#stored(id),
+            historyExpected: false,
+            updatedAt: this.#now(),
+          });
+        } catch {
+          this.#storageFaults.add(id);
+        }
+      }
+      if (slot.abort) {
+        try {
+          await slot.abort;
+        } catch {
+          /* The runtime is already being stopped. */
+        }
+      }
+      if (this.#turns.get(id) === slot) this.#turns.delete(id);
+    }
+  }
+
   shutdown(): Promise<void> {
     if (this.#shutdown) return this.#shutdown;
     this.#stopping = true;
     this.#shutdown = (async () => {
       await this.#queue;
       let failed = false;
-      for (const [id, runtime] of this.#runtimes) {
+      const slots = [...this.#turns.values()];
+      for (const slot of slots) {
         try {
-          await this.#rememberHistory(this.#stored(id), runtime);
-        } catch {
-          failed = true;
-        }
-        try {
-          await runtime.stop();
+          const turn = this.#storedTurn(slot.sessionId, slot.runId);
+          if (active(turn))
+            this.#writeTurn({
+              ...turn,
+              cancellationRequested: true,
+              status: slot.dispatched ? turn.status : "aborted",
+              updatedAt: this.#now(),
+            });
+          if (slot.dispatched) void this.#abortRuntime(slot).catch(() => {});
         } catch {
           failed = true;
         }
       }
+      // Stop uses stdin EOF and bounded TERM/KILL escalation, concurrently across children.
+      await Promise.all(
+        [...this.#runtimes.values()].map(async (runtime) => {
+          try {
+            await runtime.stop();
+          } catch {
+            failed = true;
+          }
+        }),
+      );
+      await Promise.all(slots.map((slot) => slot.done));
       this.#runtimes.clear();
       this.#catalog.close();
       if (failed) throw new Error("Session shutdown could not save all runtime metadata.");
@@ -318,7 +682,12 @@ export class SessionService {
           : stored.historyExpected
             ? "available"
             : "empty",
-      error: stored.error,
+      error: this.#storageFaults.has(stored.id)
+        ? "Turn state could not be saved. Repair storage and restart the host."
+        : stored.error,
+      activeTurnId:
+        this.#turns.get(stored.id)?.runId ?? this.#catalog.activeTurn(stored.id)?.runId ?? null,
+      latestTurnId: this.#catalog.latestTurn(stored.id)?.runId ?? null,
     };
   }
 
@@ -481,13 +850,27 @@ export class SessionService {
   async #rememberHistory(stored: StoredSession, runtime: PiProcess): Promise<void> {
     if (runtime.state === "failed" || runtime.state === "exited") return;
     const state = await runtime.getState();
-    const current = { ...stored, piSessionFile: state.sessionFile ?? stored.piSessionFile };
+    const current = {
+      ...this.#stored(stored.id),
+      piSessionFile: state.sessionFile ?? stored.piSessionFile,
+    };
     const file = await this.#history(current);
-    this.#catalog.update({
-      ...current,
-      historyExpected: stored.historyExpected || file !== undefined,
-      error: stored.historyExpected && file === undefined ? HISTORY_UNAVAILABLE : stored.error,
-      updatedAt: this.#now(),
-    });
+    const latest = this.#stored(stored.id);
+    try {
+      this.#catalog.update({
+        ...latest,
+        piSessionFile: current.piSessionFile,
+        historyExpected: latest.historyExpected || file !== undefined,
+        error: latest.historyExpected && file === undefined ? HISTORY_UNAVAILABLE : latest.error,
+        updatedAt: this.#now(),
+      });
+    } catch {
+      this.#storageFaults.add(stored.id);
+      throw new SessionError(
+        503,
+        "storage_unavailable",
+        "Session history metadata could not be saved.",
+      );
+    }
   }
 }

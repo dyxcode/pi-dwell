@@ -151,6 +151,8 @@ function scriptedStream(
     }
 
     const prompt = latestUserText(context);
+    const turnLog = process.env.DWELL_TEST_TURN_LOG;
+    if (turnLog) await appendFile(turnLog, `${prompt}\n`, { mode: 0o600 });
     if (prompt === "tool") {
       const echoResult = latestEchoResult(context);
       if (echoResult === undefined) {
@@ -219,6 +221,9 @@ function scriptedStream(
 }
 
 export default function registerDwellFixture(pi: ExtensionAPI): void {
+  pi.on("input", async (event) =>
+    event.text === "handled" ? { action: "handled" } : { action: "continue" },
+  );
   pi.on("session_start", async () => {
     const log = process.env.DWELL_TEST_START_LOG;
     if (log) await appendFile(log, `${process.pid}\n`, { mode: 0o600 });

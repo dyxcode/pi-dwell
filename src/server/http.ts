@@ -6,6 +6,7 @@ import { dataDirectory, type HostMode } from "../local/paths.ts";
 import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
 import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
 import { isRuntimeConfiguration } from "../shared/sessions.ts";
+import { isTurnCreateRequest } from "../shared/turns.ts";
 import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
 
 export interface HostOptions {
@@ -152,16 +153,27 @@ export async function startHost({
       const sessionMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)(?:\/(open|close|context))?$/.exec(
         path,
       );
+      const turnMatch =
+        /^\/api\/v1\/sessions\/([a-f0-9-]+)\/turns(?:\/([a-f0-9-]+)(?:\/(result|abort))?)?$/.exec(
+          path,
+        );
       const sessionRoute =
-        path === "/api/v1/sessions" || path === "/api/v1/runtime" || sessionMatch !== null;
+        path === "/api/v1/sessions" ||
+        path === "/api/v1/runtime" ||
+        sessionMatch !== null ||
+        turnMatch !== null;
       const method = sessionRoute
         ? path === "/api/v1/runtime" ||
           sessionMatch?.[2] === "open" ||
           sessionMatch?.[2] === "close"
           ? "POST"
-          : path === "/api/v1/sessions" && request.method === "POST"
-            ? "POST"
-            : "GET"
+          : turnMatch
+            ? turnMatch[2] === undefined || turnMatch[3] === "abort"
+              ? "POST"
+              : "GET"
+            : path === "/api/v1/sessions" && request.method === "POST"
+              ? "POST"
+              : "GET"
         : gets.includes(path)
           ? "GET"
           : posts.includes(path)
@@ -230,6 +242,25 @@ export async function startHost({
                 },
               });
             } else send(response, 201, created);
+          }
+        } else if (turnMatch) {
+          const id = turnMatch[1];
+          if (!id) fail(400, "invalid_input", "Invalid session ID.");
+          const runId = turnMatch[2];
+          const action = turnMatch[3];
+          if (runId === undefined) {
+            if (!isTurnCreateRequest(body))
+              fail(400, "invalid_input", "Provide a request UUID and nonempty plain-text message.");
+            const admitted = await sessions.submitTurn(id, body);
+            send(response, admitted.created ? 202 : 200, admitted.turn);
+          } else if (action === "result") {
+            send(response, 200, await sessions.getTurnResult(id, runId));
+          } else if (action === "abort") {
+            if (Object.keys(body).length !== 0)
+              fail(400, "invalid_input", "This operation expects an empty JSON object.");
+            send(response, 200, await sessions.abortTurn(id, runId));
+          } else {
+            send(response, 200, sessions.getTurn(id, runId));
           }
         } else {
           const id = sessionMatch?.[1];

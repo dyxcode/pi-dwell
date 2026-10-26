@@ -73,6 +73,86 @@ test("catalog configuration and private SQLite storage survive reopening", async
   });
 });
 
+test("version-one catalogs migrate transactionally while preserving sessions and configuration", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "dwell-catalog-v1-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const dataDir = join(root, "data");
+  await mkdir(dataDir, { mode: 0o700 });
+  const path = join(dataDir, "catalog.sqlite");
+  const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
+  database.exec(
+    "CREATE TABLE runtime_configuration (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), executable TEXT NOT NULL CHECK (length(executable) > 0), entry_point TEXT CHECK (entry_point IS NULL OR length(entry_point) > 0)) STRICT;" +
+      "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT NOT NULL CHECK (length(provider) > 0), model TEXT NOT NULL CHECK (length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT) STRICT;" +
+      "INSERT INTO runtime_configuration VALUES (1, '/opt/pi/bin/pi', NULL);" +
+      "INSERT INTO sessions VALUES ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 'payload-v1', '/tmp/project-v1', 'test-provider', 'test-model', '33333333-3333-4333-8333-333333333333', NULL, 1, 'ready', 1000, 1100, NULL);" +
+      "PRAGMA user_version = 1;",
+  );
+  database.close();
+  await chmod(path, 0o600);
+
+  const catalog = await SessionCatalog.open(dataDir);
+  t.after(() => catalog.close());
+  assert.deepEqual(catalog.configuration(), { executable: "/opt/pi/bin/pi" });
+  assert.deepEqual(catalog.list(), [
+    {
+      id: "11111111-1111-4111-8111-111111111111",
+      requestId: "22222222-2222-4222-8222-222222222222",
+      payloadIdentity: "payload-v1",
+      directory: "/tmp/project-v1",
+      provider: "test-provider",
+      model: "test-model",
+      piSessionId: "33333333-3333-4333-8333-333333333333",
+      piSessionFile: null,
+      historyExpected: true,
+      status: "ready",
+      createdAt: 1000,
+      updatedAt: 1100,
+      error: null,
+    },
+  ]);
+  catalog.close();
+
+  const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 2n);
+  assert.equal(
+    migrated.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'turns'").get()
+      ?.count,
+    1n,
+  );
+  migrated.close();
+});
+
+test("version-one schema rejection leaves the original catalog version and tables intact", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "dwell-catalog-v1-invalid-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const dataDir = join(root, "data");
+  await mkdir(dataDir, { mode: 0o700 });
+  const path = join(dataDir, "catalog.sqlite");
+  const database = new DatabaseSync(path);
+  database.exec(
+    "CREATE TABLE runtime_configuration (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), executable TEXT NOT NULL CHECK (length(executable) > 0), entry_point TEXT CHECK (entry_point IS NULL OR length(entry_point) > 0)) STRICT;" +
+      "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT NOT NULL CHECK (length(provider) > 0), model TEXT NOT NULL CHECK (length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT) STRICT;" +
+      "CREATE TABLE unexpected (value TEXT) STRICT; PRAGMA user_version = 1;",
+  );
+  database.close();
+  await chmod(path, 0o600);
+
+  await assert.rejects(SessionCatalog.open(dataDir), /schema|version|unsupported/i);
+  const unchanged = new DatabaseSync(path, { readOnly: true, readBigInts: true });
+  assert.equal(unchanged.prepare("PRAGMA user_version").get()?.user_version, 1n);
+  assert.equal(
+    unchanged.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'turns'").get()
+      ?.count,
+    0n,
+  );
+  assert.equal(
+    unchanged.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'unexpected'").get()
+      ?.count,
+    1n,
+  );
+  unchanged.close();
+});
+
 test("catalog enforces request uniqueness and reopens deterministic list and updates", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "dwell-catalog-"));
   t.after(() => rm(root, { recursive: true, force: true }));

@@ -16,6 +16,7 @@ const state = {
 const output = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}\n`);
 const decoder = new StringDecoder("utf8");
 let buffered = "";
+let promptRejectionsRemaining = mode === "reject-prompt" ? 1 : 0;
 const keepAlive = mode === "stubborn" ? setInterval(() => {}, 1000) : undefined;
 if (mode === "stubborn") process.on("SIGTERM", () => {});
 process.stdin.on("end", () => {
@@ -57,11 +58,33 @@ process.stdin.on("data", (chunk: Buffer) => {
       const split = record.indexOf(Buffer.from("你")) + 1;
       process.stdout.write(record.subarray(0, split));
       setTimeout(() => process.stdout.write(record.subarray(split)), 5);
+    } else if (value.type === "get_entries") {
+      output({
+        ...response,
+        data: {
+          entries: mode === "invalid-entries" ? [{ id: "missing-parent", type: "message" }] : [],
+          leafId: null,
+        },
+      });
     } else if (value.type === "prompt") {
       if (mode === "crash") {
         process.exit(23);
       }
       if (mode === "timeout") continue;
+      if (promptRejectionsRemaining > 0) {
+        promptRejectionsRemaining -= 1;
+        output({ ...response, success: false, error: "synthetic prompt rejection" });
+        continue;
+      }
+      if (mode === "settle-before-acceptance") {
+        output({
+          type: "message_end",
+          message: { role: "assistant", stopReason: "stop", content: [] },
+        });
+        output({ type: "agent_settled", aborted: false });
+        output({ ...response, data: { disposition: "started" } });
+        continue;
+      }
       output({ ...response, data: { disposition: "started" } });
       if (mode === "recovered") {
         output({

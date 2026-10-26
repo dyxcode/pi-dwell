@@ -47,6 +47,9 @@ test("real Pi performs a tool turn, saves history, and reopens the same session"
   assert.equal(pi.state, "ready");
   assert.equal(initial.messageCount, 0);
   assert.ok(initial.sessionFile);
+  const initialEntries = await pi.getEntries();
+  assert.ok(initialEntries.entries.length > 0);
+  assert.equal(initialEntries.leafId, initialEntries.entries.at(-1)?.id);
   await assert.rejects(access(initial.sessionFile));
   const events: string[] = [];
   pi.subscribe((event) => {
@@ -58,18 +61,45 @@ test("real Pi performs a tool turn, saves history, and reopens the same session"
   assert.equal(events.at(-1), "agent_settled");
   const before = await pi.getMessages();
   assert.ok(before.some((message) => message.role === "toolResult"));
+  const history = await pi.getEntries();
+  assert.ok(history.entries.length > 0);
+  assert.ok(history.entries.length > initialEntries.entries.length);
+  assert.deepEqual(history.entries.slice(0, initialEntries.entries.length), initialEntries.entries);
+  assert.ok(history.entries.every((entry) => entry.id.length > 0 && entry.type.length > 0));
+  assert.equal(history.leafId, history.entries.at(-1)?.id);
   await pi.stop();
   assert.equal(pi.state, "exited");
   const reopened = await PiProcess.start({ ...options, resumeFile: initial.sessionFile });
   t.after(() => reopened.stop());
   assert.equal((await reopened.getState()).sessionId, initial.sessionId);
   assert.deepEqual(await reopened.getMessages(), before);
+  assert.deepEqual(await reopened.getEntries(), history);
   await reopened.stop();
   await unlink(initial.sessionFile);
   await assert.rejects(
     PiProcess.start({ ...options, resumeFile: initial.sessionFile }),
     /session|ENOENT/i,
   );
+});
+
+test("startRun exposes prompt acceptance separately from settled outcome", async (t) => {
+  const { pi } = await runtime(t);
+  let streaming!: () => void;
+  const started = new Promise<void>((resolve) => {
+    streaming = resolve;
+  });
+  const unsubscribe = pi.subscribe((event) => {
+    if (event.type === "message_update") streaming();
+  });
+
+  const run = pi.startRun("slow");
+  assert.equal(pi.state, "running");
+  await started;
+  assert.equal(await run.accepted, "started");
+  assert.equal(pi.state, "running");
+  unsubscribe();
+  await pi.abort();
+  assert.equal((await run.settled).outcome, "aborted");
 });
 
 test("real Pi observers detach without stopping work, busy runs reject, and abort settles", async (t) => {

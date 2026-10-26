@@ -25,6 +25,6 @@ agent-docs/
 *.sqlite-*
 *.db
 *.db-*
-sessions/
+/sessions/
 state/
 credentials/

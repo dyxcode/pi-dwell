@@ -136,9 +136,9 @@ function isHostStatus(value) {
     !("service" in value) ||
     value.service !== "pi-dwell" ||
     !("protocolVersion" in value) ||
-    value.protocolVersion !== 1 ||
+    value.protocolVersion !== 2 ||
     !("phase" in value) ||
-    value.phase !== "scaffold" ||
+    value.phase !== "sessions" ||
     !("startedAt" in value) ||
     typeof value.startedAt !== "string" ||
     !Number.isFinite(Date.parse(value.startedAt)) ||
@@ -162,7 +162,7 @@ function isHostStatus(value) {
     capabilities !== null &&
     !Array.isArray(capabilities) &&
     "sessions" in capabilities &&
-    capabilities.sessions === false &&
+    capabilities.sessions === true &&
     "tasks" in capabilities &&
     capabilities.tasks === false
   );

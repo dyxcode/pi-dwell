@@ -1,7 +1,15 @@
 import { dataDirectory } from "../../local/paths.ts";
-import { startHost, type HostOptions } from "../../server/http.ts";
+import type { HostOptions } from "../../server/http.ts";
 import { runServiceCommand } from "../../service/service.ts";
 import { parseCommand } from "./arguments.ts";
+import {
+  closeHostedSession,
+  configureRuntime,
+  createHostedSession,
+  listHostedSessions,
+  openHostedSession,
+  readHostedSession,
+} from "./sessions.ts";
 import { createPairing, readHostStatus, revokeBrowsers } from "./status.ts";
 
 /** Overrides are an internal subprocess-test seam, never CLI options or environment settings. */
@@ -19,6 +27,13 @@ Usage: npm run dwell -- <command>
   status [--dev]      Read authenticated host status
   pair [--dev]        Display a single-use browser pairing code (five minutes)
   auth revoke [--dev] Revoke all browser sessions and pending pairing codes
+  pi configure --executable <absolute> [--entry-point <absolute>] [--dev]
+                      Configure the Pi executable for this host
+  new --directory <path> --provider <id> --model <id> [--request-id <uuid>] [--dev]
+                      Create a persistent Pi session
+  sessions [--dev]    List hosted sessions
+  sessions show|open|close <uuid> [--dev]
+                      Inspect or change a session's runtime state
   service install    Register the production user service (no login autostart)
   service start      Start the background service and wait for readiness
   service stop       Stop the registered service
@@ -28,7 +43,7 @@ Usage: npm run dwell -- <command>
   --help             Show this help
 
 npm run dev watches the development host. Stop production before development.
-No project folder or model configuration is required. Pi sessions are not yet available.`);
+No project folder or model configuration is required to start. Select both when creating a session.`);
     return;
   }
   if (command.kind === "service") {
@@ -52,7 +67,42 @@ No project folder or model configuration is required. Pi sessions are not yet av
     console.log("All browser sessions and pending pairing codes have been revoked.");
     return;
   }
+  if (command.kind === "configure") {
+    const configuration = await configureRuntime(options, {
+      executable: command.executable,
+      ...(command.entryPoint === undefined ? {} : { entryPoint: command.entryPoint }),
+    });
+    console.log(JSON.stringify(configuration, null, 2));
+    return;
+  }
+  if (command.kind === "new") {
+    const session = await createHostedSession(options, {
+      requestId: command.requestId,
+      directory: command.directory,
+      provider: command.provider,
+      model: command.model,
+    });
+    console.log(JSON.stringify(session, null, 2));
+    return;
+  }
+  if (command.kind === "sessions-list") {
+    console.log(JSON.stringify(await listHostedSessions(options), null, 2));
+    return;
+  }
+  if (command.kind === "session-show") {
+    console.log(JSON.stringify(await readHostedSession(options, command.sessionId), null, 2));
+    return;
+  }
+  if (command.kind === "session-open") {
+    console.log(JSON.stringify(await openHostedSession(options, command.sessionId), null, 2));
+    return;
+  }
+  if (command.kind === "session-close") {
+    console.log(JSON.stringify(await closeHostedSession(options, command.sessionId), null, 2));
+    return;
+  }
   let stopRequested = false;
+  const { startHost } = await import("../../server/http.ts");
   let host: Awaited<ReturnType<typeof startHost>> | undefined;
   const shutdown = () => {
     stopRequested = true;

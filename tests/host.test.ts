@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer, request } from "node:http";
-import { mkdtemp, readFile, rm, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test, type TestContext } from "node:test";
+import { type TestContext, test } from "node:test";
 import { readHostStatus } from "../src/clients/cli/status.ts";
 import { startHost } from "../src/server/http.ts";
 
@@ -23,10 +23,11 @@ test("loopback host serves public health/assets and authenticated status", async
   assert.deepEqual(await health.json(), { status: "ok" });
   const status = await readHostStatus({ port: Number(new URL(host.url).port), dataDir });
   assert.equal(status.service, "pi-dwell");
-  assert.equal(status.phase, "scaffold");
+  assert.equal(status.phase, "sessions");
+  assert.equal(status.protocolVersion, 2);
   assert.equal(status.processId, process.pid);
   assert.equal(status.mode, "production");
-  assert.deepEqual(status.capabilities, { sessions: false, tasks: false });
+  assert.deepEqual(status.capabilities, { sessions: true, tasks: false });
   for (const [route, type] of [
     ["/", "text/html"],
     ["/client.js", "text/javascript"],
@@ -37,7 +38,7 @@ test("loopback host serves public health/assets and authenticated status", async
     assert.ok(response.headers.get("content-type")?.includes(type ?? ""));
     assert.match(response.headers.get("content-security-policy") ?? "", /script-src 'self'/);
   }
-  assert.equal((await fetch(`${host.url}/api/v1/sessions`)).status, 404);
+  assert.equal((await fetch(`${host.url}/api/v1/sessions`)).status, 401);
   const write = await fetch(`${host.url}/api/v1/status`, { method: "POST" });
   assert.equal(write.status, 405);
   assert.equal(write.headers.get("allow"), "GET");

@@ -3,7 +3,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { HOST_PAGE, STYLE } from "../clients/web/page.ts";
 import { BROWSER_SCRIPT } from "../clients/web/script.ts";
 import { dataDirectory, type HostMode } from "../local/paths.ts";
+import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
 import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
+import { isRuntimeConfiguration } from "../shared/sessions.ts";
 import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
 
 export interface HostOptions {
@@ -12,6 +14,7 @@ export interface HostOptions {
   dataDir?: string;
   mode?: HostMode;
   now?: () => number;
+  sessions?: Pick<SessionServiceOptions, "env" | "extensions">;
 }
 export interface RunningHost {
   url: string;
@@ -82,20 +85,22 @@ export async function startHost({
   mode = "production",
   dataDir = dataDirectory(mode),
   now = Date.now,
+  sessions: sessionOptions,
 }: HostOptions = {}): Promise<RunningHost> {
   if (!Number.isInteger(port) || port < 0 || port > 65535)
     throw new Error("Port must be an integer between 0 and 65535.");
   const status: HostStatus = {
     service: "pi-dwell",
-    protocolVersion: 1,
-    phase: "scaffold",
+    protocolVersion: 2,
+    phase: "sessions",
     startedAt: new Date().toISOString(),
-    capabilities: { sessions: false, tasks: false },
+    capabilities: { sessions: true, tasks: false },
     processId: process.pid,
     instanceId: randomUUID(),
     mode,
   };
   let auth: LocalAuth | undefined;
+  let sessions: SessionService | undefined;
   let url = "";
   let stopping = false;
   const cookieName = `dwell_browser_${mode}`;
@@ -144,11 +149,105 @@ export async function startHost({
         "/api/v1/auth/logout",
         "/api/v1/auth/revoke",
       ];
-      const method = gets.includes(path) ? "GET" : posts.includes(path) ? "POST" : undefined;
+      const sessionMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)(?:\/(open|close|context))?$/.exec(
+        path,
+      );
+      const sessionRoute =
+        path === "/api/v1/sessions" || path === "/api/v1/runtime" || sessionMatch !== null;
+      const method = sessionRoute
+        ? path === "/api/v1/runtime" ||
+          sessionMatch?.[2] === "open" ||
+          sessionMatch?.[2] === "close"
+          ? "POST"
+          : path === "/api/v1/sessions" && request.method === "POST"
+            ? "POST"
+            : "GET"
+        : gets.includes(path)
+          ? "GET"
+          : posts.includes(path)
+            ? "POST"
+            : undefined;
       if (!method) fail(404, "not_found", "Unknown route.");
       if (request.method !== method) {
         response.setHeader("Allow", method);
         fail(405, "method_not_allowed", `Use ${method} for this route.`);
+      }
+      if (sessionRoute) {
+        if (!sessions) fail(503, "unavailable", "Session service is starting.");
+        const cli = auth.isCli(request.headers.authorization);
+        if (
+          !cli &&
+          !auth.isBrowser(cookieToken(request, cookieName), request.headers["x-dwell-browser"])
+        )
+          fail(401, "unauthenticated", "Connect this browser or use a valid local CLI credential.");
+        if (
+          method === "GET" &&
+          (request.headers["transfer-encoding"] !== undefined ||
+            Number(request.headers["content-length"] ?? 0) !== 0)
+        )
+          fail(400, "unexpected_body", "GET requests must not contain a body.");
+        if (path === "/api/v1/runtime" && !cli)
+          fail(
+            403,
+            "cli_required",
+            "Pi executable configuration requires the local CLI credential.",
+          );
+        if (method === "POST" && !cli) browserRequest(request, url);
+        const body = method === "POST" ? await readJson(request) : {};
+        if (stopping) fail(503, "unavailable", "Dwell is stopping.");
+        // Body/header deadlines remain bounded; admitted RPC work has its own deadlines.
+        request.socket.setTimeout(0);
+        if (path === "/api/v1/runtime") {
+          if (
+            !isRuntimeConfiguration(body) ||
+            !Object.keys(body).every((key) => key === "executable" || key === "entryPoint")
+          )
+            fail(400, "invalid_input", "Provide the Pi executable and optional entryPoint.");
+          send(response, 200, await sessions.configure(body));
+        } else if (path === "/api/v1/sessions") {
+          if (method === "GET") send(response, 200, sessions.listSessions());
+          else {
+            if (
+              Object.keys(body).length !== 4 ||
+              typeof body.requestId !== "string" ||
+              typeof body.directory !== "string" ||
+              typeof body.provider !== "string" ||
+              typeof body.model !== "string"
+            )
+              fail(400, "invalid_input", "Provide requestId, directory, provider, and model.");
+            const created = await sessions.createSession({
+              requestId: body.requestId,
+              directory: body.directory,
+              provider: body.provider,
+              model: body.model,
+            });
+            if (created.status !== "ready") {
+              send(response, created.status === "failed" ? 503 : 409, {
+                error: {
+                  code:
+                    created.status === "failed" ? "session_start_failed" : "session_interrupted",
+                  message: `${created.error ?? "Session creation was interrupted."} Session ID: ${created.id}.`,
+                },
+              });
+            } else send(response, 201, created);
+          }
+        } else {
+          const id = sessionMatch?.[1];
+          if (!id) fail(400, "invalid_input", "Invalid session ID.");
+          if (Object.keys(body).length !== 0)
+            fail(400, "invalid_input", "This operation expects an empty JSON object.");
+          const action = sessionMatch?.[2];
+          const result =
+            action === "open"
+              ? await sessions.openSession(id)
+              : action === "close"
+                ? await sessions.closeSession(id)
+                : action === "context"
+                  ? await sessions.getContext(id)
+                  : sessions.getSession(id);
+          send(response, 200, result);
+        }
+        return;
       }
       if (method === "GET") {
         if (
@@ -219,7 +318,7 @@ export async function startHost({
     } catch (error) {
       if (response.destroyed) return;
       response.setHeader("Connection", "close");
-      if (error instanceof AccessError) {
+      if (error instanceof AccessError || error instanceof SessionError) {
         if (error.status === 429)
           response.setHeader("Retry-After", error.code === "pairing_limit" ? "300" : "60");
         send(response, error.status, { error: { code: error.code, message: error.message } });
@@ -260,17 +359,22 @@ export async function startHost({
       closing = (async () => {
         server.closeAllConnections();
         await Promise.all(active);
-        await auth?.drain();
-        await new Promise<void>((resolve, reject) =>
-          server.close((error) => (error ? reject(error) : resolve())),
-        );
-        server.closeAllConnections();
+        try {
+          await sessions?.shutdown();
+        } finally {
+          await auth?.drain();
+          await new Promise<void>((resolve, reject) =>
+            server.close((error) => (error ? reject(error) : resolve())),
+          );
+          server.closeAllConnections();
+        }
       })();
     }
     return closing;
   };
   try {
     auth = await LocalAuth.open(dataDir, now);
+    sessions = await SessionService.create({ dataDir, ...sessionOptions, now });
   } catch (error) {
     await close();
     throw error;

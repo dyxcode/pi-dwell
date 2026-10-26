@@ -3,6 +3,7 @@ import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { validateDataDirectory } from "../local/paths.ts";
+import { type RuntimeConfiguration, SESSION_ID } from "../shared/sessions.ts";
 import { isRecord, PiRpc, type RpcRecord } from "./pi-rpc.ts";
 
 const exec = promisify(execFile);
@@ -17,6 +18,7 @@ export interface PiOptions {
   env: NodeJS.ProcessEnv;
   sessionDirectory: string;
   resumeFile?: string;
+  sessionId?: string;
   provider: string;
   model: string;
   extensions?: readonly string[];
@@ -30,6 +32,7 @@ export interface SessionState {
   isCompacting: boolean;
   messageCount: number;
   pendingMessageCount: number;
+  model?: { provider: string; id: string };
 }
 export interface RunResult {
   outcome: "completed" | "failed" | "aborted" | "handled";
@@ -72,7 +75,54 @@ function sessionState(value: unknown): SessionState {
     isCompacting: value.isCompacting,
     messageCount: value.messageCount,
     pendingMessageCount: value.pendingMessageCount,
+    ...(isRecord(value.model) &&
+    typeof value.model.provider === "string" &&
+    typeof value.model.id === "string"
+      ? { model: { provider: value.model.provider, id: value.model.id } }
+      : {}),
   };
+}
+
+export async function verifyPiConfiguration(
+  configuration: RuntimeConfiguration,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  timeout = 15_000,
+): Promise<RuntimeConfiguration> {
+  for (const path of [
+    configuration.executable,
+    ...(configuration.entryPoint !== undefined ? [configuration.entryPoint] : []),
+  ]) {
+    if (
+      !isAbsolute(path) ||
+      [...path].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+    )
+      throw new Error(
+        "Pi executable and entry point must be absolute paths without control characters.",
+      );
+  }
+  let executable: string;
+  let entryPoint: string | undefined;
+  let version: string;
+  try {
+    executable = await realpath(configuration.executable);
+    entryPoint = configuration.entryPoint ? await realpath(configuration.entryPoint) : undefined;
+    const result = await exec(executable, [...(entryPoint ? [entryPoint] : []), "--version"], {
+      cwd,
+      env,
+      timeout,
+      killSignal: "SIGKILL",
+      maxBuffer: 16 * 1024,
+    });
+    version = result.stdout.trim();
+  } catch {
+    throw new Error("Cannot read the configured Pi version. Check its executable and entry point.");
+  }
+  if (version !== SUPPORTED_PI_VERSION)
+    throw new Error(
+      `Unsupported Pi version ${version.slice(0, 80)}; expected ${SUPPORTED_PI_VERSION}.`,
+    );
+  return { executable, ...(entryPoint ? { entryPoint } : {}) };
 }
 
 /** Owns one Pi subprocess and one session. Observers never own execution. */
@@ -134,6 +184,11 @@ export class PiProcess {
   }
 
   static async start(options: PiOptions): Promise<PiProcess> {
+    if (
+      options.sessionId !== undefined &&
+      (!SESSION_ID.test(options.sessionId) || options.resumeFile !== undefined)
+    )
+      throw new Error("Provide one valid session ID or an existing session file.");
     for (const path of [
       options.executable,
       options.cwd,
@@ -166,25 +221,7 @@ export class PiProcess {
       await validateDataDirectory(dirname(resumeFile));
     }
     const prefix = options.entryPoint ? [options.entryPoint] : [];
-    let version: string;
-    try {
-      const result = await exec(options.executable, [...prefix, "--version"], {
-        cwd,
-        env: options.env,
-        timeout: requestMs,
-        killSignal: "SIGKILL",
-        maxBuffer: 16 * 1024,
-      });
-      version = result.stdout.trim();
-    } catch {
-      throw new Error(
-        "Cannot read the configured Pi version. Check its executable and entry point.",
-      );
-    }
-    if (version !== SUPPORTED_PI_VERSION)
-      throw new Error(
-        `Unsupported Pi version ${version.slice(0, 80)}; expected ${SUPPORTED_PI_VERSION}.`,
-      );
+    await verifyPiConfiguration(options, cwd, options.env, requestMs);
     await mkdir(sessionDirectory, { recursive: true, mode: 0o700 });
     const args = [
       ...prefix,
@@ -204,6 +241,7 @@ export class PiProcess {
       "--no-mcp",
     ];
     if (resumeFile) args.push("--session", resumeFile);
+    if (options.sessionId) args.push("--session-id", options.sessionId);
     for (const extension of options.extensions ?? []) args.push("--extension", extension);
     const child = spawn(options.executable, args, {
       cwd,
@@ -218,6 +256,8 @@ export class PiProcess {
         throw new Error("Pi did not start idle.");
       if (resumeFile && (!state.sessionFile || (await realpath(state.sessionFile)) !== resumeFile))
         throw new Error("Pi did not reopen the requested session.");
+      if (options.sessionId && state.sessionId !== options.sessionId)
+        throw new Error("Pi did not preserve the requested session identity.");
       if (runtime.#state !== "starting")
         throw runtime.#error ?? new Error("Pi stopped during startup.");
       runtime.#state = "ready";

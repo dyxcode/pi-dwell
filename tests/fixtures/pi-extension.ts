@@ -1,3 +1,4 @@
+import { appendFile } from "node:fs/promises";
 import {
   type Api,
   type AssistantMessage,
@@ -218,6 +219,10 @@ function scriptedStream(
 }
 
 export default function registerDwellFixture(pi: ExtensionAPI): void {
+  pi.on("session_start", async () => {
+    const log = process.env.DWELL_TEST_START_LOG;
+    if (log) await appendFile(log, `${process.pid}\n`, { mode: 0o600 });
+  });
   pi.registerProvider(PROVIDER, {
     name: "Dwell Offline Fixture",
     api: API,

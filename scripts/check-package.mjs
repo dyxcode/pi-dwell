@@ -40,6 +40,10 @@ try {
     "src/server/http.ts",
     "src/runtime/pi-process.ts",
     "src/runtime/pi-rpc.ts",
+    "src/sessions/service.ts",
+    "src/storage/catalog.ts",
+    "src/shared/sessions.ts",
+    "src/clients/cli/sessions.ts",
     "README.md",
     "docs/i18n/README.zh-CN.md",
   ]) {

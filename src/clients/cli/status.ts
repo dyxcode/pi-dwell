@@ -11,11 +11,24 @@ export interface ClientOptions {
 export async function localRequest(
   path: string,
   options: ClientOptions = {},
-  method = "GET",
+  method: "GET" | "POST" = "GET",
+  body?: unknown,
 ): Promise<unknown> {
   const { port = DEFAULT_PORT, dataDir = dataDirectory(), timeoutMs = 3000 } = options;
   const token = await readCredential(dataDir);
   const url = `http://127.0.0.1:${port}`;
+  let requestBody: string | undefined;
+  if (method === "POST") {
+    try {
+      requestBody = JSON.stringify(body === undefined ? {} : body);
+    } catch (error) {
+      throw new Error("Could not encode the local request body as JSON.", { cause: error });
+    }
+    if (requestBody === undefined)
+      throw new Error("The local request body must be JSON-serializable.");
+  } else if (body !== undefined) {
+    throw new Error("GET requests cannot include a JSON body.");
+  }
   let response: Response;
   try {
     response = await fetch(`${url}${path}`, {
@@ -27,9 +40,19 @@ export async function localRequest(
         Authorization: `Bearer ${token}`,
         ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
       },
-      ...(method === "POST" ? { body: "{}" } : {}),
+      ...(requestBody === undefined ? {} : { body: requestBody }),
     });
   } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      error.name === "TimeoutError"
+    )
+      throw new Error(
+        `Request to pi-dwell at ${url} timed out. The host may have completed it; inspect sessions before retrying.`,
+        { cause: error },
+      );
     throw new Error(
       `Cannot reach pi-dwell at ${url}. Start it with npm start or npm run dwell -- service start.`,
       { cause: error },
@@ -39,13 +62,40 @@ export async function localRequest(
     throw new Error(
       "Dwell rejected the local credential. Check that the CLI and host use the same development/production mode.",
     );
-  if (!response.ok)
-    throw new Error(`Dwell returned HTTP ${response.status}. Check the host status and try again.`);
+  let value: unknown;
   try {
-    return await response.json();
+    value = await response.json();
   } catch {
+    if (!response.ok)
+      throw new Error(
+        `Dwell returned HTTP ${response.status}. Check the host status and try again.`,
+      );
     throw new Error("Incompatible pi-dwell host response.");
   }
+  if (!response.ok) {
+    const message = errorMessage(value);
+    throw new Error(
+      message
+        ? `Dwell returned HTTP ${response.status}: ${message}`
+        : `Dwell returned HTTP ${response.status}. Check the host status and try again.`,
+    );
+  }
+  return value;
+}
+
+function errorMessage(value: unknown): string | undefined {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("error" in value) ||
+    typeof value.error !== "object" ||
+    value.error === null ||
+    !("message" in value.error) ||
+    typeof value.error.message !== "string" ||
+    value.error.message.trim().length === 0
+  )
+    return undefined;
+  return value.error.message;
 }
 
 export async function readHostStatus(options: ClientOptions = {}): Promise<HostStatus> {

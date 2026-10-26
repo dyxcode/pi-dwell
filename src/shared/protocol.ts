@@ -2,13 +2,13 @@ export const DEFAULT_PORT = 8787;
 
 export interface HostStatus {
   service: "pi-dwell";
-  protocolVersion: 1;
-  phase: "scaffold";
+  protocolVersion: 2;
+  phase: "sessions";
   startedAt: string;
   processId: number;
   instanceId: string;
   mode: "production" | "development";
-  capabilities: { sessions: false; tasks: false };
+  capabilities: { sessions: true; tasks: false };
 }
 
 export function isHostStatus(value: unknown): value is HostStatus {
@@ -17,9 +17,9 @@ export function isHostStatus(value: unknown): value is HostStatus {
     !("service" in value) ||
     value.service !== "pi-dwell" ||
     !("protocolVersion" in value) ||
-    value.protocolVersion !== 1 ||
+    value.protocolVersion !== 2 ||
     !("phase" in value) ||
-    value.phase !== "scaffold" ||
+    value.phase !== "sessions" ||
     !("startedAt" in value) ||
     typeof value.startedAt !== "string" ||
     !Number.isFinite(Date.parse(value.startedAt)) ||
@@ -41,7 +41,7 @@ export function isHostStatus(value: unknown): value is HostStatus {
     typeof capabilities === "object" &&
     capabilities !== null &&
     "sessions" in capabilities &&
-    capabilities.sessions === false &&
+    capabilities.sessions === true &&
     "tasks" in capabilities &&
     capabilities.tasks === false
   );

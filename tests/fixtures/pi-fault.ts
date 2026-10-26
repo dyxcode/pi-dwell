@@ -2,6 +2,7 @@ import { StringDecoder } from "node:string_decoder";
 
 const mode = process.env.DWELL_PI_FAULT ?? "normal";
 if (process.argv.includes("--version")) {
+  if (mode === "slow-version") await new Promise((resolve) => setTimeout(resolve, 5200));
   console.log(mode === "version" ? "9.0.0" : "1.3.0");
   process.exit(0);
 }

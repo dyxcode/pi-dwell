@@ -1,25 +1,12 @@
-import { randomUUID } from "node:crypto";
-import { homedir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute } from "node:path";
 import type { HostMode } from "../../local/paths.ts";
 import type { ServiceAction } from "../../service/service.ts";
-import { SESSION_ID } from "../../shared/sessions.ts";
 
 export type Command =
   | { kind: "help" }
   | { kind: "serve" | "status" | "pair" | "revoke"; mode: HostMode }
   | { kind: "service"; action: ServiceAction }
-  | { kind: "configure"; mode: HostMode; executable: string; entryPoint?: string }
-  | {
-      kind: "new";
-      mode: HostMode;
-      directory: string;
-      provider: string;
-      model: string;
-      requestId: string;
-    }
-  | { kind: "sessions-list"; mode: HostMode }
-  | { kind: "session-show" | "session-open" | "session-close"; mode: HostMode; sessionId: string };
+  | { kind: "configure"; mode: HostMode; executable: string; entryPoint?: string };
 
 interface ParsedOptions {
   mode: HostMode;
@@ -69,16 +56,6 @@ function absolutePath(value: string, option: string): string {
   return value;
 }
 
-function resolveUserDirectory(value: string): string {
-  const expanded =
-    value === "~" ? homedir() : value.startsWith("~/") ? join(homedir(), value.slice(2)) : value;
-  return resolve(expanded);
-}
-
-function isUuid(value: string): boolean {
-  return SESSION_ID.test(value.toLowerCase());
-}
-
 export function parseCommand(args: string[]): Command {
   if (args.length === 1 && args[0] === "--help") return { kind: "help" };
   const [first = "serve", ...rest] = args;
@@ -86,7 +63,7 @@ export function parseCommand(args: string[]): Command {
   if (
     rest.length === 1 &&
     rest[0] === "--help" &&
-    ["serve", "status", "pair", "auth", "service", "pi", "new", "sessions"].includes(first)
+    ["serve", "status", "pair", "auth", "service", "pi"].includes(first)
   )
     return { kind: "help" };
 
@@ -121,48 +98,6 @@ export function parseCommand(args: string[]): Command {
       ...(entryPoint === undefined
         ? {}
         : { entryPoint: absolutePath(entryPoint, "--entry-point") }),
-    };
-  }
-
-  if (first === "new") {
-    const parsed = parseOptions(rest, ["--directory", "--provider", "--model", "--request-id"]);
-    if (parsed.positionals.length !== 0)
-      throw new Error("new accepts only named options. Use --help.");
-    const suppliedRequestId = parsed.values.get("--request-id");
-    if (suppliedRequestId !== undefined && !isUuid(suppliedRequestId))
-      throw new Error("--request-id must be a UUID.");
-    return {
-      kind: "new",
-      mode: parsed.mode,
-      directory: resolveUserDirectory(requiredValue(parsed.values, "--directory")),
-      provider: requiredValue(parsed.values, "--provider"),
-      model: requiredValue(parsed.values, "--model"),
-      requestId: (suppliedRequestId ?? randomUUID()).toLowerCase(),
-    };
-  }
-
-  if (first === "sessions") {
-    if (rest.length === 0) return { kind: "sessions-list", mode: "production" };
-    if (rest.length === 1 && rest[0] === "--dev")
-      return { kind: "sessions-list", mode: "development" };
-    const [action, ...actionArgs] = rest;
-    if (action === "--help") return { kind: "help" };
-    if (action !== "show" && action !== "open" && action !== "close")
-      throw new Error(
-        "Expected sessions [--dev] or sessions show|open|close <uuid> [--dev]. Use --help.",
-      );
-    if (actionArgs.length === 1 && actionArgs[0] === "--help") return { kind: "help" };
-    const parsed = parseOptions(actionArgs, []);
-    if (parsed.positionals.length !== 1)
-      throw new Error(`Expected one session UUID after sessions ${action}. Use --help.`);
-    const [sessionId] = parsed.positionals;
-    if (sessionId === undefined || !isUuid(sessionId))
-      throw new Error("Session ID must be a UUID.");
-    return {
-      kind:
-        action === "show" ? "session-show" : action === "open" ? "session-open" : "session-close",
-      mode: parsed.mode,
-      sessionId: sessionId.toLowerCase(),
     };
   }
 

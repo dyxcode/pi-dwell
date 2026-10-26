@@ -25,8 +25,37 @@ test("help is read-only and development data is separate", async () => {
   assert.match(result.stdout, /serve/);
   assert.match(result.stdout, /pair/);
   assert.match(result.stdout, /service/);
+  assert.match(result.stdout, /pi configure/);
+  assert.doesNotMatch(result.stdout, /^\s+(?:new|sessions)\b/m);
   assert.equal(result.stderr, "");
   assert.notEqual(dataDirectory("production"), dataDirectory("development"));
+});
+
+test("removed session commands fail before accessing host state, including help aliases", async (t) => {
+  const dataDir = join(await directory(t), "absent");
+  const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  for (const args of [
+    ["new", "--directory", ".", "--provider", "test", "--model", "test"],
+    ["new", "--help"],
+    ["sessions"],
+    ["sessions", "--dev"],
+    ["sessions", "--help"],
+    ...["show", "open", "close"].flatMap((action) => [
+      ["sessions", action, id],
+      ["sessions", action, "--help"],
+    ]),
+  ]) {
+    await assert.rejects(
+      exec(process.execPath, [fixture, dataDir, "1", ...args], { timeout: 3000 }),
+      (error: unknown) => {
+        assert.ok(error instanceof Error && "code" in error && "stderr" in error);
+        assert.equal(error.code, 1);
+        assert.match(String(error.stderr), /Unknown command\. Use --help\./);
+        return true;
+      },
+    );
+  }
+  await assert.rejects(access(dataDir));
 });
 
 test("CLI status, pair and revoke use authenticated HTTP and do not print the long-lived credential", async (t) => {

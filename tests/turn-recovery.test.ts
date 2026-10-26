@@ -96,8 +96,14 @@ for (const point of ["accepted", "dispatching", "running", "settled"]) {
     assert.equal(await count(), point === "accepted" || point === "dispatching" ? 0 : 1);
     if (point === "dispatching")
       await assert.rejects(restored.openSession(turn.sessionId), /history.*unavailable/i);
-    if (point === "settled")
-      assert.match(JSON.stringify(await restored.getContext(turn.sessionId)), /Hello from/);
+    if (point === "settled") {
+      const history = await restored.getHistory(turn.sessionId);
+      assert.match(JSON.stringify(history.entries), /Hello from/);
+      assert.equal(history.coveredTurnId, null);
+      assert.equal(history.latestTurnId, original.runId);
+      assert.equal(restored.getTurn(turn.sessionId, original.runId).status, "interrupted");
+      assert.equal(restored.runtimeCount, 0);
+    }
     assert.equal(await count(), point === "accepted" || point === "dispatching" ? 0 : 1);
   });
 }
@@ -166,7 +172,10 @@ test("a final ledger write failure blocks new execution until restart without lo
   const restored = await SessionService.create(options);
   t.after(() => restored.shutdown());
   assert.equal((await restored.submitTurn(session.id, request)).turn.status, "interrupted");
-  assert.match(JSON.stringify(await restored.getContext(session.id)), /Hello from/);
+  const history = await restored.getHistory(session.id);
+  assert.match(JSON.stringify(history.entries), /Hello from/);
+  assert.equal(history.coveredTurnId, null);
+  assert.equal(restored.runtimeCount, 0);
 });
 
 test("failed cancellation persistence stops the runtime and blocks new work", async (t) => {

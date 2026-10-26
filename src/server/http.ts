@@ -8,7 +8,7 @@ import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
 import { isRuntimeConfiguration } from "../shared/sessions.ts";
 import { isTurnCreateRequest } from "../shared/turns.ts";
 import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
-import { createSseConnection, SseStartError, type SseConnection } from "./sse.ts";
+import { createSseConnection, type SseConnection, SseStartError } from "./sse.ts";
 
 export interface HostOptions {
   /** Internal embedding/test seam. The public CLI always uses DEFAULT_PORT. */
@@ -82,6 +82,19 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
 function send(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status);
   response.end(JSON.stringify(body));
+}
+function parseHistoryCursor(query: string): string | undefined {
+  const parameters = new URLSearchParams(query);
+  const cursors = parameters.getAll("cursor");
+  if (cursors.length > 1) fail(400, "invalid_cursor", "Provide at most one history cursor.");
+  if ([...parameters].some(([name]) => name !== "cursor") || query.split("&").length !== 1)
+    fail(400, "unexpected_query", "Only the history cursor query parameter is supported.");
+  if (cursors.length !== 1)
+    fail(400, "unexpected_query", "Provide one history cursor query parameter.");
+  const cursor = cursors[0];
+  if (!cursor || cursor.length > 1536)
+    fail(400, "invalid_cursor", "History cursor must contain 1 to 1536 characters.");
+  return cursor;
 }
 
 export async function startHost({
@@ -182,9 +195,16 @@ export async function startHost({
         fail(403, "forbidden_origin", "Cross-origin requests are not allowed.");
       if (!auth || stopping)
         fail(503, "unavailable", "Dwell is starting or stopping. Try again shortly.");
-      const path = request.url ?? "";
-      if (path.length > 2048) fail(414, "url_too_long", "Request URL is too long.");
-      if (path.includes("?")) fail(400, "unexpected_query", "Query parameters are not supported.");
+      const requestTarget = request.url ?? "";
+      if (requestTarget.length > 2048) fail(414, "url_too_long", "Request URL is too long.");
+      const queryStart = requestTarget.indexOf("?");
+      const path = queryStart < 0 ? requestTarget : requestTarget.slice(0, queryStart);
+      const historyMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/history$/.exec(path);
+      let historyCursor: string | undefined;
+      if (queryStart >= 0) {
+        if (!historyMatch) fail(400, "unexpected_query", "Query parameters are not supported.");
+        historyCursor = parseHistoryCursor(requestTarget.slice(queryStart + 1));
+      }
       const gets = ["/", "/client.js", "/style.css", "/healthz", "/api/v1/status"];
       const posts = [
         "/api/v1/auth/pairings",
@@ -204,6 +224,7 @@ export async function startHost({
         path === "/api/v1/sessions" ||
         path === "/api/v1/runtime" ||
         sessionMatch !== null ||
+        historyMatch !== null ||
         eventMatch !== null ||
         turnMatch !== null;
       let method: string | undefined;
@@ -214,7 +235,7 @@ export async function startHost({
           sessionMatch?.[2] === "close"
         ) {
           method = "POST";
-        } else if (eventMatch) {
+        } else if (eventMatch || historyMatch) {
           method = "GET";
         } else if (turnMatch) {
           method = turnMatch[2] === undefined || turnMatch[3] === "abort" ? "POST" : "GET";
@@ -292,6 +313,10 @@ export async function startHost({
               });
             } else send(response, 201, created);
           }
+        } else if (historyMatch) {
+          const id = historyMatch[1];
+          if (!id) fail(400, "invalid_input", "Invalid session ID.");
+          send(response, 200, await sessions.getHistory(id, historyCursor));
         } else if (eventMatch) {
           const id = eventMatch[1];
           if (!id) fail(400, "invalid_input", "Invalid session ID.");

@@ -3,13 +3,13 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest, type IncomingMessage } from "node:http";
 import { createConnection } from "node:net";
-import { StringDecoder } from "node:string_decoder";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { createSseConnection, type SseConnection } from "../src/server/sse.ts";
 import { startHost } from "../src/server/http.ts";
+import { createSseConnection, type SseConnection } from "../src/server/sse.ts";
 import { isStreamFrame, type StreamFrame } from "../src/shared/events.ts";
 import { isSessionInfo, type SessionInfo } from "../src/shared/sessions.ts";
 import { isTurnInfo, type TurnInfo } from "../src/shared/turns.ts";
@@ -368,12 +368,14 @@ async function waitForTextFile(path: string, timeoutMs = 5000): Promise<string> 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      return await readFile(path, "utf8");
+      const text = await readFile(path, "utf8");
+      if (text.endsWith("\n")) return text;
     } catch {
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // The fixture may not have created its marker yet.
     }
+    await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  throw new Error(`File ${path} was not created before the deadline.`);
+  throw new Error(`File ${path} did not contain a complete marker before the deadline.`);
 }
 
 async function rawStatus(url: string, headerLines: readonly string[]): Promise<number> {

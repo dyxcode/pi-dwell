@@ -4,23 +4,26 @@ import { open, readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
 import { prepareDataDirectory } from "../local/files.ts";
 import { hasCode } from "../local/paths.ts";
+import { HistoryReadError, readSavedHistory } from "../runtime/pi-history.ts";
 import { type PiEntry, PiProcess, verifyPiConfiguration } from "../runtime/pi-process.ts";
 import { isRecord, RpcCommandError } from "../runtime/pi-rpc.ts";
-import { isTurnCreateRequest, type TurnCreateRequest, type TurnInfo } from "../shared/turns.ts";
+import type { StreamFrame } from "../shared/events.ts";
+import type { HistoryPage } from "../shared/history.ts";
 import {
   type RuntimeConfiguration,
   SESSION_ID,
   type SessionCreateRequest,
   type SessionInfo,
 } from "../shared/sessions.ts";
+import { isTurnCreateRequest, type TurnCreateRequest, type TurnInfo } from "../shared/turns.ts";
 import { SessionCatalog, type StoredSession, type StoredTurn } from "../storage/catalog.ts";
-import type { StreamFrame } from "../shared/events.ts";
 import {
   InvalidCursorError,
   SessionEvents,
   StreamCapacityError,
   SubscriberLimitError,
 } from "./events.ts";
+import { HistoryPages } from "./history.ts";
 
 export class SessionError extends Error {
   readonly status: number;
@@ -72,6 +75,7 @@ interface ActiveTurn {
   dispatched: boolean;
   abort?: Promise<void>;
   abortFailed: boolean;
+  historyMaterialized: boolean;
 }
 
 function turnView(turn: StoredTurn): TurnInfo {
@@ -95,6 +99,8 @@ export class SessionService {
   readonly #turns = new Map<string, ActiveTurn>();
   readonly #storageFaults = new Set<string>();
   readonly #events = new SessionEvents();
+  readonly #historyPages = new HistoryPages();
+  readonly #reads = new Set<Promise<unknown>>();
   readonly #checkpoint: SessionServiceOptions["turnCheckpoint"];
   #queue: Promise<void> = Promise.resolve();
   #stopping = false;
@@ -342,6 +348,66 @@ export class SessionService {
     });
   }
 
+  getHistory(id: string, cursor?: string): Promise<HistoryPage> {
+    return this.#read(async () => {
+      const stored = this.#stored(id);
+      const file = await this.#history(stored);
+      if (!file) {
+        const slot = this.#turns.get(id);
+        const pending =
+          slot !== undefined &&
+          !slot.historyMaterialized &&
+          active(this.#storedTurn(id, slot.runId));
+        if (stored.historyExpected && !pending)
+          throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+        if (cursor !== undefined)
+          throw new SessionError(400, "invalid_cursor", "No saved history exists for this cursor.");
+        const session = this.#view(this.#stored(id));
+        return {
+          sessionId: id,
+          status: pending ? "pending" : "empty",
+          revision: null,
+          leafId: null,
+          entries: [],
+          nextCursor: null,
+          incompleteTail: false,
+          activeTurnId: session.activeTurnId,
+          latestTurnId: session.latestTurnId,
+          coveredTurnId: null,
+        };
+      }
+      const slot = this.#turns.get(id);
+      if (slot) slot.historyMaterialized = true;
+      const slice = await this.#historyPages.read({
+        sessionId: id,
+        file,
+        piSessionId: stored.piSessionId,
+        directory: stored.directory,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      const session = this.#view(this.#stored(id));
+      const latest = this.#catalog.latestTurn(id);
+      const covered =
+        !this.#storageFaults.has(id) &&
+        latest &&
+        !active(latest) &&
+        latest.entryIds.length > 0 &&
+        latest.entryIds.every((entryId) => slice.branchIds.has(entryId));
+      return {
+        sessionId: id,
+        status: "available",
+        revision: slice.history.revision,
+        leafId: slice.history.leafId,
+        entries: slice.entries,
+        nextCursor: slice.nextCursor,
+        incompleteTail: slice.history.incompleteTail,
+        activeTurnId: session.activeTurnId,
+        latestTurnId: session.latestTurnId,
+        coveredTurnId: covered && latest ? latest.runId : null,
+      };
+    });
+  }
+
   submitTurn(
     id: string,
     request: TurnCreateRequest,
@@ -394,6 +460,7 @@ export class SessionService {
         done,
         dispatched: false,
         abortFailed: false,
+        historyMaterialized: this.#stored(id).historyExpected,
       };
       this.#turns.set(id, slot);
       this.#publishState(id, true);
@@ -415,22 +482,20 @@ export class SessionService {
   }
 
   getTurnResult(id: string, runId: string): Promise<{ runId: string; entries: PiEntry[] }> {
-    return this.#mutate(async () => {
+    return this.#read(async () => {
       this.#checkStorage(id);
       const turn = this.#storedTurn(id, runId);
       if (active(turn))
         throw new SessionError(409, "turn_pending", "The turn has not settled yet.");
       const stored = this.#stored(id);
-      if (!turn.entryIds.length || !(await this.#history(stored)))
+      const file = await this.#history(stored);
+      if (!turn.entryIds.length || !file)
         throw new SessionError(410, "result_unavailable", "Saved turn result is unavailable.");
-      let runtime = this.#runtimes.get(id);
-      if (!runtime || (runtime.state !== "ready" && runtime.state !== "running")) {
-        await this.#open(this.#stored(id));
-        runtime = this.#runtimes.get(id);
-      }
-      if (!runtime)
-        throw new SessionError(503, "runtime_unavailable", "Pi runtime is unavailable.");
-      const { entries } = await runtime.getEntries();
+      const { entries } = await readSavedHistory({
+        file,
+        piSessionId: stored.piSessionId,
+        directory: stored.directory,
+      });
       const byId = new Map(entries.map((entry) => [entry.id, entry]));
       const selected: PiEntry[] = [];
       for (const entryId of turn.entryIds) {
@@ -439,6 +504,23 @@ export class SessionService {
           throw new SessionError(410, "result_unavailable", "Saved turn entries are unavailable.");
         selected.push(entry);
       }
+      let serialized: string;
+      try {
+        serialized = JSON.stringify(selected);
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error;
+        throw new SessionError(
+          413,
+          "result_limit",
+          "Saved result is too deeply nested; use paginated history.",
+        );
+      }
+      if (Buffer.byteLength(serialized) > 8 * 1024 * 1024)
+        throw new SessionError(
+          413,
+          "result_limit",
+          "Saved result exceeds the response limit; use paginated history.",
+        );
       return { runId, entries: selected };
     });
   }
@@ -706,6 +788,7 @@ export class SessionService {
       this.#runtimeObservers.clear();
       this.#runtimes.clear();
       this.#events.close();
+      await Promise.allSettled([...this.#reads]);
       this.#catalog.close();
       if (failed) throw new Error("Session shutdown could not save all runtime metadata.");
     })();
@@ -738,6 +821,33 @@ export class SessionService {
     this.#queue = result.then(
       () => {},
       () => {},
+    );
+    return result;
+  }
+
+  #read<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      this.#admit();
+      if (this.#reads.size >= 2)
+        throw new SessionError(
+          429,
+          "history_busy",
+          "Two history reads are already active. Try again shortly.",
+        );
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const result = Promise.resolve()
+      .then(operation)
+      .catch((error: unknown) => {
+        if (error instanceof HistoryReadError)
+          throw new SessionError(error.status, error.code, error.message);
+        throw error;
+      });
+    this.#reads.add(result);
+    void result.then(
+      () => this.#reads.delete(result),
+      () => this.#reads.delete(result),
     );
     return result;
   }

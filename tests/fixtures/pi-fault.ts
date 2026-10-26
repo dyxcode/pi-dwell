@@ -12,6 +12,7 @@ const state = {
   isCompacting: false,
   messageCount: 0,
   pendingMessageCount: 0,
+  model: { provider: "dwell-test", id: "dwell-test" },
 };
 const output = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}\n`);
 const decoder = new StringDecoder("utf8");

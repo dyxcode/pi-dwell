@@ -40,8 +40,6 @@ export const HOST_PAGE = `<!doctype html>
 </div>
 <nav id="session-list" class="session-names" aria-label="Session names">
 </nav>
-<p id="selected-directory" class="selected-directory">
-</p>
 <div class="rail-foot">
 <button id="connection-badge" class="text-button" type="button">Connecting…</button>
 </div>
@@ -68,15 +66,15 @@ export const HOST_PAGE = `<!doctype html>
 </div>
 </div>
 <footer>
+<div id="composer-context" class="composer-context" hidden>
+<span id="composer-directory" aria-label="Current directory"></span>
+<button id="choose-model" type="button" aria-label="Choose model" aria-haspopup="dialog" disabled><span id="model-label"></span><span aria-hidden="true">⌄</span></button>
+</div>
 <form id="composer">
 <label for="message" class="sr-only">Message Pi</label>
 <textarea id="message" placeholder="Message Pi…" rows="1" disabled>
 </textarea>
 <div class="composer-bottom">
-<span class="model">
-<span id="model-label">
-</span>
-</span>
 <button id="send" type="submit" aria-label="Send message" disabled>↑</button>
 </div>
 </form>
@@ -101,16 +99,22 @@ export const HOST_PAGE = `<!doctype html>
 </div>
 <div id="directories" class="directories">
 </div>
-<label for="model">MODEL</label>
-<select id="model" required>
-</select>
-<label for="session-name">NAME · OPTIONAL</label>
-<input id="session-name" maxlength="80" autocomplete="off">
-<p class="footnote">This browser remembers your name for the conversation.</p>
 <p id="create-error" class="feedback" role="status">
 </p>
 <button id="create-button" class="action" type="submit">Start conversation ↗</button>
 </form>
+</dialog>
+<dialog id="model-dialog" aria-labelledby="model-title">
+<div class="handle"></div>
+<div class="panel-heading">
+<div><div class="eyebrow">THIS CONVERSATION</div><h2 id="model-title">Choose a model.</h2></div>
+<button id="close-model" class="icon" aria-label="Close model picker">×</button>
+</div>
+<label for="model-search" class="sr-only">Search models</label>
+<input id="model-search" type="search" placeholder="Search models…" autocomplete="off">
+<div id="model-options"></div>
+<p id="model-error" class="feedback" role="status"></p>
+<p class="footnote">Applies to your next message.</p>
 </dialog>
 <dialog id="host-dialog" aria-labelledby="host-title">
 <div class="panel-heading">
@@ -194,8 +198,6 @@ textarea{width:100%;resize:none;border:0;background:none;min-height:53px;display
 textarea::placeholder{color:#a09686}
 textarea:focus-visible{outline:none}
 .composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:7px}
-.model{color:var(--teal);font:16px var(--mono);display:flex;align-items:center;gap:8px}
-.model>span{color:var(--muted);font-size:9px}
 #send,.action{background:var(--teal);color:var(--surface);font:600 11px var(--mono);min-height:40px;padding:10px 15px;display:flex;align-items:center;justify-content:center;gap:17px}
 #send span{font-size:20px;font-weight:400}
 .carry{display:block;width:100%;border:1px solid #aaa08e;background:var(--surface);text-align:left;padding:18px 16px 17px;box-shadow:4px 4px var(--lilac);margin:0 0 32px}
@@ -319,7 +321,6 @@ header{padding:0 25px;gap:13px}
 .name-row.active{background:var(--surface);border-color:var(--teal);box-shadow:2px 2px #c8d7c9}
 .name-index{font:9px var(--mono);color:var(--muted);flex-shrink:0}
 .name-row .session-title{font-size:11px;overflow-wrap:anywhere;min-width:0}
-.selected-directory{font:9px/1.8 var(--mono);color:var(--muted);overflow-wrap:anywhere;padding:0 10px;margin-top:21px}
 
 
 #send .send-label{font:600 11px var(--mono)}
@@ -336,7 +337,7 @@ header{padding:0 25px;gap:13px}
 
  .composer-bottom{display:contents}
 
- .composer-bottom .model,#send .send-label{display:none}
+ #send .send-label{display:none}
 
  #send{width:40px;height:40px;min-height:40px;padding:0;gap:0;align-self:end}
 
@@ -415,15 +416,14 @@ footer{padding-left:28px;padding-right:28px}
 @media(min-width:761px){
  footer{flex-shrink:0}
 
- #composer{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:end;gap:16px;padding:6px;margin-right:3px;box-shadow:3px 3px var(--lilac)}
+ #composer{display:grid;grid-template-columns:minmax(0,1fr) 40px;align-items:end;gap:16px;padding:6px;margin-right:3px;box-shadow:3px 3px var(--lilac)}
 
  #message{min-width:0;min-height:30px;height:30px;margin:5px 0;padding:2px 8px;font:15px/26px var(--sans);overflow-y:hidden;overscroll-behavior:contain;scrollbar-width:thin}
 
  .composer-bottom{display:contents}
 
- .composer-bottom .model{height:40px;align-self:end;align-items:center}
 
- #send{height:40px;align-self:end;min-height:40px}
+ #send{width:40px;height:40px;align-self:end;min-height:40px;padding:0}
 
 }
 
@@ -469,8 +469,6 @@ footer{padding-left:28px;padding-right:28px}
 .directory-row:hover{background:var(--paper)}
 button:disabled{opacity:.55;cursor:default}
 #send{font:22px var(--mono)}
-.model{max-width:200px;overflow:hidden;white-space:nowrap}
-.model>span{text-overflow:ellipsis;overflow:hidden}
 .live .message-body{white-space:pre-wrap}
 .empty h1{font:600 27px/1.5 var(--mono)}
 
@@ -484,4 +482,19 @@ button:disabled{opacity:.55;cursor:default}
 @media(max-width:760px){#new-mobile{display:grid;width:38px;min-width:38px;height:38px;font:18px var(--mono);border:1px solid var(--line);background:var(--surface);color:var(--dark);padding:0}
 #rail #new-session{display:none}
 }
+
+/* Directory and model share a compact row above the full-width composer. */
+.composer-context{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;margin:0 3px 2px 0;padding:0 3px}
+#composer-directory{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font:10px/1.6 var(--mono)}
+#choose-model{display:flex;align-items:center;gap:6px;flex-shrink:0;max-width:48%;min-height:30px;padding:0 2px;color:var(--dark);font:10px var(--mono)}
+#model-label{min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#model-search{width:100%;height:44px;border:1px solid var(--line);background:var(--paper);font:13px var(--mono);padding:10px;border-radius:0;margin-bottom:16px}
+#model-options{max-height:40dvh;overflow:auto}
+.model-option{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:13px 12px;border:1px solid transparent;text-align:left;min-height:64px}
+.model-option.selected{background:var(--pale);border-color:var(--teal)}
+.model-option>span:first-child{min-width:0;overflow-wrap:anywhere}
+.model-option strong{display:block;font:600 12px/1.6 var(--mono)}
+.model-option small{display:block;color:var(--muted);font:10px/1.8 var(--mono)}
+.model-option .tick{color:var(--teal)}
+@media(max-width:760px){.composer-context{gap:12px}#choose-model{min-height:32px}#model-label{max-width:140px}footer{padding-bottom:max(5px,env(safe-area-inset-bottom))}}
 `;

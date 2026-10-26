@@ -8,6 +8,11 @@ export interface RuntimeConfiguration {
 export interface SessionCreateRequest {
   requestId: string;
   directory: string;
+  provider?: string;
+  model?: string;
+}
+
+export interface SessionModelRequest {
   provider: string;
   model: string;
 }
@@ -15,8 +20,8 @@ export interface SessionCreateRequest {
 export interface SessionInfo {
   id: string;
   directory: string;
-  provider: string;
-  model: string;
+  provider: string | null;
+  model: string | null;
   piSessionId: string;
   createdAt: number;
   updatedAt: number;
@@ -53,9 +58,12 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
     "directory" in value &&
     typeof value.directory === "string" &&
     "provider" in value &&
-    typeof value.provider === "string" &&
+    (value.provider === null ||
+      (typeof value.provider === "string" && value.provider.length > 0)) &&
     "model" in value &&
-    typeof value.model === "string" &&
+    (value.model === null || (typeof value.model === "string" && value.model.length > 0)) &&
+    ((value.provider === null && value.model === null) ||
+      (typeof value.provider === "string" && typeof value.model === "string")) &&
     "createdAt" in value &&
     typeof value.createdAt === "number" &&
     Number.isSafeInteger(value.createdAt) &&
@@ -78,6 +86,25 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
       (typeof value.activeTurnId === "string" && SESSION_ID.test(value.activeTurnId))) &&
     "latestTurnId" in value &&
     (value.latestTurnId === null ||
-      (typeof value.latestTurnId === "string" && SESSION_ID.test(value.latestTurnId)))
+      (typeof value.latestTurnId === "string" && SESSION_ID.test(value.latestTurnId))) &&
+    (value.status !== "ready" ||
+      (typeof value.provider === "string" && typeof value.model === "string"))
+  );
+}
+
+export function isSessionModelRequest(value: unknown): value is SessionModelRequest {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  return (
+    Object.keys(value).length === 2 &&
+    Object.hasOwn(value, "provider") &&
+    Object.hasOwn(value, "model") &&
+    "provider" in value &&
+    typeof value.provider === "string" &&
+    value.provider.length > 0 &&
+    value.provider.length <= 200 &&
+    "model" in value &&
+    typeof value.model === "string" &&
+    value.model.length > 0 &&
+    value.model.length <= 300
   );
 }

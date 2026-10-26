@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { type TestContext, test } from "node:test";
@@ -8,9 +8,21 @@ import { fileURLToPath } from "node:url";
 import { PiProcess } from "../src/runtime/pi-process.ts";
 import { SessionService } from "../src/sessions/service.ts";
 import { SessionCatalog } from "../src/storage/catalog.ts";
+import type { StreamFrame } from "../src/shared/events.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
 const entryPoint = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry"));
+
+async function until<T>(read: () => T, matches: (value: T) => boolean): Promise<T> {
+  const deadline = Date.now() + 8000;
+  for (;;) {
+    const value = read();
+    if (matches(value)) return value;
+    if (Date.now() > deadline)
+      throw new Error(`Timed out waiting for state: ${JSON.stringify(value)}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
 
 async function setup(t: TestContext) {
   const environment = await createPiEnvironment();
@@ -54,6 +66,125 @@ test("sessions start without Pi configuration and create/reopen empty identities
   assert.deepEqual(await restored.getContext(first.id), { messages: [] });
   await restored.closeSession(first.id);
   await restored.shutdown();
+});
+
+test("directory-only sessions use Pi defaults and persist native idle model changes", async (t) => {
+  const { service, configure, options, environment } = await setup(t);
+  await configure();
+  const creating = service.createSession({
+    requestId: randomUUID(),
+    directory: environment.cwd,
+  });
+  const pending = await until(
+    () => service.listSessions()[0],
+    (current) => current?.status === "creating",
+  );
+  assert.ok(pending);
+  assert.equal(pending.provider, null);
+  assert.equal(pending.model, null);
+  const session = await creating;
+  assert.equal(session.status, "ready");
+  assert.equal(session.provider, "dwell-test");
+  assert.equal(session.model, "dwell-test");
+
+  const frames: StreamFrame[] = [];
+  const stream = service.subscribeEvents(session.id, undefined, (frame) => frames.push(frame));
+  const changed = await service.setSessionModel(session.id, {
+    provider: "dwell-test",
+    model: "dwell-test-alt",
+  });
+  assert.equal(changed.provider, "dwell-test");
+  assert.equal(changed.model, "dwell-test-alt");
+  assert.ok(
+    stream.initial.some(
+      (frame) => frame.type === "snapshot" && frame.payload.session.model === "dwell-test",
+    ),
+  );
+  assert.ok(
+    frames.some(
+      (frame) => frame.type === "session.updated" && frame.payload.model === "dwell-test-alt",
+    ),
+  );
+  stream.unsubscribe();
+
+  await service.closeSession(session.id);
+  await service.shutdown();
+  const restored = await SessionService.create(options);
+  t.after(() => restored.shutdown());
+  const reopened = await restored.openSession(session.id);
+  assert.equal(reopened.provider, "dwell-test");
+  assert.equal(reopened.model, "dwell-test-alt");
+});
+
+test("model changes are rejected while a session turn is active", async (t) => {
+  const { service, configure, request } = await setup(t);
+  await configure();
+  const session = await service.createSession({
+    requestId: randomUUID(),
+    directory: request.directory,
+  });
+  const { turn } = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "slow",
+  });
+  await until(
+    () => service.getTurn(session.id, turn.runId),
+    (current) => current.status === "running",
+  );
+  await assert.rejects(
+    service.setSessionModel(session.id, { provider: "dwell-test", model: "dwell-test-alt" }),
+    /busy|active/i,
+  );
+  await service.abortTurn(session.id, turn.runId);
+  await until(
+    () => service.getSession(session.id),
+    (current) => current.activeTurnId === null,
+  );
+});
+
+test("a failed native model-change append closes the uncertain runtime and can reopen safely", async (t) => {
+  const { service, configure, request, options } = await setup(t);
+  await configure();
+  const session = await service.createSession({
+    requestId: randomUUID(),
+    directory: request.directory,
+  });
+  const { turn } = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "tool",
+  });
+  await until(
+    () => service.getTurn(session.id, turn.runId),
+    (current) => current.status === "completed",
+  );
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const stored = catalog.get(session.id);
+  catalog.close();
+  assert.ok(stored?.piSessionFile);
+
+  const savedFile = `${stored.piSessionFile}.saved`;
+  await rename(stored.piSessionFile, savedFile);
+  await mkdir(stored.piSessionFile);
+  try {
+    await assert.rejects(
+      service.setSessionModel(session.id, {
+        provider: "dwell-test",
+        model: "dwell-test-alt",
+      }),
+      /could not confirm/i,
+    );
+    assert.equal(service.runtimeCount, 0);
+    assert.equal(service.getSession(session.id).runtimeState, "closed");
+    assert.equal(service.getSession(session.id).model, "dwell-test");
+  } finally {
+    await rm(stored.piSessionFile, { recursive: true, force: true });
+    await rename(savedFile, stored.piSessionFile);
+  }
+
+  const reopened = await service.openSession(session.id);
+  assert.equal(reopened.status, "ready");
+  assert.equal(reopened.provider, "dwell-test");
+  assert.equal(reopened.model, "dwell-test");
 });
 
 test("create retries and concurrent opens share one persisted session and runtime", async (t) => {

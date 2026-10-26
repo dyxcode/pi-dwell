@@ -226,16 +226,20 @@ function parseCursor(cursor: string, sessionId: string): ParsedCursor {
 
 function projectSession(value: SessionInfo): { value: SessionInfo; limited: boolean } {
   const directory = boundedJsonString(value.directory, MAX_METADATA_DIRECTORY_JSON_BYTES);
-  const provider = boundedJsonString(value.provider, MAX_METADATA_VALUE_JSON_BYTES);
-  const model = boundedJsonString(value.model, MAX_METADATA_VALUE_JSON_BYTES);
+  const provider =
+    value.provider === null
+      ? null
+      : boundedJsonString(value.provider, MAX_METADATA_VALUE_JSON_BYTES);
+  const model =
+    value.model === null ? null : boundedJsonString(value.model, MAX_METADATA_VALUE_JSON_BYTES);
   const error =
     value.error === null ? null : boundedJsonString(value.error, MAX_METADATA_ERROR_JSON_BYTES);
   return {
     value: {
       id: value.id,
       directory: directory.value,
-      provider: provider.value,
-      model: model.value,
+      provider: provider?.value ?? null,
+      model: model?.value ?? null,
       piSessionId: value.piSessionId,
       createdAt: value.createdAt,
       updatedAt: value.updatedAt,
@@ -247,7 +251,10 @@ function projectSession(value: SessionInfo): { value: SessionInfo; limited: bool
       latestTurnId: value.latestTurnId,
     },
     limited:
-      directory.truncated || provider.truncated || model.truncated || error?.truncated === true,
+      directory.truncated ||
+      provider?.truncated === true ||
+      model?.truncated === true ||
+      error?.truncated === true,
   };
 }
 

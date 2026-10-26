@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { access, unlink, writeFile } from "node:fs/promises";
+import { access, readFile, unlink, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { type TestContext, test } from "node:test";
 import { join } from "node:path";
@@ -68,6 +68,24 @@ async function runtime(
   });
   return { pi, environment, options };
 }
+
+test("native defaults and model changes work without changing global Pi settings", async (t) => {
+  const { pi, environment, options } = await runtime(t);
+  await pi.stop();
+  const { provider, model, ...nativeOptions } = options;
+  const before = await readFile(join(environment.agentDir, "settings.json"), "utf8");
+  const native = await PiProcess.start(nativeOptions);
+  t.after(() => native.stop());
+  const initial = await native.getState();
+  assert.equal(initial.model?.provider, provider);
+  assert.equal(initial.model?.id, model);
+  await native.setModel(provider, "dwell-test-alt");
+  const changed = await native.getState();
+  assert.equal(changed.model?.provider, provider);
+  assert.equal(changed.model?.id, "dwell-test-alt");
+  assert.equal(await readFile(join(environment.agentDir, "settings.json"), "utf8"), before);
+  await native.stop();
+});
 
 test("real Pi performs a tool turn, saves history, and reopens the same session", async (t) => {
   const { pi, options } = await runtime(t);

@@ -20,6 +20,7 @@ import {
   SESSION_ID,
   type SessionCreateRequest,
   type SessionInfo,
+  type SessionModelRequest,
 } from "../shared/sessions.ts";
 import { isTurnCreateRequest, type TurnCreateRequest, type TurnInfo } from "../shared/turns.ts";
 import { SessionCatalog, type StoredSession, type StoredTurn } from "../storage/catalog.ts";
@@ -288,23 +289,30 @@ export class SessionService {
 
   createSession(request: SessionCreateRequest): Promise<SessionInfo> {
     return this.#mutate(async () => {
+      const provider = request.provider;
+      const model = request.model;
+      const validModelSelection =
+        (provider === undefined && model === undefined) ||
+        (typeof provider === "string" &&
+          provider.length > 0 &&
+          provider.length <= 200 &&
+          typeof model === "string" &&
+          model.length > 0 &&
+          model.length <= 300);
       if (
         !SESSION_ID.test(request.requestId) ||
         !isAbsolute(request.directory) ||
         request.directory.length > 4096 ||
-        !request.provider ||
-        request.provider.length > 200 ||
-        !request.model ||
-        request.model.length > 300
+        !validModelSelection
       )
         throw new SessionError(
           400,
           "invalid_input",
-          "Provide a request UUID, absolute directory, provider, and model.",
+          "Provide a request UUID and absolute directory, with both provider and model or neither.",
         );
       // Compare the original admitted payload before touching the filesystem: retries remain identifiable after directory removal.
       const identity = createHash("sha256")
-        .update(JSON.stringify([request.directory, request.provider, request.model]))
+        .update(JSON.stringify([request.directory, provider ?? null, model ?? null]))
         .digest("hex");
       const existing = this.#catalog.findRequest(request.requestId);
       if (existing) {
@@ -331,8 +339,8 @@ export class SessionService {
         requestId: request.requestId,
         payloadIdentity: identity,
         directory,
-        provider: request.provider,
-        model: request.model,
+        provider: typeof provider === "string" ? provider : null,
+        model: typeof model === "string" ? model : null,
         piSessionId: randomUUID(),
         piSessionFile: null,
         historyExpected: false,
@@ -356,6 +364,105 @@ export class SessionService {
         this.#publishState(failed.id);
         return this.#view(failed);
       }
+    });
+  }
+
+  setSessionModel(id: string, request: SessionModelRequest): Promise<SessionInfo> {
+    return this.#mutate(async () => {
+      if (
+        typeof request.provider !== "string" ||
+        request.provider.length === 0 ||
+        request.provider.length > 200 ||
+        typeof request.model !== "string" ||
+        request.model.length === 0 ||
+        request.model.length > 300
+      )
+        throw new SessionError(
+          400,
+          "invalid_input",
+          "Provide a non-empty provider and model within their length limits.",
+        );
+
+      const stored = this.#stored(id);
+      this.#checkStorage(id);
+      if (stored.status !== "ready")
+        throw new SessionError(409, "session_not_ready", "Only a ready session can change model.");
+      if (this.#turns.has(id))
+        throw new SessionError(409, "session_busy", "Abort active work before changing model.");
+      if (stored.provider === request.provider && stored.model === request.model)
+        return this.#view(stored);
+
+      await this.#open(stored);
+      const runtime = this.#runtimes.get(id);
+      if (runtime?.state !== "ready")
+        throw new SessionError(409, "session_busy", "The session is not idle.");
+
+      let selected: { provider: string; model: string };
+      try {
+        selected = await runtime.setModel(request.provider, request.model);
+        const state = await runtime.getState();
+        if (
+          state.sessionId !== stored.piSessionId ||
+          !state.model ||
+          state.model.provider !== selected.provider ||
+          state.model.id !== selected.model
+        )
+          throw new Error("Pi did not confirm the selected session model.");
+      } catch (error) {
+        this.#runtimeObservers.get(id)?.();
+        this.#runtimeObservers.delete(id);
+        this.#runtimes.delete(id);
+        try {
+          await runtime.stop();
+        } catch {
+          /* An unconfirmed model must not keep running under stale metadata. */
+        }
+        this.#publishState(id);
+        if (
+          error instanceof RpcCommandError &&
+          error.command === "set_model" &&
+          /^(Model not found:|No API key for )/u.test(error.rejection)
+        )
+          throw new SessionError(
+            400,
+            "model_unavailable",
+            "Pi could not select the requested provider and model. The session was closed safely.",
+          );
+        if (error instanceof SessionError) throw error;
+        throw new SessionError(
+          503,
+          "model_change_failed",
+          "Pi could not confirm the model change. The session was closed safely; reopen before continuing.",
+        );
+      }
+
+      const updated: StoredSession = {
+        ...this.#stored(id),
+        provider: selected.provider,
+        model: selected.model,
+        updatedAt: this.#now(),
+        error: null,
+      };
+      try {
+        this.#catalog.update(updated);
+      } catch {
+        this.#storageFault(id);
+        this.#runtimeObservers.get(id)?.();
+        this.#runtimeObservers.delete(id);
+        this.#runtimes.delete(id);
+        try {
+          await runtime.stop();
+        } catch {
+          /* A failed save must not keep an unrecorded model running. */
+        }
+        throw new SessionError(
+          503,
+          "storage_unavailable",
+          "The selected model could not be saved. Repair storage and restart the host.",
+        );
+      }
+      this.#publishState(id);
+      return this.#view(updated);
     });
   }
 
@@ -1074,8 +1181,9 @@ export class SessionService {
         env: this.#env,
         sessionDirectory: join(this.#dataDir, "sessions", stored.id),
         ...(resumeFile ? { resumeFile } : { sessionId: stored.piSessionId }),
-        provider: stored.provider,
-        model: stored.model,
+        ...(stored.provider !== null && stored.model !== null
+          ? { provider: stored.provider, model: stored.model }
+          : {}),
         extensions: this.#extensions,
       });
     } catch {
@@ -1089,17 +1197,20 @@ export class SessionService {
       const state = await runtime.getState();
       if (
         state.sessionId !== stored.piSessionId ||
-        state.model?.provider !== stored.provider ||
-        state.model.id !== stored.model ||
+        !state.model ||
+        (stored.provider !== null && state.model.provider !== stored.provider) ||
+        (stored.model !== null && state.model.id !== stored.model) ||
         !state.sessionFile
       )
         throw new SessionError(
           503,
           "runtime_mismatch",
-          "Pi did not use the requested session, provider, and model.",
+          "Pi did not use the requested session and model selection.",
         );
       const ready: StoredSession = {
         ...stored,
+        provider: state.model.provider,
+        model: state.model.id,
         status: "ready",
         updatedAt: this.#now(),
         error: null,

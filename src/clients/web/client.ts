@@ -1,6 +1,10 @@
 /// <reference lib="dom" />
 
-import { isAvailableModelsResponse, isHostDirectoryListing } from "../../shared/discovery.ts";
+import {
+  isAvailableModelsResponse,
+  isHostDirectoryListing,
+  type PiModelOption,
+} from "../../shared/discovery.ts";
 import { type HistoryEntry, isHistoryPage } from "../../shared/history.ts";
 import { isHostStatus } from "../../shared/protocol.ts";
 import { isSessionInfo, type SessionInfo } from "../../shared/sessions.ts";
@@ -36,10 +40,14 @@ const scroll = el("scroll", HTMLElement),
 const send = el("send", HTMLButtonElement),
   notice = el("notice", HTMLElement);
 const dialog = el("new-dialog", HTMLDialogElement);
-const directory = el("directory", HTMLInputElement),
-  model = el("model", HTMLSelectElement);
-const sessionName = el("session-name", HTMLInputElement),
-  createButton = el("create-button", HTMLButtonElement);
+const directory = el("directory", HTMLInputElement);
+const createButton = el("create-button", HTMLButtonElement);
+const modelDialog = el("model-dialog", HTMLDialogElement);
+const modelSearch = el("model-search", HTMLInputElement);
+const chooseModel = el("choose-model", HTMLButtonElement);
+let availableModels: PiModelOption[] = [];
+let modelSession: string | null = null,
+  changingModel: string | null = null;
 const older = el("load-older", HTMLButtonElement);
 const names = new Map<string, string>(),
   drafts = new Map<string, string>();
@@ -62,9 +70,6 @@ let pendingSend: { session: string; requestId: string; message: string } | null 
 let pendingCreate: {
   requestId: string;
   directory: string;
-  provider: string;
-  model: string;
-  name: string;
 } | null = null;
 let authAttempt = 0,
   browseAttempt = 0,
@@ -182,12 +187,34 @@ function navigation(): void {
   });
   el("session-count", HTMLElement).textContent = String(sessions.length).padStart(2, "0");
   const s = activeSession();
-  el("selected-directory", HTMLElement).textContent = s?.directory ?? "";
-  el("model-label", HTMLElement).textContent = s ? `${s.provider} / ${s.model}` : "";
+  el("composer-context", HTMLElement).hidden = !s;
+  const contextDirectory = el("composer-directory", HTMLElement);
+  contextDirectory.textContent = s?.directory ?? "";
+  contextDirectory.title = s?.directory ?? "";
+  contextDirectory.setAttribute("aria-label", `Current directory: ${s?.directory ?? ""}`);
+  el("model-label", HTMLElement).textContent = s?.model ?? "Choose model";
+  chooseModel.title = s?.model ? `${s.provider} / ${s.model}` : "Choose model";
+  chooseModel.setAttribute("aria-label", `Choose model, current: ${s?.model ?? "not selected"}`);
   const busy = !!s?.activeTurnId;
+  chooseModel.disabled =
+    !s ||
+    !authenticated ||
+    s.status !== "ready" ||
+    busy ||
+    sending ||
+    changingModel !== null ||
+    pendingSend?.session === selected;
+  if (modelDialog.open) {
+    const disabled = chooseModel.disabled || modelSession !== selected;
+    el("model-options", HTMLElement)
+      .querySelectorAll("button")
+      .forEach((button) => {
+        button.disabled = disabled;
+      });
+  }
   input.disabled = !s || !authenticated || s.status !== "ready";
-  input.readOnly = sending || pendingSend?.session === selected;
-  send.disabled = !s || !authenticated || sending;
+  input.readOnly = sending || changingModel === selected || pendingSend?.session === selected;
+  send.disabled = !s || !authenticated || sending || changingModel === selected;
   send.textContent = busy ? "□" : pendingSend?.session === selected ? "↻" : "↑";
   send.setAttribute(
     "aria-label",
@@ -431,6 +458,8 @@ async function stream(id: string, epoch: number): Promise<void> {
 }
 async function select(id: string): Promise<void> {
   if (selected === id) return;
+  modelDialog.close();
+  modelAttempt++;
   if (selected) drafts.set(selected, input.value);
   stopStream();
   generation++;
@@ -510,6 +539,8 @@ function disconnect(reason: string): void {
   authAttempt++;
   generation++;
   dialog.close();
+  modelDialog.close();
+  modelAttempt++;
   el("host-dialog", HTMLDialogElement).close();
   stopStream();
   window.clearTimeout(pollTimer);
@@ -555,7 +586,7 @@ async function connect(): Promise<void> {
 }
 async function submit(): Promise<void> {
   const s = activeSession();
-  if (!s || sending) return;
+  if (!s || sending || changingModel === s.id) return;
   if (s.activeTurnId) {
     sending = true;
     navigation();
@@ -673,73 +704,129 @@ async function browse(path?: string): Promise<void> {
       container.replaceChildren(node("p", message(error), "feedback"));
   }
 }
-async function newSession(): Promise<void> {
+function renderModels(): void {
+  const container = el("model-options", HTMLElement);
+  const query = modelSearch.value.trim().toLowerCase();
+  const session = activeSession();
+  container.replaceChildren();
+  for (const item of availableModels) {
+    if (!`${item.provider} ${item.id}`.toLowerCase().includes(query)) continue;
+    const current = item.provider === session?.provider && item.id === session.model;
+    const button = node("button", "", `model-option${current ? " selected" : ""}`);
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(current));
+    button.disabled = chooseModel.disabled || modelSession !== selected;
+    const text = node("span");
+    text.append(node("strong", item.id), node("small", item.provider));
+    button.append(text);
+    if (current) button.append(node("span", "✓", "tick"));
+    button.onclick = () => {
+      void changeModel(item);
+    };
+    container.append(button);
+  }
+  if (!container.childElementCount)
+    container.append(
+      node("p", query ? "No matching models." : "Pi has no available models.", "footnote"),
+    );
+}
+async function showModels(): Promise<void> {
+  const session = activeSession();
+  if (!session || chooseModel.disabled) return;
   const attempt = ++modelAttempt,
     authentication = authAttempt;
+  modelSession = session.id;
+  availableModels = [];
+  modelSearch.value = "";
+  el("model-error", HTMLElement).textContent = "";
+  el("model-options", HTMLElement).replaceChildren(node("p", "Loading models…", "footnote"));
+  modelDialog.showModal();
+  el("close-model", HTMLButtonElement).focus();
+  try {
+    const result = await api("/api/v1/models");
+    if (!isAvailableModelsResponse(result)) throw new Error("Invalid model list.");
+    if (
+      attempt !== modelAttempt ||
+      authentication !== authAttempt ||
+      !modelDialog.open ||
+      selected !== session.id
+    )
+      return;
+    availableModels = result.models;
+    renderModels();
+  } catch (error) {
+    if (attempt !== modelAttempt || authentication !== authAttempt || !modelDialog.open) return;
+    if (error instanceof ApiError && error.status === 401) showError(error);
+    el("model-options", HTMLElement).replaceChildren();
+    el("model-error", HTMLElement).textContent = message(error);
+  }
+}
+async function changeModel(choice: PiModelOption): Promise<void> {
+  const session = activeSession();
+  if (!session || modelSession !== session.id || chooseModel.disabled) return;
+  if (session.provider === choice.provider && session.model === choice.id) {
+    modelDialog.close();
+    return;
+  }
+  const authentication = authAttempt;
+  changingModel = session.id;
+  el("model-error", HTMLElement).textContent = "";
+  navigation();
+  try {
+    const result = await api(`/api/v1/sessions/${session.id}/model`, {
+      provider: choice.provider,
+      model: choice.id,
+    });
+    if (!isSessionInfo(result) || result.id !== session.id)
+      throw new Error("Invalid model response. Reopen the picker to check the current model.");
+    if (authentication !== authAttempt) return;
+    sessions = sessions.map((s) => (s.id === session.id ? result : s));
+    if (selected === session.id) modelDialog.close();
+    await refresh();
+  } catch (error) {
+    if (authentication !== authAttempt) return;
+    if (error instanceof ApiError && error.status === 401) showError(error);
+    else if (modelDialog.open && selected === session.id)
+      el("model-error", HTMLElement).textContent = message(error);
+    else showError(error);
+    // Read back authoritative metadata after a response failure; never replay the mutation.
+    try {
+      await refresh();
+    } catch {
+      /* normal polling will retry this read */
+    }
+  } finally {
+    changingModel = null;
+    navigation();
+    if (modelDialog.open) renderModels();
+  }
+}
+function newSession(): void {
   nav(false);
   dialog.showModal();
   if (pendingCreate) return;
-  sessionName.value = "";
-  createButton.disabled = true;
-  model.replaceChildren(node("option", "Loading models…"));
   el("create-error", HTMLElement).textContent = "";
+  directory.value = activeSession()?.directory ?? "";
   void browse(activeSession()?.directory);
-  try {
-    const value = await api("/api/v1/models");
-    if (!isAvailableModelsResponse(value)) throw new Error("Invalid model list.");
-    if (attempt !== modelAttempt || authentication !== authAttempt || !dialog.open) return;
-    model.replaceChildren();
-    for (const item of value.models) {
-      const option = node("option", `${item.provider} / ${item.id}`);
-      option.value = JSON.stringify([item.provider, item.id]);
-      model.append(option);
-    }
-    createButton.disabled = model.options.length === 0;
-    if (!model.options.length)
-      throw new Error("Pi has no available models. Configure a provider in Pi, then try again.");
-  } catch (error) {
-    if (attempt !== modelAttempt || authentication !== authAttempt || !dialog.open) return;
-    if (error instanceof ApiError && error.status === 401) showError(error);
-    el("create-error", HTMLElement).textContent = message(error);
-  }
 }
 async function createSession(): Promise<void> {
   if (createButton.disabled) return;
   const authentication = authAttempt;
-  const choice: unknown = JSON.parse(model.value || "null");
-  if (
-    !Array.isArray(choice) ||
-    choice.length !== 2 ||
-    typeof choice[0] !== "string" ||
-    typeof choice[1] !== "string"
-  )
-    return;
   const attempt = pendingCreate ?? {
     requestId: crypto.randomUUID(),
     directory: directory.value,
-    provider: choice[0],
-    model: choice[1],
-    name: sessionName.value.trim(),
   };
   pendingCreate = attempt;
   createButton.disabled = true;
   directory.disabled = true;
-  model.disabled = true;
-  sessionName.disabled = true;
   try {
     const result = await api("/api/v1/sessions", {
       requestId: attempt.requestId,
       directory: attempt.directory,
-      provider: attempt.provider,
-      model: attempt.model,
     });
     if (!isSessionInfo(result))
       throw new Error("Invalid session response. Retry to confirm the same creation request.");
     if (authentication !== authAttempt) return;
-    if (attempt.name) {
-      names.set(result.id, attempt.name);
-      savePreference(result.id, attempt.name);
-    }
     pendingCreate = null;
     dialog.close();
     await refresh();
@@ -758,10 +845,16 @@ async function createSession(): Promise<void> {
   } finally {
     createButton.disabled = false;
     directory.disabled = !!pendingCreate;
-    model.disabled = !!pendingCreate;
-    sessionName.disabled = !!pendingCreate;
   }
 }
+chooseModel.onclick = () => {
+  void showModels();
+};
+el("close-model", HTMLButtonElement).onclick = () => modelDialog.close();
+modelSearch.oninput = renderModels;
+modelDialog.addEventListener("close", () => {
+  modelAttempt++;
+});
 el("open-nav", HTMLButtonElement).onclick = () => nav(true);
 el("close-nav", HTMLButtonElement).onclick = () => nav(false);
 el("scrim", HTMLButtonElement).onclick = () => nav(false);
@@ -772,6 +865,10 @@ el("new-session", HTMLButtonElement).onclick = () => {
   void newSession();
 };
 el("close-new", HTMLButtonElement).onclick = () => dialog.close();
+directory.oninput = () => {
+  browseAttempt++;
+  el("directories", HTMLElement).replaceChildren();
+};
 el("browse", HTMLButtonElement).onclick = () => {
   if (!pendingCreate) void browse(directory.value);
 };

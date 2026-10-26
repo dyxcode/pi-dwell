@@ -185,6 +185,55 @@ test("HTTP create/list/open/close/context preserve one session across host resta
   await restarted.close();
 });
 
+test("HTTP creation can use the configured Pi default and idle model changes are durable", async (t) => {
+  const { request, configure, host, environment } = await setup(t);
+  await configure();
+  const missingPair = await request("/sessions", {
+    requestId: randomUUID(),
+    directory: environment.cwd,
+    provider: "dwell-test",
+  });
+  assert.equal(missingPair.status, 400);
+  const createdResponse = await request("/sessions", {
+    requestId: randomUUID(),
+    directory: environment.cwd,
+  });
+  assert.equal(createdResponse.status, 201);
+  const created: unknown = await createdResponse.json();
+  assert.ok(isSessionInfo(created));
+  assert.equal(created.provider, "dwell-test");
+  assert.equal(created.model, "dwell-test");
+
+  const invalidModel = await request(`/sessions/${created.id}/model`, {
+    provider: "missing-dwell-provider",
+    model: "missing-dwell-model",
+  });
+  assert.equal(invalidModel.status, 400);
+  const reopened = await request(`/sessions/${created.id}/open`, {});
+  assert.equal(reopened.status, 200);
+  const reopenedSession: unknown = await reopened.json();
+  assert.ok(isSessionInfo(reopenedSession));
+  assert.equal(reopenedSession.model, "dwell-test");
+
+  const changedResponse = await request(`/sessions/${created.id}/model`, {
+    provider: "dwell-test",
+    model: "dwell-test-alt",
+  });
+  assert.equal(changedResponse.status, 200);
+  const changed: unknown = await changedResponse.json();
+  assert.ok(isSessionInfo(changed));
+  assert.equal(changed.provider, "dwell-test");
+  assert.equal(changed.model, "dwell-test-alt");
+  assert.equal(
+    (await request(`/sessions/${created.id}/model`, { provider: "dwell-test" })).status,
+    400,
+  );
+
+  const closed = await request(`/sessions/${created.id}/close`, {});
+  assert.equal(closed.status, 200);
+  await host.close();
+});
+
 test("disconnecting an admitted creation request does not cancel or duplicate it", async (t) => {
   const { request, configure, body, host, token } = await setup(t);
   await configure();

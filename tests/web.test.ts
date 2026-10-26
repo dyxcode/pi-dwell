@@ -40,3 +40,15 @@ test("native browser compilation exposes a fixed set of credential-safe modules"
     assert.doesNotMatch(asset, /from ["'][^"']+\.ts["']/);
   }
 });
+
+test("creation asks only for a directory and model selection sits above the composer", () => {
+  assert.doesNotMatch(HOST_PAGE, /id="(?:session-name|model)"/);
+  assert.match(HOST_PAGE, /id="directory"/);
+  assert.match(HOST_PAGE, /id="model-dialog"/);
+  const context = HOST_PAGE.indexOf('id="composer-context"');
+  const composer = HOST_PAGE.indexOf('id="composer"');
+  assert.ok(context > 0 && context < composer);
+  const row = HOST_PAGE.slice(context, composer);
+  assert.match(row, /id="composer-directory"/);
+  assert.match(row, /id="choose-model"/);
+});

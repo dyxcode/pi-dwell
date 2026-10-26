@@ -12,7 +12,9 @@ test("the real conversation shell exposes pairing, history, stop, and directory 
     "session-list",
     "new-session",
     "directory",
-    "model",
+    "choose-model",
+    "model-dialog",
+    "composer-directory",
     "load-older",
   ])
     assert.match(HOST_PAGE, new RegExp(`id="${id}"`));

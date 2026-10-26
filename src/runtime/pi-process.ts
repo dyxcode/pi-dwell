@@ -3,7 +3,11 @@ import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { validateDataDirectory } from "../local/paths.ts";
-import { type RuntimeConfiguration, SESSION_ID } from "../shared/sessions.ts";
+import {
+  type RuntimeConfiguration,
+  type SessionModelRequest,
+  SESSION_ID,
+} from "../shared/sessions.ts";
 import { isRecord, PiRpc, type RpcRecord } from "./pi-rpc.ts";
 
 const exec = promisify(execFile);
@@ -19,8 +23,8 @@ export interface PiOptions {
   sessionDirectory: string;
   resumeFile?: string;
   sessionId?: string;
-  provider: string;
-  model: string;
+  provider?: string;
+  model?: string;
   extensions?: readonly string[];
   requestTimeoutMs?: number;
   shutdownTimeoutMs?: number;
@@ -78,6 +82,10 @@ function sessionState(value: unknown): SessionState {
   ) {
     throw new Error("Pi returned invalid session state.");
   }
+  const model = value.model;
+  if (model !== undefined && !isSelectedModel(model)) {
+    throw new Error("Pi returned invalid session state.");
+  }
   return {
     sessionId: value.sessionId,
     ...(typeof value.sessionFile === "string" ? { sessionFile: value.sessionFile } : {}),
@@ -85,12 +93,18 @@ function sessionState(value: unknown): SessionState {
     isCompacting: value.isCompacting,
     messageCount: value.messageCount,
     pendingMessageCount: value.pendingMessageCount,
-    ...(isRecord(value.model) &&
-    typeof value.model.provider === "string" &&
-    typeof value.model.id === "string"
-      ? { model: { provider: value.model.provider, id: value.model.id } }
-      : {}),
+    ...(model === undefined ? {} : { model }),
   };
+}
+
+function isSelectedModel(value: unknown): value is { provider: string; id: string } {
+  return (
+    isRecord(value) &&
+    typeof value.provider === "string" &&
+    value.provider.length > 0 &&
+    typeof value.id === "string" &&
+    value.id.length > 0
+  );
 }
 
 function sessionEntries(value: unknown): { entries: PiEntry[]; leafId: string | null } {
@@ -241,8 +255,20 @@ export class PiProcess {
           "Pi executable, entry point, project, session and extension paths must be absolute.",
         );
     }
-    if (options.provider.length === 0 || options.model.length === 0)
-      throw new Error("Select a Pi provider and model.");
+    const provider = options.provider;
+    const model = options.model;
+    const hasProvider = provider !== undefined;
+    const hasModel = model !== undefined;
+    if (
+      hasProvider !== hasModel ||
+      (provider !== undefined &&
+        model !== undefined &&
+        (provider.length === 0 ||
+          model.length === 0 ||
+          provider.length > 200 ||
+          model.length > 300))
+    )
+      throw new Error("Provide both Pi provider and model, or omit both to use Pi defaults.");
     const requestMs = options.requestTimeoutMs ?? 15_000;
     const shutdownMs = options.shutdownTimeoutMs ?? 2_000;
     for (const duration of [requestMs, shutdownMs]) {
@@ -269,10 +295,9 @@ export class PiProcess {
       "rpc",
       "--session-dir",
       sessionDirectory,
-      "--provider",
-      options.provider,
-      "--model",
-      options.model,
+      ...(provider !== undefined && model !== undefined
+        ? ["--provider", provider, "--model", model]
+        : []),
       "--no-extensions",
       "--no-skills",
       "--no-prompt-templates",
@@ -294,10 +319,20 @@ export class PiProcess {
       const state = await runtime.getState();
       if (state.isStreaming || state.isCompacting || state.pendingMessageCount !== 0)
         throw new Error("Pi did not start idle.");
+      if (!state.model)
+        throw new Error(
+          "Pi did not select a model. Configure a Pi default before creating sessions.",
+        );
       if (resumeFile && (!state.sessionFile || (await realpath(state.sessionFile)) !== resumeFile))
         throw new Error("Pi did not reopen the requested session.");
       if (options.sessionId && state.sessionId !== options.sessionId)
         throw new Error("Pi did not preserve the requested session identity.");
+      if (
+        provider !== undefined &&
+        model !== undefined &&
+        (state.model.provider !== provider || state.model.id !== model)
+      )
+        throw new Error("Pi did not use the requested provider and model.");
       if (runtime.#state !== "starting")
         throw runtime.#error ?? new Error("Pi stopped during startup.");
       runtime.#setState("ready");
@@ -341,6 +376,35 @@ export class PiProcess {
         this.#rpc.fail(error);
       throw error;
     }
+  }
+
+  async setModel(provider: string, model: string): Promise<SessionModelRequest> {
+    if (this.#state === "running" || this.#run) throw new Error("Pi session is busy.");
+    if (this.#state !== "ready") throw this.#error ?? new Error("Pi runtime is not ready.");
+    if (provider.length === 0 || provider.length > 200 || model.length === 0 || model.length > 300)
+      throw new Error("Select a valid Pi provider and model.");
+    let response: unknown;
+    try {
+      response = await this.#rpc.request("set_model", { provider, modelId: model });
+    } catch (error) {
+      if (error instanceof Error) throw error;
+      throw new Error("Pi rejected the model change.");
+    }
+    if (
+      !isRecord(response) ||
+      typeof response.provider !== "string" ||
+      typeof response.id !== "string"
+    ) {
+      const error = new Error("Pi returned an invalid model selection.");
+      this.#rpc.fail(error);
+      throw error;
+    }
+    if (response.provider !== provider || response.id !== model) {
+      const error = new Error("Pi selected a different provider or model.");
+      this.#rpc.fail(error);
+      throw error;
+    }
+    return { provider: response.provider, model: response.id };
   }
 
   async getMessages(): Promise<Record<string, unknown>[]> {

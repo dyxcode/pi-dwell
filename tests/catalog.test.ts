@@ -38,6 +38,21 @@ function session(overrides: Partial<StoredSession> = {}): StoredSession {
   };
 }
 
+function createV2Catalog(path: string, orphanTurn = false): void {
+  const database = new DatabaseSync(path, { enableForeignKeyConstraints: false });
+  database.exec(
+    "CREATE TABLE runtime_configuration (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), executable TEXT NOT NULL CHECK (length(executable) > 0), entry_point TEXT CHECK (entry_point IS NULL OR length(entry_point) > 0)) STRICT;" +
+      "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT NOT NULL CHECK (length(provider) > 0), model TEXT NOT NULL CHECK (length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT) STRICT;" +
+      "CREATE TABLE turns (run_id TEXT NOT NULL PRIMARY KEY CHECK (length(run_id) > 0), session_id TEXT NOT NULL REFERENCES sessions(id), request_id TEXT NOT NULL CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) = 64), status TEXT NOT NULL CHECK (status IN ('accepted', 'dispatching', 'running', 'completed', 'failed', 'aborted', 'interrupted')), cancellation_requested INTEGER NOT NULL CHECK (cancellation_requested IN (0, 1)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error_code TEXT, error_message TEXT, entry_ids TEXT NOT NULL CHECK (json_valid(entry_ids)), UNIQUE (session_id, request_id), CHECK ((error_code IS NULL AND error_message IS NULL) OR (length(error_code) > 0 AND length(error_message) > 0))) STRICT;" +
+      "CREATE UNIQUE INDEX one_active_turn_per_session ON turns(session_id) WHERE status IN ('accepted', 'dispatching', 'running');" +
+      "INSERT INTO runtime_configuration VALUES (1, '/opt/pi/bin/pi', NULL);" +
+      "INSERT INTO sessions VALUES ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 'payload-v2', '/tmp/project-v2', 'test-provider', 'test-model', '33333333-3333-4333-8333-333333333333', NULL, 0, 'ready', 1000, 1100, NULL);" +
+      `INSERT INTO turns VALUES ('44444444-4444-4444-8444-444444444444', '${orphanTurn ? "missing-session" : "11111111-1111-4111-8111-111111111111"}', '55555555-5555-4555-8555-555555555555', '${"a".repeat(64)}', 'completed', 0, 1000, 1100, NULL, NULL, '[]');` +
+      "PRAGMA user_version = 2;",
+  );
+  database.close();
+}
+
 test("catalog configuration and private SQLite storage survive reopening", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "dwell-catalog-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -113,13 +128,105 @@ test("version-one catalogs migrate transactionally while preserving sessions and
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 2n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 3n);
   assert.equal(
     migrated.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'turns'").get()
       ?.count,
     1n,
   );
   migrated.close();
+});
+
+test("version-two migration preserves sessions, turns, indexes, and foreign keys", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "dwell-catalog-v2-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const dataDir = join(root, "data");
+  await mkdir(dataDir, { mode: 0o700 });
+  const path = join(dataDir, "catalog.sqlite");
+  createV2Catalog(path);
+  await chmod(path, 0o600);
+
+  const catalog = await SessionCatalog.open(dataDir);
+  t.after(() => catalog.close());
+  assert.equal(catalog.configuration()?.executable, "/opt/pi/bin/pi");
+  assert.deepEqual(catalog.get("11111111-1111-4111-8111-111111111111"), {
+    id: "11111111-1111-4111-8111-111111111111",
+    requestId: "22222222-2222-4222-8222-222222222222",
+    payloadIdentity: "payload-v2",
+    directory: "/tmp/project-v2",
+    provider: "test-provider",
+    model: "test-model",
+    piSessionId: "33333333-3333-4333-8333-333333333333",
+    piSessionFile: null,
+    historyExpected: false,
+    status: "ready",
+    createdAt: 1000,
+    updatedAt: 1100,
+    error: null,
+  });
+  assert.equal(catalog.listTurns()[0]?.runId, "44444444-4444-4444-8444-444444444444");
+  catalog.insert(
+    session({
+      id: "66666666-6666-4666-8666-666666666666",
+      requestId: "77777777-7777-4777-8777-777777777777",
+      piSessionId: "88888888-8888-4888-8888-888888888888",
+      provider: null,
+      model: null,
+    }),
+  );
+  assert.equal(catalog.get("66666666-6666-4666-8666-666666666666")?.provider, null);
+  assert.equal(catalog.get("66666666-6666-4666-8666-666666666666")?.model, null);
+  assert.throws(
+    () =>
+      catalog.insert(
+        session({
+          id: "99999999-9999-4999-8999-999999999999",
+          requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          model: null,
+        }),
+      ),
+    /Invalid stored session/i,
+  );
+  catalog.close();
+
+  const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 3n);
+  assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
+  const index = migrated
+    .prepare("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = ?")
+    .get("one_active_turn_per_session");
+  assert.ok(index);
+  migrated.close();
+});
+
+test("version-two migration rolls back if preserved turns violate the session foreign key", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "dwell-catalog-v2-corrupt-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const dataDir = join(root, "data");
+  await mkdir(dataDir, { mode: 0o700 });
+  const path = join(dataDir, "catalog.sqlite");
+  createV2Catalog(path, true);
+  await chmod(path, 0o600);
+
+  await assert.rejects(SessionCatalog.open(dataDir), /foreign key|invalid/i);
+  const unchanged = new DatabaseSync(path, { readOnly: true, readBigInts: true });
+  assert.equal(unchanged.prepare("PRAGMA user_version").get()?.user_version, 2n);
+  assert.equal(
+    unchanged.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'sessions'").get()
+      ?.count,
+    1n,
+  );
+  assert.equal(
+    unchanged
+      .prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'sessions_v2'")
+      .get()?.count,
+    0n,
+  );
+  assert.equal(
+    unchanged.prepare("SELECT run_id FROM turns").get()?.run_id,
+    "44444444-4444-4444-8444-444444444444",
+  );
+  unchanged.close();
 });
 
 test("version-one schema rejection leaves the original catalog version and tables intact", async (t) => {

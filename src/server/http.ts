@@ -6,7 +6,7 @@ import { BROWSER_ASSETS } from "../clients/web/script.ts";
 import { dataDirectory, type HostMode } from "../local/paths.ts";
 import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
 import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
-import { isRuntimeConfiguration } from "../shared/sessions.ts";
+import { isRuntimeConfiguration, isSessionModelRequest } from "../shared/sessions.ts";
 import { isTurnCreateRequest } from "../shared/turns.ts";
 import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
 import { browserCookie, readBrowserOrigin, requestAccess } from "./access.ts";
@@ -227,6 +227,7 @@ export async function startHost({
       const sessionMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)(?:\/(open|close|context))?$/.exec(
         path,
       );
+      const modelMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/model$/.exec(path);
       const eventMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/events$/.exec(path);
       const turnMatch =
         /^\/api\/v1\/sessions\/([a-f0-9-]+)\/turns(?:\/([a-f0-9-]+)(?:\/(result|abort))?)?$/.exec(
@@ -237,6 +238,7 @@ export async function startHost({
         path === "/api/v1/directories" ||
         path === "/api/v1/models" ||
         path === "/api/v1/runtime" ||
+        modelMatch !== null ||
         sessionMatch !== null ||
         historyMatch !== null ||
         eventMatch !== null ||
@@ -245,6 +247,7 @@ export async function startHost({
       if (sessionRoute) {
         if (
           path === "/api/v1/runtime" ||
+          modelMatch !== null ||
           sessionMatch?.[2] === "open" ||
           sessionMatch?.[2] === "close"
         ) {
@@ -307,19 +310,28 @@ export async function startHost({
         } else if (path === "/api/v1/sessions") {
           if (method === "GET") send(response, 200, sessions.listSessions());
           else {
+            const hasProvider = Object.hasOwn(body, "provider");
+            const hasModel = Object.hasOwn(body, "model");
             if (
-              Object.keys(body).length !== 4 ||
+              !Object.keys(body).every((key) =>
+                ["requestId", "directory", "provider", "model"].includes(key),
+              ) ||
               typeof body.requestId !== "string" ||
               typeof body.directory !== "string" ||
-              typeof body.provider !== "string" ||
-              typeof body.model !== "string"
+              hasProvider !== hasModel ||
+              (hasProvider && (typeof body.provider !== "string" || typeof body.model !== "string"))
             )
-              fail(400, "invalid_input", "Provide requestId, directory, provider, and model.");
+              fail(
+                400,
+                "invalid_input",
+                "Provide requestId and directory, with both provider and model or neither.",
+              );
             const created = await sessions.createSession({
               requestId: body.requestId,
               directory: body.directory,
-              provider: body.provider,
-              model: body.model,
+              ...(typeof body.provider === "string" && typeof body.model === "string"
+                ? { provider: body.provider, model: body.model }
+                : {}),
             });
             if (created.status !== "ready") {
               send(response, created.status === "failed" ? 503 : 409, {
@@ -331,6 +343,12 @@ export async function startHost({
               });
             } else send(response, 201, created);
           }
+        } else if (modelMatch) {
+          const id = modelMatch[1];
+          if (!id) fail(400, "invalid_input", "Invalid session ID.");
+          if (!isSessionModelRequest(body))
+            fail(400, "invalid_input", "Provide a non-empty provider and model.");
+          send(response, 200, await sessions.setSessionModel(id, body));
         } else if (historyMatch) {
           const id = historyMatch[1];
           if (!id) fail(400, "invalid_input", "Invalid session ID.");

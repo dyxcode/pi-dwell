@@ -17,6 +17,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const PROVIDER = "dwell-test";
 const MODEL = "dwell-test";
+const ALT_MODEL = "dwell-test-alt";
 const API: Api = "dwell-test";
 const TOOL_NAME = "echo";
 const SLOW_DELAY_MS = 30_000;
@@ -309,6 +310,17 @@ export default function registerDwellFixture(pi: ExtensionAPI): void {
       {
         id: MODEL,
         name: "Dwell Offline Fixture",
+        api: API,
+        baseUrl: "http://127.0.0.1",
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        reasoning: false,
+        contextWindow: 4096,
+        maxTokens: 256,
+      },
+      {
+        id: ALT_MODEL,
+        name: "Dwell Offline Fixture Alternate",
         api: API,
         baseUrl: "http://127.0.0.1",
         input: ["text"],

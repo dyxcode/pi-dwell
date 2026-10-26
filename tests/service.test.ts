@@ -102,6 +102,8 @@ test("Linux install writes a private systemd user unit without enabling login st
     entryPath: "/home/example/app source/cli.ts",
     runner: async (command, args) => {
       calls.push({ command, args });
+      if (args.includes("--property=UnitFileState")) return success("disabled\n");
+      if (command === "/usr/bin/loginctl") return success("no\n");
       return success();
     },
   });
@@ -110,7 +112,7 @@ test("Linux install writes a private systemd user unit without enabling login st
   const unit = await readFile(unitPath, "utf8");
   const unitStats = await stat(unitPath);
 
-  assert.match(result, /not enabled for login startup/i);
+  assert.match(result, /Autostart: disabled/i);
   assert.match(
     unit,
     /ExecStart="\/opt\/node bin\/node" "\/home\/example\/app source\/cli\.ts" "serve"/,
@@ -122,6 +124,8 @@ test("Linux install writes a private systemd user unit without enabling login st
   assert.match(unit, /RestartSec=5s/);
   assert.match(unit, /StartLimitIntervalSec=60s/);
   assert.match(unit, /StartLimitBurst=5/);
+  assert.ok(!unit.includes("After=default.target"));
+  assert.match(unit, /WantedBy=default.target/);
   assert.ok(!calls.some(({ args }) => args.includes("enable")));
   assert.ok(calls.some(({ args }) => args[0] === "--user" && args[1] === "daemon-reload"));
   assert.equal(unitStats.mode & 0o077, 0);
@@ -166,7 +170,10 @@ test("service installation rejects repository and vault destinations before writ
 });
 
 test("install is idempotent for its own registration and refuses to overwrite unrelated content", async (t) => {
-  const options = await createOptions("linux", t, { runner: async () => success() });
+  const options = await createOptions("linux", t, {
+    runner: async (_command, args) =>
+      args.includes("--property=LoadState") ? success("LoadState=not-found\n") : success(),
+  });
   const registration = join(
     options.homeDirectory,
     ".config",

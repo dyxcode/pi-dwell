@@ -1,6 +1,16 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { open, lstat, mkdir, realpath, unlink, type FileHandle } from "node:fs/promises";
+import {
+  open,
+  lstat,
+  mkdir,
+  realpath,
+  unlink,
+  rename,
+  rm,
+  type FileHandle,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -316,7 +326,7 @@ function launchAgentContent(paths: ServicePaths): string {
   ].join("\n");
 }
 
-function systemdUnitContent(paths: ServicePaths): string {
+function systemdUnitContent(paths: ServicePaths, legacy = false): string {
   const command = [paths.executablePath, paths.entryPath, "serve"]
     .map((argument) => systemdQuote(argument, true))
     .join(" ");
@@ -326,7 +336,7 @@ function systemdUnitContent(paths: ServicePaths): string {
     "Description=Pi Dwell local host",
     "StartLimitIntervalSec=60s",
     "StartLimitBurst=5",
-    "After=default.target",
+    ...(legacy ? ["After=default.target"] : []),
     "",
     "[Service]",
     "Type=simple",
@@ -347,6 +357,10 @@ function systemdUnitContent(paths: ServicePaths): string {
 
 function registrationContent(paths: ServicePaths): string {
   return paths.platform === "darwin" ? launchAgentContent(paths) : systemdUnitContent(paths);
+}
+
+function isLegacyRegistration(paths: ServicePaths, content: string): boolean {
+  return paths.platform === "linux" && content === systemdUnitContent(paths, true);
 }
 
 function fileOpenFlags(): number {
@@ -393,15 +407,59 @@ async function readPrivateRegistration(path: string, userId: number): Promise<st
   }
 }
 
-async function writePrivateRegistration(paths: ServicePaths, content: string): Promise<boolean> {
+type RegistrationChange = "created" | "updated" | "unchanged";
+
+async function upgradeRegistration(
+  paths: ServicePaths,
+  previous: string,
+  content: string,
+): Promise<void> {
+  const temporary = `${paths.registrationPath}.${randomUUID()}.tmp`;
+  try {
+    const handle = await open(
+      temporary,
+      fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW,
+      0o600,
+    );
+    try {
+      await handle.writeFile(content, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    if ((await readPrivateRegistration(paths.registrationPath, paths.userId)) !== previous)
+      throw new Error("Service registration changed during upgrade; refusing to replace it.");
+    await rename(temporary, paths.registrationPath);
+    const directory = await open(dirname(paths.registrationPath), fsConstants.O_RDONLY);
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
+async function writePrivateRegistration(
+  paths: ServicePaths,
+  content: string,
+): Promise<RegistrationChange> {
   const current = await readPrivateRegistration(paths.registrationPath, paths.userId);
   if (current !== undefined) {
-    if (current !== content) {
+    const legacy = isLegacyRegistration(paths, current);
+    if (current !== content && !legacy) {
       throw new Error(
         `Refusing to replace existing service registration: ${paths.registrationPath}`,
       );
     }
-    return false;
+    // A matching file must not authorize reloading a different manager unit.
+    if (paths.platform === "linux") await inspectLinux(paths);
+    if (legacy) {
+      await upgradeRegistration(paths, current, content);
+      return "updated";
+    }
+    return "unchanged";
   }
 
   let handle: FileHandle;
@@ -414,7 +472,7 @@ async function writePrivateRegistration(paths: ServicePaths, content: string): P
   } catch (error: unknown) {
     if (error instanceof Error && "code" in error && error.code === "EEXIST") {
       const raced = await readPrivateRegistration(paths.registrationPath, paths.userId);
-      if (raced === content) return false;
+      if (raced === content) return "unchanged";
       throw new Error(
         `Refusing to replace existing service registration: ${paths.registrationPath}`,
       );
@@ -427,19 +485,28 @@ async function writePrivateRegistration(paths: ServicePaths, content: string): P
     await handle.close();
   }
   await readPrivateRegistration(paths.registrationPath, paths.userId);
-  return true;
+  return "created";
 }
 
-async function verifyRegistration(paths: ServicePaths): Promise<boolean> {
+async function verifyRegistration(
+  paths: ServicePaths,
+  allowLegacy = false,
+): Promise<"current" | "legacy" | undefined> {
   await ensureServiceDirectories(paths, false);
   const actual = await readPrivateRegistration(paths.registrationPath, paths.userId);
-  if (actual === undefined) return false;
+  if (actual === undefined) return undefined;
+  if (isLegacyRegistration(paths, actual)) {
+    if (allowLegacy) return "legacy";
+    throw new Error(
+      "Run npm run dwell -- service install to upgrade the legacy Linux unit before starting it.",
+    );
+  }
   if (actual !== registrationContent(paths)) {
     throw new Error(
       `Service registration does not match this pi-dwell installation: ${paths.registrationPath}`,
     );
   }
-  return true;
+  return "current";
 }
 
 async function run(
@@ -470,6 +537,67 @@ async function runRequired(
 async function reloadLinuxManager(paths: ServicePaths): Promise<void> {
   if (paths.platform === "linux")
     await runRequired(paths, "/usr/bin/systemctl", ["--user", "daemon-reload"]);
+}
+
+function unknownSetting(error: unknown): string {
+  const reason = error instanceof Error ? error.message : "Query failed.";
+  return `unknown (${reason.replace(/\s+/g, " ").slice(0, 500)})`;
+}
+
+async function linuxAutostart(paths: ServicePaths): Promise<string> {
+  try {
+    const result = await runRequired(paths, "/usr/bin/systemctl", [
+      "--user",
+      "show",
+      SYSTEMD_UNIT,
+      "--property=UnitFileState",
+      "--value",
+    ]);
+    const state = result.stdout.trim();
+    if (state === "enabled" || state === "disabled") return state;
+    if (state === "enabled-runtime") return "enabled-runtime (until reboot)";
+    if (
+      [
+        "linked",
+        "linked-runtime",
+        "alias",
+        "masked",
+        "masked-runtime",
+        "static",
+        "indirect",
+        "generated",
+        "transient",
+        "bad",
+        "not-found",
+      ].includes(state)
+    )
+      return `${state} (not persistent autostart)`;
+    throw new Error("systemd returned an invalid UnitFileState.");
+  } catch (error) {
+    return unknownSetting(error);
+  }
+}
+
+async function linuxLingering(paths: ServicePaths): Promise<string> {
+  try {
+    const result = await runRequired(paths, "/usr/bin/loginctl", [
+      "show-user",
+      String(paths.userId),
+      "--property=Linger",
+      "--value",
+    ]);
+    const state = result.stdout.trim();
+    if (state === "yes") return "enabled";
+    if (state === "no") return "disabled";
+    throw new Error("logind returned an invalid Linger value.");
+  } catch (error) {
+    return unknownSetting(error);
+  }
+}
+
+async function linuxBootStatus(paths: ServicePaths): Promise<string> {
+  const [autostart, lingering] = await Promise.all([linuxAutostart(paths), linuxLingering(paths)]);
+  return `Autostart: ${autostart}\nUser lingering: ${lingering}`;
 }
 
 async function inspectLinux(paths: ServicePaths): Promise<ManagerState | undefined> {
@@ -701,7 +829,7 @@ async function waitForStopped(paths: ServicePaths): Promise<void> {
 }
 
 async function stopService(paths: ServicePaths): Promise<boolean> {
-  if (!(await verifyRegistration(paths)))
+  if (!(await verifyRegistration(paths, true)))
     throw new Error("pi-dwell service is not installed; refusing to stop an unmanaged process.");
   if (paths.platform === "linux") await reloadLinuxManager(paths);
   const state = await inspectManager(paths);
@@ -718,7 +846,7 @@ async function stopService(paths: ServicePaths): Promise<boolean> {
 async function removeRegistration(paths: ServicePaths): Promise<void> {
   const content = await readPrivateRegistration(paths.registrationPath, paths.userId);
   if (content === undefined) return;
-  if (content !== registrationContent(paths)) {
+  if (content !== registrationContent(paths) && !isLegacyRegistration(paths, content)) {
     throw new Error(
       `Refusing to remove an unrelated service registration: ${paths.registrationPath}`,
     );
@@ -730,23 +858,65 @@ async function install(paths: ServicePaths): Promise<string> {
   // Validate all injected executable paths before creating any user directories.
   const content = registrationContent(paths);
   await ensureServiceDirectories(paths, true);
-  const created = await writePrivateRegistration(paths, content);
-  await reloadLinuxManager(paths);
-  return created
+  const change = await writePrivateRegistration(paths, content);
+  try {
+    await reloadLinuxManager(paths);
+  } catch (error) {
+    throw new Error(
+      `Service registration is saved, but manager reload failed. Retry service install. ${error instanceof Error ? error.message : "Unknown error."}`,
+      { cause: error },
+    );
+  }
+  if (paths.platform === "linux") {
+    const result =
+      change === "created"
+        ? "Installed pi-dwell service."
+        : change === "updated"
+          ? "Updated pi-dwell service registration; running processes were not restarted."
+          : "pi-dwell service is already installed.";
+    return `${result}\n${await linuxBootStatus(paths)}`;
+  }
+  return change === "created"
     ? "Installed pi-dwell service; it is not enabled for login startup."
     : "pi-dwell service is already installed; login startup remains disabled.";
 }
 
 async function uninstall(paths: ServicePaths): Promise<string> {
-  if (!(await verifyRegistration(paths))) return "pi-dwell service is not installed.";
+  if (!(await verifyRegistration(paths, true))) return "pi-dwell service is not installed.";
   const stopped = await stopService(paths);
-  await removeRegistration(paths);
-  if (paths.platform === "linux") await reloadLinuxManager(paths);
+  if (paths.platform === "linux") {
+    // Recheck after the asynchronous stop before modifying unit enablement.
+    if (!(await verifyRegistration(paths, true)))
+      throw new Error("Service registration disappeared after stop; uninstall is incomplete.");
+    try {
+      await runRequired(paths, "/usr/bin/systemctl", ["--user", "disable", SYSTEMD_UNIT]);
+    } catch (error) {
+      throw new Error(
+        `Service is stopped, but disabling autostart failed; registration and data were retained. ${error instanceof Error ? error.message : "Unknown error."}`,
+        { cause: error },
+      );
+    }
+  }
+  try {
+    await removeRegistration(paths);
+  } catch (error) {
+    throw new Error(
+      `Service is stopped${paths.platform === "linux" ? " and autostart is disabled" : ""}, but registration removal failed. ${error instanceof Error ? error.message : "Unknown error."}`,
+      { cause: error },
+    );
+  }
+  try {
+    await reloadLinuxManager(paths);
+  } catch (error) {
+    throw new Error(
+      `Service registration was removed, but manager reload failed. ${error instanceof Error ? error.message : "Unknown error."}`,
+      { cause: error },
+    );
+  }
   return stopped ? "Stopped and uninstalled pi-dwell service." : "Uninstalled pi-dwell service.";
 }
 
-async function status(paths: ServicePaths): Promise<string> {
-  if (!(await verifyRegistration(paths))) return "pi-dwell service is not installed.";
+async function runtimeStatus(paths: ServicePaths): Promise<string> {
   const state = await inspectManager(paths);
   if (state === undefined) {
     return paths.platform === "darwin"
@@ -781,6 +951,15 @@ async function status(paths: ServicePaths): Promise<string> {
   }
 }
 
+async function status(paths: ServicePaths): Promise<string> {
+  const registration = await verifyRegistration(paths, true);
+  if (!registration) return "pi-dwell service is not installed.";
+  const runtime = await runtimeStatus(paths);
+  return paths.platform === "linux"
+    ? `Runtime: ${runtime}\n${await linuxBootStatus(paths)}${registration === "legacy" ? "\nRegistration: legacy; run npm run dwell -- service install to upgrade." : ""}`
+    : runtime;
+}
+
 export async function runServiceCommand(
   action: ServiceAction,
   options: ServiceCommandOptions = {},
@@ -797,6 +976,8 @@ export async function runServiceCommand(
     return stopped ? "Stopped pi-dwell service." : "pi-dwell service is already stopped.";
   }
   if (action === "restart") {
+    if (!(await verifyRegistration(paths)))
+      throw new Error("Install the pi-dwell service before restarting it.");
     await stopService(paths);
     return startService(paths).then((result) => result.replace(/^Started/, "Restarted"));
   }

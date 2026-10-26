@@ -326,7 +326,7 @@ function launchAgentContent(paths: ServicePaths): string {
   ].join("\n");
 }
 
-function systemdUnitContent(paths: ServicePaths, legacy = false): string {
+function systemdUnitContent(paths: ServicePaths, legacy?: "ordered" | "quoted"): string {
   const command = [paths.executablePath, paths.entryPath, "serve"]
     .map((argument) => systemdQuote(argument, true))
     .join(" ");
@@ -336,11 +336,13 @@ function systemdUnitContent(paths: ServicePaths, legacy = false): string {
     "Description=Pi Dwell local host",
     "StartLimitIntervalSec=60s",
     "StartLimitBurst=5",
-    ...(legacy ? ["After=default.target"] : []),
+    ...(legacy === "ordered" ? ["After=default.target"] : []),
     "",
     "[Service]",
     "Type=simple",
-    `WorkingDirectory=${systemdQuote(dirname(paths.entryPath))}`,
+    // This scalar directive does not unquote or C-unescape. The final /. keeps
+    // trailing spaces and backslashes out of the unit file's line grammar.
+    `WorkingDirectory=${legacy ? systemdQuote(dirname(paths.entryPath)) : `${dirname(paths.entryPath).replaceAll("%", "%%")}/.`}`,
     `Environment=${systemdQuote(`HOME=${paths.homeDirectory}`)}`,
     `ExecStart=${command}`,
     "Restart=on-failure",
@@ -360,7 +362,11 @@ function registrationContent(paths: ServicePaths): string {
 }
 
 function isLegacyRegistration(paths: ServicePaths, content: string): boolean {
-  return paths.platform === "linux" && content === systemdUnitContent(paths, true);
+  return (
+    paths.platform === "linux" &&
+    (content === systemdUnitContent(paths, "ordered") ||
+      content === systemdUnitContent(paths, "quoted"))
+  );
 }
 
 function fileOpenFlags(): number {
@@ -454,7 +460,7 @@ async function writePrivateRegistration(
       );
     }
     // A matching file must not authorize reloading a different manager unit.
-    if (paths.platform === "linux") await inspectLinux(paths);
+    if (paths.platform === "linux") await inspectLinux(paths, legacy);
     if (legacy) {
       await upgradeRegistration(paths, current, content);
       return "updated";
@@ -600,7 +606,10 @@ async function linuxBootStatus(paths: ServicePaths): Promise<string> {
   return `Autostart: ${autostart}\nUser lingering: ${lingering}`;
 }
 
-async function inspectLinux(paths: ServicePaths): Promise<ManagerState | undefined> {
+async function inspectLinux(
+  paths: ServicePaths,
+  repairingLegacy = false,
+): Promise<ManagerState | undefined> {
   const command = "/usr/bin/systemctl";
   const args = [
     "--user",
@@ -627,7 +636,7 @@ async function inspectLinux(paths: ServicePaths): Promise<ManagerState | undefin
   const processIdText = fields.get("MainPID");
   const activeState = fields.get("ActiveState");
   if (
-    loadState !== "loaded" ||
+    (loadState !== "loaded" && !(repairingLegacy && loadState === "bad-setting")) ||
     fragmentPath === undefined ||
     processIdText === undefined ||
     activeState === undefined
@@ -641,6 +650,8 @@ async function inspectLinux(paths: ServicePaths): Promise<ManagerState | undefin
     throw new Error("systemd returned an invalid pi-dwell main process ID.");
   }
   const processId = Number(processIdText);
+  if (loadState === "bad-setting" && (processId !== 0 || activeState !== "inactive"))
+    throw new Error("Refusing to replace an invalid systemd unit with unexpected runtime state.");
   return { processId, state: activeState };
 }
 

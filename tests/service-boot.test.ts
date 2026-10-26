@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   mkdir,
   mkdtemp,
@@ -12,6 +13,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { promisify } from "node:util";
 import { type TestContext, test } from "node:test";
 import {
   runServiceCommand,
@@ -221,6 +223,57 @@ test("install atomically upgrades only the exact previous unit and keeps an enab
   } finally {
     await oldFile.close();
   }
+});
+
+test("install repairs the exact quoted-directory unit rejected by systemd without starting it", async (t) => {
+  const options = await createLinuxOptions(t);
+  await createUnitDirectory(options);
+  await writeFile(unitPath(options), systemdUnit(options, false), { mode: 0o600 });
+  const calls: Call[] = [];
+  let fragment = join(options.homeDirectory, "unrelated.service");
+  let processId = 0;
+  options.runner = async (command, args) => {
+    recordCalls(calls, command, args);
+    if (isUnitFileStateQuery(command, args)) return success("disabled\n");
+    if (isLingerQuery(command, args)) return success("yes\n");
+    if (command === SYSTEMCTL && args[1] === "show")
+      return success(
+        `LoadState=bad-setting\nFragmentPath=${fragment}\nMainPID=${processId}\nActiveState=inactive\n`,
+      );
+    return success();
+  };
+  await assert.rejects(runServiceCommand("install", options), /different systemd unit/);
+  fragment = unitPath(options);
+  processId = 4242;
+  await assert.rejects(runServiceCommand("install", options), /unexpected runtime state/);
+  assert.equal(await readFile(unitPath(options), "utf8"), systemdUnit(options, false));
+  processId = 0;
+  assert.match(await runServiceCommand("install", options), /updated/i);
+  const unit = await readFile(unitPath(options), "utf8");
+  assert.match(unit, /^WorkingDirectory=\//m);
+  assert.ok(!calls.some(({ args }) => ["start", "stop", "restart"].includes(args[1] ?? "")));
+});
+
+test("systemd accepts the generated unit with special characters in its working directory", {
+  skip: process.platform !== "linux" ? "Requires the Linux systemd parser." : false,
+}, async (t) => {
+  const exec = promisify(execFile);
+  try {
+    await exec("systemd-analyze", ["--version"]);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      t.skip("systemd-analyze is not installed.");
+      return;
+    }
+    throw error;
+  }
+  const options = await createLinuxOptions(t, { executablePath: process.execPath });
+  options.entryPath = join(options.homeDirectory, 'app % space " slash\\ ', "cli.ts");
+  await mkdir(dirname(options.entryPath), { mode: 0o700 });
+  await writeFile(options.entryPath, "// Parser validation only; this file is never executed.\n");
+  await installCurrentUnit(options);
+  const result = await exec("systemd-analyze", ["--user", "verify", unitPath(options)]);
+  assert.equal(result.stderr, "");
 });
 
 test("install refuses a symlinked Linux unit without changing its target", async (t) => {

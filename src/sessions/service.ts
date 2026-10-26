@@ -7,6 +7,12 @@ import { hasCode } from "../local/paths.ts";
 import { HistoryReadError, readSavedHistory } from "../runtime/pi-history.ts";
 import { type PiEntry, PiProcess, verifyPiConfiguration } from "../runtime/pi-process.ts";
 import { isRecord, RpcCommandError } from "../runtime/pi-rpc.ts";
+import {
+  discoverPiModels,
+  listHostDirectories,
+  SessionDiscoveryError,
+} from "../server/session-discovery.ts";
+import type { HostDirectoryListing, PiModelOption } from "../shared/discovery.ts";
 import type { StreamFrame } from "../shared/events.ts";
 import type { HistoryPage } from "../shared/history.ts";
 import {
@@ -101,6 +107,7 @@ export class SessionService {
   readonly #events = new SessionEvents();
   readonly #historyPages = new HistoryPages();
   readonly #reads = new Set<Promise<unknown>>();
+  #modelDiscovery: Promise<PiModelOption[]> | undefined;
   readonly #checkpoint: SessionServiceOptions["turnCheckpoint"];
   #queue: Promise<void> = Promise.resolve();
   #stopping = false;
@@ -165,6 +172,54 @@ export class SessionService {
   getSession(id: string): SessionInfo {
     this.#admit();
     return this.#view(this.#stored(id));
+  }
+
+  listDirectories(path?: string): Promise<HostDirectoryListing> {
+    try {
+      this.#admit();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const home =
+      this.#env.HOME ?? (process.platform === "win32" ? this.#env.USERPROFILE : undefined);
+    if (path === undefined && !home)
+      return Promise.reject(
+        new SessionError(
+          503,
+          "home_directory_unavailable",
+          "Dwell could not determine the host home directory.",
+        ),
+      );
+    return listHostDirectories(path, home ?? "").catch((error: unknown) => {
+      if (error instanceof SessionDiscoveryError)
+        throw new SessionError(error.status, error.code, error.message);
+      throw error;
+    });
+  }
+
+  listAvailableModels(): Promise<PiModelOption[]> {
+    try {
+      this.#admit();
+      const configuration = this.#configuration();
+      if (this.#modelDiscovery) return this.#modelDiscovery;
+      const discovery = discoverPiModels(configuration, this.#env).catch((error: unknown) => {
+        if (error instanceof SessionDiscoveryError)
+          throw new SessionError(error.status, error.code, error.message);
+        throw error;
+      });
+      this.#modelDiscovery = discovery;
+      void discovery.then(
+        () => {
+          if (this.#modelDiscovery === discovery) this.#modelDiscovery = undefined;
+        },
+        () => {
+          if (this.#modelDiscovery === discovery) this.#modelDiscovery = undefined;
+        },
+      );
+      return discovery;
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   subscribeEvents(
@@ -788,7 +843,10 @@ export class SessionService {
       this.#runtimeObservers.clear();
       this.#runtimes.clear();
       this.#events.close();
-      await Promise.allSettled([...this.#reads]);
+      await Promise.allSettled([
+        ...this.#reads,
+        ...(this.#modelDiscovery ? [this.#modelDiscovery] : []),
+      ]);
       this.#catalog.close();
       if (failed) throw new Error("Session shutdown could not save all runtime metadata.");
     })();

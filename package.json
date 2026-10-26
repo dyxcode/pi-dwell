@@ -24,7 +24,8 @@
     "test": "node --test tests/*.test.ts",
     "check": "npm run lint && npm run format:check && npm run typecheck && npm test",
     "check:package": "node scripts/check-package.mjs",
-    "check:pi": "node scripts/check-pi.ts"
+    "check:pi": "node scripts/check-pi.ts",
+    "check:web": "node scripts/check-web.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2",

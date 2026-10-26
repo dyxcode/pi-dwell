@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { HOST_PAGE, STYLE } from "../clients/web/page.ts";
-import { BROWSER_SCRIPT } from "../clients/web/script.ts";
+import { BROWSER_ASSETS } from "../clients/web/script.ts";
 import { dataDirectory, type HostMode } from "../local/paths.ts";
 import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
 import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
@@ -201,11 +201,20 @@ export async function startHost({
       const path = queryStart < 0 ? requestTarget : requestTarget.slice(0, queryStart);
       const historyMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/history$/.exec(path);
       let historyCursor: string | undefined;
+      let directoryPath: string | undefined;
       if (queryStart >= 0) {
-        if (!historyMatch) fail(400, "unexpected_query", "Query parameters are not supported.");
-        historyCursor = parseHistoryCursor(requestTarget.slice(queryStart + 1));
+        if (path === "/api/v1/directories") {
+          const query = new URLSearchParams(requestTarget.slice(queryStart + 1));
+          if ([...query].length !== 1 || !query.has("path"))
+            fail(400, "unexpected_query", "Provide one directory path.");
+          directoryPath = query.get("path") ?? "";
+          if (!directoryPath) fail(400, "invalid_input", "Provide a nonempty directory path.");
+        } else {
+          if (!historyMatch) fail(400, "unexpected_query", "Query parameters are not supported.");
+          historyCursor = parseHistoryCursor(requestTarget.slice(queryStart + 1));
+        }
       }
-      const gets = ["/", "/client.js", "/style.css", "/healthz", "/api/v1/status"];
+      const gets = ["/", "/style.css", "/healthz", "/api/v1/status", ...BROWSER_ASSETS.keys()];
       const posts = [
         "/api/v1/auth/pairings",
         "/api/v1/auth/pair",
@@ -222,6 +231,8 @@ export async function startHost({
         );
       const sessionRoute =
         path === "/api/v1/sessions" ||
+        path === "/api/v1/directories" ||
+        path === "/api/v1/models" ||
         path === "/api/v1/runtime" ||
         sessionMatch !== null ||
         historyMatch !== null ||
@@ -286,6 +297,10 @@ export async function startHost({
           )
             fail(400, "invalid_input", "Provide the Pi executable and optional entryPoint.");
           send(response, 200, await sessions.configure(body));
+        } else if (path === "/api/v1/directories") {
+          send(response, 200, await sessions.listDirectories(directoryPath));
+        } else if (path === "/api/v1/models") {
+          send(response, 200, { models: await sessions.listAvailableModels() });
         } else if (path === "/api/v1/sessions") {
           if (method === "GET") send(response, 200, sessions.listSessions());
           else {
@@ -372,16 +387,18 @@ export async function startHost({
           send(response, 200, { status: "ok" });
           return;
         }
-        if (path === "/" || path === "/client.js" || path === "/style.css") {
+        if (path === "/" || BROWSER_ASSETS.has(path) || path === "/style.css") {
           response.setHeader(
             "Content-Type",
             path === "/"
               ? "text/html; charset=utf-8"
-              : path === "/client.js"
+              : BROWSER_ASSETS.has(path)
                 ? "text/javascript; charset=utf-8"
                 : "text/css; charset=utf-8",
           );
-          response.end(path === "/" ? HOST_PAGE : path === "/client.js" ? BROWSER_SCRIPT : STYLE);
+          response.end(
+            path === "/" ? HOST_PAGE : BROWSER_ASSETS.has(path) ? BROWSER_ASSETS.get(path) : STYLE,
+          );
           return;
         }
         if (

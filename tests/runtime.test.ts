@@ -1,17 +1,45 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { access, unlink } from "node:fs/promises";
+import { access, unlink, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { type TestContext, test } from "node:test";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PiProcess } from "../src/runtime/pi-process.ts";
+import { isRecord } from "../src/runtime/pi-rpc.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
 const piEntry = import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry");
 
-async function runtime(t: TestContext, resumeFile?: string) {
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+async function waitForFile(path: string, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await access(path);
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  assert.fail(`Timed out waiting for ${path}.`);
+}
+
+async function runtime(
+  t: TestContext,
+  resumeFile?: string,
+  configureEnvironment?: (environment: Awaited<ReturnType<typeof createPiEnvironment>>) => void,
+) {
   const environment = await createPiEnvironment();
+  configureEnvironment?.(environment);
   const options = {
     executable: process.env.DWELL_TEST_PI_EXECUTABLE ?? process.execPath,
     ...(process.env.DWELL_TEST_PI_EXECUTABLE
@@ -127,6 +155,205 @@ test("real Pi observers detach without stopping work, busy runs reject, and abor
   assert.equal((await run).outcome, "aborted");
   assert.equal(pi.state, "ready");
   assert.equal((await pi.run("hello")).outcome, "completed");
+});
+
+test("runtime state subscribers receive initial state and child lifecycle transitions", async (t) => {
+  const { pi } = await runtime(t);
+  const states: string[] = [];
+  const unsubscribe = pi.subscribeState((state) => {
+    states.push(state);
+  });
+  pi.subscribeState(async (state) => {
+    if (state === "running") throw new Error("async state observer failure");
+  });
+  assert.deepEqual(states, ["ready"]);
+
+  const run = pi.startRun("hello");
+  assert.deepEqual(states, ["ready", "running"]);
+  assert.equal(await run.accepted, "started");
+  assert.equal((await run.settled).outcome, "completed");
+  assert.deepEqual(states, ["ready", "running", "ready"]);
+
+  await pi.stop();
+  assert.deepEqual(states, ["ready", "running", "ready", "stopping", "exited"]);
+  unsubscribe();
+});
+
+test("runtime state subscribers observe an unexpected real Pi child exit", async (t) => {
+  const { pi } = await runtime(t);
+  const failed = deferred<void>();
+  const unsubscribe = pi.subscribeState((state) => {
+    if (state === "failed") failed.resolve();
+  });
+  const pid = pi.pid;
+  assert.ok(pid);
+  process.kill(pid, "SIGKILL");
+  await failed.promise;
+  assert.equal(pi.state, "failed");
+  await pi.stop();
+  unsubscribe();
+});
+
+test("passive Pi observers do not keep dialogs open without an interactive observer", async (t) => {
+  const { pi } = await runtime(t);
+  const passiveCancelled = deferred<number>();
+  const requestStarted = { at: 0, id: "" };
+  const passive = pi.subscribe(
+    (event) => {
+      if (event.type !== "extension_ui_request") return;
+      if (event.method === "confirm") {
+        requestStarted.at = performance.now();
+        requestStarted.id = String(event.id);
+      }
+      if (event.method === "notify" && event.message === "dwell-confirm: cancelled")
+        passiveCancelled.resolve(performance.now() - requestStarted.at);
+    },
+    { interactive: false },
+  );
+
+  assert.equal((await pi.run("/dwell-confirm")).outcome, "handled");
+  const passiveDelay = await passiveCancelled.promise;
+  assert.ok(passiveDelay < 500, `passive-only confirmation took ${passiveDelay}ms`);
+  await assert.rejects(
+    pi.respondToUi({ id: requestStarted.id, confirmed: true }),
+    /Unknown or already answered/,
+  );
+  passive();
+
+  const activeRequest = deferred<void>();
+  const passiveActiveRequest = deferred<void>();
+  const confirmedNotice = deferred<void>();
+  const active = pi.subscribe((event) => {
+    if (event.type !== "extension_ui_request") return;
+    if (event.method === "confirm") {
+      activeRequest.resolve();
+      void pi.respondToUi({ id: String(event.id), confirmed: true }).catch(() => {});
+    }
+    if (event.method === "notify" && event.message === "dwell-confirm: confirmed")
+      confirmedNotice.resolve();
+  });
+  const observingPassive = pi.subscribe(
+    (event) => {
+      if (event.type === "extension_ui_request" && event.method === "confirm")
+        passiveActiveRequest.resolve();
+    },
+    { interactive: false },
+  );
+  assert.equal((await pi.run("/dwell-confirm")).outcome, "handled");
+  await Promise.all([activeRequest.promise, passiveActiveRequest.promise, confirmedNotice.promise]);
+  active();
+  observingPassive();
+
+  const detachingRequest = deferred<void>();
+  const detachedNotice = deferred<number>();
+  let detachedRequestId = "";
+  let unsubscribeLastInteractive = () => {};
+  unsubscribeLastInteractive = pi.subscribe((event) => {
+    if (event.type === "extension_ui_request" && event.method === "confirm") {
+      unsubscribeLastInteractive();
+      detachingRequest.resolve();
+    }
+  });
+  const remainingPassive = pi.subscribe(
+    (event) => {
+      if (event.type !== "extension_ui_request") return;
+      if (event.method === "confirm") {
+        detachedRequestId = String(event.id);
+        requestStarted.at = performance.now();
+      }
+      if (event.method === "notify" && event.message === "dwell-confirm: cancelled")
+        detachedNotice.resolve(performance.now() - requestStarted.at);
+    },
+    { interactive: false },
+  );
+  assert.equal((await pi.run("/dwell-confirm")).outcome, "handled");
+  await detachingRequest.promise;
+  const detachedDelay = await detachedNotice.promise;
+  assert.ok(detachedDelay < 500, `last-interactive removal took ${detachedDelay}ms`);
+  await assert.rejects(
+    pi.respondToUi({ id: detachedRequestId, confirmed: true }),
+    /Unknown or already answered/,
+  );
+  remainingPassive();
+});
+
+test("real Pi stream fixture waits for a release barrier and aborts while waiting", async (t) => {
+  let releasePath = "";
+  let startedPath = "";
+  const { pi } = await runtime(t, undefined, (value) => {
+    releasePath = join(value.root, "stream-release");
+    startedPath = join(value.root, "stream-started");
+    value.env.DWELL_TEST_STREAM_RELEASE = releasePath;
+    value.env.DWELL_TEST_STREAM_STARTED = startedPath;
+  });
+  const deltas: string[] = [];
+  const firstChunk = deferred<void>();
+  const unsubscribe = pi.subscribe((event) => {
+    if (event.type !== "message_update" || !isRecord(event.assistantMessageEvent)) return;
+    const update = event.assistantMessageEvent;
+    if (update.type !== "text_delta" || typeof update.delta !== "string") return;
+    deltas.push(update.delta);
+    if (update.delta === "stream-first-") firstChunk.resolve();
+  });
+
+  const run = pi.startRun("stream");
+  await firstChunk.promise;
+  assert.equal(await run.accepted, "started");
+  assert.equal(deltas.includes("stream-second"), false);
+  await waitForFile(startedPath);
+  await writeFile(releasePath, "release\n", { mode: 0o600 });
+  assert.equal((await run.settled).outcome, "completed");
+  assert.ok(deltas.includes("stream-second"));
+
+  await unlink(releasePath);
+  await unlink(startedPath);
+  const secondFirstChunk = deferred<void>();
+  const unsubscribeAbortObserver = pi.subscribe((event) => {
+    if (
+      event.type === "message_update" &&
+      isRecord(event.assistantMessageEvent) &&
+      event.assistantMessageEvent.type === "text_delta" &&
+      event.assistantMessageEvent.delta === "stream-first-"
+    )
+      secondFirstChunk.resolve();
+  });
+  const abortingRun = pi.startRun("stream");
+  await secondFirstChunk.promise;
+  await abortingRun.accepted;
+  await pi.abort();
+  assert.equal((await abortingRun.settled).outcome, "aborted");
+  unsubscribeAbortObserver();
+  unsubscribe();
+});
+
+test("real Pi burst fixture streams large tool updates with a bounded final message", async (t) => {
+  const { pi } = await runtime(t);
+  let updateBytes = 0;
+  let updateCount = 0;
+  const unsubscribe = pi.subscribe((event) => {
+    if (event.type !== "tool_execution_update" || !isRecord(event.partialResult)) return;
+    const content = event.partialResult.content;
+    if (!Array.isArray(content)) return;
+    for (const item of content) {
+      if (isRecord(item) && item.type === "text" && typeof item.text === "string") {
+        updateBytes += Buffer.byteLength(item.text);
+        updateCount += 1;
+      }
+    }
+  });
+
+  const result = await pi.run("burst");
+  assert.equal(result.outcome, "completed");
+  assert.equal(updateCount, 128);
+  assert.ok(updateBytes > 2 * 1024 * 1024);
+  const messages = await pi.getMessages();
+  const latestAssistant = messages
+    .slice()
+    .reverse()
+    .find((message) => message.role === "assistant");
+  assert.ok(latestAssistant);
+  assert.ok(Buffer.byteLength(JSON.stringify(latestAssistant)) < 1024);
+  unsubscribe();
 });
 
 test("real Pi reports provider failures rather than successful settlement", async (t) => {

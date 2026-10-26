@@ -8,6 +8,7 @@ import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
 import { isRuntimeConfiguration } from "../shared/sessions.ts";
 import { isTurnCreateRequest } from "../shared/turns.ts";
 import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
+import { createSseConnection, SseStartError, type SseConnection } from "./sse.ts";
 
 export interface HostOptions {
   /** Internal embedding/test seam. The public CLI always uses DEFAULT_PORT. */
@@ -16,6 +17,8 @@ export interface HostOptions {
   mode?: HostMode;
   now?: () => number;
   sessions?: Pick<SessionServiceOptions, "env" | "extensions">;
+  /** Internal test seam for exercising stream expiry and heartbeats. */
+  eventHeartbeatMs?: number;
 }
 export interface RunningHost {
   url: string;
@@ -87,6 +90,7 @@ export async function startHost({
   dataDir = dataDirectory(mode),
   now = Date.now,
   sessions: sessionOptions,
+  eventHeartbeatMs,
 }: HostOptions = {}): Promise<RunningHost> {
   if (!Number.isInteger(port) || port < 0 || port > 65535)
     throw new Error("Port must be an integer between 0 and 65535.");
@@ -108,6 +112,43 @@ export async function startHost({
   const cookie = (token: string, maxAge: number) =>
     `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
   const active = new Set<Promise<void>>();
+  const eventStreams = new Set<SseConnection>();
+
+  function revalidateEventStreams(): void {
+    for (const stream of eventStreams) stream.revalidate();
+  }
+
+  function openEventStream(
+    request: IncomingMessage,
+    response: ServerResponse,
+    sessionId: string,
+    cursor: string | undefined,
+  ): void {
+    if (!auth || !sessions) fail(503, "unavailable", "Session service is starting.");
+    let stream: SseConnection | undefined;
+    stream = createSseConnection(response, {
+      ...(eventHeartbeatMs === undefined ? {} : { heartbeatMs: eventHeartbeatMs }),
+      isAuthorized: () =>
+        Boolean(
+          auth &&
+            (auth.isCli(request.headers.authorization) ||
+              auth.isBrowser(cookieToken(request, cookieName), request.headers["x-dwell-browser"])),
+        ),
+      onClose: () => {
+        if (stream) eventStreams.delete(stream);
+      },
+    });
+    eventStreams.add(stream);
+    try {
+      const subscription = sessions.subscribeEvents(sessionId, cursor, (frame) =>
+        stream?.enqueue(frame),
+      );
+      stream.start(subscription.initial, subscription.unsubscribe);
+    } catch (error) {
+      stream.close();
+      throw error;
+    }
+  }
 
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     response.setHeader("Cache-Control", "no-store");
@@ -126,6 +167,7 @@ export async function startHost({
         "cookie",
         "x-dwell-request",
         "x-dwell-browser",
+        "last-event-id",
       ]) {
         if (
           request.rawHeaders.filter(
@@ -153,6 +195,7 @@ export async function startHost({
       const sessionMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)(?:\/(open|close|context))?$/.exec(
         path,
       );
+      const eventMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/events$/.exec(path);
       const turnMatch =
         /^\/api\/v1\/sessions\/([a-f0-9-]+)\/turns(?:\/([a-f0-9-]+)(?:\/(result|abort))?)?$/.exec(
           path,
@@ -161,24 +204,30 @@ export async function startHost({
         path === "/api/v1/sessions" ||
         path === "/api/v1/runtime" ||
         sessionMatch !== null ||
+        eventMatch !== null ||
         turnMatch !== null;
-      const method = sessionRoute
-        ? path === "/api/v1/runtime" ||
+      let method: string | undefined;
+      if (sessionRoute) {
+        if (
+          path === "/api/v1/runtime" ||
           sessionMatch?.[2] === "open" ||
           sessionMatch?.[2] === "close"
-          ? "POST"
-          : turnMatch
-            ? turnMatch[2] === undefined || turnMatch[3] === "abort"
-              ? "POST"
-              : "GET"
-            : path === "/api/v1/sessions" && request.method === "POST"
-              ? "POST"
-              : "GET"
-        : gets.includes(path)
-          ? "GET"
-          : posts.includes(path)
-            ? "POST"
-            : undefined;
+        ) {
+          method = "POST";
+        } else if (eventMatch) {
+          method = "GET";
+        } else if (turnMatch) {
+          method = turnMatch[2] === undefined || turnMatch[3] === "abort" ? "POST" : "GET";
+        } else if (path === "/api/v1/sessions" && request.method === "POST") {
+          method = "POST";
+        } else {
+          method = "GET";
+        }
+      } else if (gets.includes(path)) {
+        method = "GET";
+      } else if (posts.includes(path)) {
+        method = "POST";
+      }
       if (!method) fail(404, "not_found", "Unknown route.");
       if (request.method !== method) {
         response.setHeader("Allow", method);
@@ -243,6 +292,14 @@ export async function startHost({
               });
             } else send(response, 201, created);
           }
+        } else if (eventMatch) {
+          const id = eventMatch[1];
+          if (!id) fail(400, "invalid_input", "Invalid session ID.");
+          const cursorHeader = request.headers["last-event-id"];
+          if (cursorHeader !== undefined && typeof cursorHeader !== "string")
+            fail(400, "invalid_cursor", "Last-Event-ID must contain one event cursor.");
+          openEventStream(request, response, id, cursorHeader);
+          return;
         } else if (turnMatch) {
           const id = turnMatch[1];
           if (!id) fail(400, "invalid_input", "Invalid session ID.");
@@ -336,23 +393,35 @@ export async function startHost({
           send(response, 201, auth.createPairing());
           return;
         }
-        if (path === "/api/v1/auth/revoke") await auth.revoke();
-        else {
+        if (path === "/api/v1/auth/revoke") {
+          await auth.revoke();
+          revalidateEventStreams();
+        } else {
           const token = cookieToken(request, cookieName);
           if (!token || !auth.isBrowser(token, request.headers["x-dwell-browser"]))
             fail(401, "unauthenticated", "This browser session has expired or been revoked.");
           await auth.logout(token);
+          revalidateEventStreams();
           response.setHeader("Set-Cookie", cookie("", 0));
         }
       }
       send(response, 200, { ok: true });
     } catch (error) {
       if (response.destroyed) return;
+      if (error instanceof AccessError && error.code === "storage_unavailable")
+        revalidateEventStreams();
+      if (response.headersSent) {
+        response.destroy();
+        return;
+      }
       response.setHeader("Connection", "close");
       if (error instanceof AccessError || error instanceof SessionError) {
         if (error.status === 429)
           response.setHeader("Retry-After", error.code === "pairing_limit" ? "300" : "60");
         send(response, error.status, { error: { code: error.code, message: error.message } });
+      } else if (error instanceof SseStartError) {
+        const status = error.code === "unauthenticated" ? 401 : 503;
+        send(response, status, { error: { code: error.code, message: error.message } });
       } else
         send(response, 500, {
           error: { code: "internal_error", message: "Dwell could not complete the request." },
@@ -388,6 +457,7 @@ export async function startHost({
     if (!closing) {
       stopping = true;
       closing = (async () => {
+        for (const stream of eventStreams) stream.close();
         server.closeAllConnections();
         await Promise.all(active);
         try {

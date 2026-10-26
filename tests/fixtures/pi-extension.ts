@@ -1,4 +1,4 @@
-import { appendFile } from "node:fs/promises";
+import { access, appendFile } from "node:fs/promises";
 import {
   type Api,
   type AssistantMessage,
@@ -89,12 +89,16 @@ function emitText(
   stream.end();
 }
 
-function emitToolCall(stream: AssistantMessageEventStream, message: AssistantMessage): void {
+function emitToolCall(
+  stream: AssistantMessageEventStream,
+  message: AssistantMessage,
+  text = "dwell-test-echo",
+): void {
   const toolCall: ToolCall = {
     type: "toolCall",
     id: uuidv7(),
     name: TOOL_NAME,
-    arguments: { text: "dwell-test-echo" },
+    arguments: { text },
   };
   const contentIndex = message.content.length;
   stream.push({ type: "start", partial: message });
@@ -136,6 +140,58 @@ function waitForAbortOrTimeout(signal: AbortSignal | undefined, delayMs: number)
   });
 }
 
+async function waitForRelease(
+  signal: AbortSignal | undefined,
+  releasePath: string,
+): Promise<boolean> {
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) return false;
+    try {
+      await access(releasePath);
+      return true;
+    } catch {
+      if (await waitForAbortOrTimeout(signal, 25)) return false;
+    }
+  }
+  return true;
+}
+
+async function emitGatedText(
+  stream: AssistantMessageEventStream,
+  message: AssistantMessage,
+  options?: SimpleStreamOptions,
+): Promise<void> {
+  const first = "stream-first-";
+  const second = "stream-second";
+  const block: TextContent = { type: "text", text: "" };
+  const contentIndex = message.content.length;
+  stream.push({ type: "start", partial: message });
+  message.content.push(block);
+  stream.push({ type: "text_start", contentIndex, partial: message });
+  block.text = first;
+  stream.push({ type: "text_delta", contentIndex, delta: first, partial: message });
+
+  const startedPath = process.env.DWELL_TEST_STREAM_STARTED;
+  if (startedPath) await appendFile(startedPath, "first-chunk\n", { mode: 0o600 });
+  const releasePath = process.env.DWELL_TEST_STREAM_RELEASE;
+  if (releasePath && !(await waitForRelease(options?.signal, releasePath))) {
+    emitError(stream, message, "aborted", "Scripted response aborted.");
+    return;
+  }
+  if (options?.signal?.aborted) {
+    emitError(stream, message, "aborted", "Scripted response aborted.");
+    return;
+  }
+
+  block.text += second;
+  stream.push({ type: "text_delta", contentIndex, delta: second, partial: message });
+  stream.push({ type: "text_end", contentIndex, content: block.text, partial: message });
+  message.stopReason = "stop";
+  stream.push({ type: "done", reason: "stop", message });
+  stream.end();
+}
+
 function scriptedStream(
   model: Model<Api>,
   context: TranscriptContext,
@@ -157,6 +213,22 @@ function scriptedStream(
       const echoResult = latestEchoResult(context);
       if (echoResult === undefined) {
         emitToolCall(stream, message);
+      } else {
+        const response = `Echo complete: ${echoResult}`;
+        emitText(stream, message, response, ["Echo ", "complete: ", echoResult]);
+      }
+      return;
+    }
+
+    if (prompt === "stream") {
+      await emitGatedText(stream, message, options);
+      return;
+    }
+
+    if (prompt === "burst") {
+      const echoResult = latestEchoResult(context);
+      if (echoResult === undefined) {
+        emitToolCall(stream, message, "dwell-test-burst");
       } else {
         const response = `Echo complete: ${echoResult}`;
         emitText(stream, message, response, ["Echo ", "complete: ", echoResult]);
@@ -254,7 +326,21 @@ export default function registerDwellFixture(pi: ExtensionAPI): void {
     label: "Echo",
     description: "Return the provided text unchanged for the local Dwell runtime fixture.",
     parameters: Type.Object({ text: Type.String() }),
-    async execute(_toolCallId, params) {
+    async execute(_toolCallId, params, signal, onUpdate) {
+      const burst = params.text === "dwell-test-burst";
+      const updateCount = burst ? 128 : 1;
+      for (let index = 0; index < updateCount; index += 1) {
+        if (signal?.aborted) throw new Error("Echo tool aborted.");
+        const text = burst
+          ? `burst-${String(index + 1).padStart(3, "0")}: ${"x".repeat(24 * 1024)}`
+          : `Echoing ${params.text}`;
+        onUpdate?.({
+          content: [{ type: "text", text }],
+          details: { echoed: params.text },
+        });
+        if (burst && index + 1 < updateCount)
+          await new Promise<void>((resolve) => setImmediate(resolve));
+      }
       return {
         content: [{ type: "text", text: params.text }],
         details: { echoed: params.text },

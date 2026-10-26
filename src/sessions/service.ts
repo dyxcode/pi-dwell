@@ -14,6 +14,13 @@ import {
   type SessionInfo,
 } from "../shared/sessions.ts";
 import { SessionCatalog, type StoredSession, type StoredTurn } from "../storage/catalog.ts";
+import type { StreamFrame } from "../shared/events.ts";
+import {
+  InvalidCursorError,
+  SessionEvents,
+  StreamCapacityError,
+  SubscriberLimitError,
+} from "./events.ts";
 
 export class SessionError extends Error {
   readonly status: number;
@@ -84,8 +91,10 @@ export class SessionService {
   readonly #extensions: readonly string[];
   readonly #now: () => number;
   readonly #runtimes = new Map<string, PiProcess>();
+  readonly #runtimeObservers = new Map<string, () => void>();
   readonly #turns = new Map<string, ActiveTurn>();
   readonly #storageFaults = new Set<string>();
+  readonly #events = new SessionEvents();
   readonly #checkpoint: SessionServiceOptions["turnCheckpoint"];
   #queue: Promise<void> = Promise.resolve();
   #stopping = false;
@@ -152,6 +161,70 @@ export class SessionService {
     return this.#view(this.#stored(id));
   }
 
+  subscribeEvents(
+    id: string,
+    cursor: string | undefined,
+    listener: (frame: StreamFrame) => void,
+  ): { initial: StreamFrame[]; unsubscribe(): void } {
+    this.#admit();
+    const session = this.#view(this.#stored(id));
+    this.#checkStorage(id);
+    const current = session.activeTurnId
+      ? this.#catalog.getTurn(id, session.activeTurnId)
+      : undefined;
+    const latest = this.#catalog.latestTurn(id);
+    try {
+      return this.#events.connect(
+        session,
+        current ? turnView(current) : null,
+        latest ? turnView(latest) : null,
+        cursor,
+        listener,
+      );
+    } catch (error) {
+      if (error instanceof InvalidCursorError)
+        throw new SessionError(400, "invalid_cursor", error.message);
+      if (error instanceof SubscriberLimitError)
+        throw new SessionError(429, "subscriber_limit", error.message);
+      if (error instanceof StreamCapacityError)
+        throw new SessionError(503, "stream_unavailable", error.message);
+      throw error;
+    }
+  }
+
+  #publishState(id: string, withTurn = false): void {
+    try {
+      const session = this.#view(this.#stored(id));
+      if (withTurn) {
+        const current = session.activeTurnId
+          ? this.#catalog.getTurn(id, session.activeTurnId)
+          : undefined;
+        const latest = this.#catalog.latestTurn(id);
+        this.#events.publishTurn(
+          session,
+          current ? turnView(current) : null,
+          latest ? turnView(latest) : null,
+        );
+      } else this.#events.publishSession(session);
+    } catch {
+      this.#events.fail(
+        id,
+        "state_unavailable",
+        "Session observation could not be synchronized. Reconnect to refresh state.",
+      );
+    }
+  }
+
+  #storageFault(id: string): void {
+    if (this.#storageFaults.has(id)) return;
+    this.#storageFaults.add(id);
+    this.#events.fail(
+      id,
+      "storage_unavailable",
+      "Durable state could not be saved. Execution will not be replayed; repair storage and restart the host.",
+    );
+  }
+
   createSession(request: SessionCreateRequest): Promise<SessionInfo> {
     return this.#mutate(async () => {
       if (
@@ -208,6 +281,7 @@ export class SessionService {
         error: null,
       };
       this.#catalog.insert(stored); // Admission is durable before any child is launched.
+      this.#publishState(stored.id);
       try {
         return await this.#open(stored);
       } catch (error) {
@@ -218,6 +292,7 @@ export class SessionService {
           error: error instanceof SessionError ? error.message : "Pi session startup failed.",
         };
         this.#catalog.update(failed);
+        this.#publishState(failed.id);
         return this.#view(failed);
       }
     });
@@ -246,8 +321,11 @@ export class SessionService {
           );
         await this.#rememberHistory(stored, runtime);
         await runtime.stop();
+        this.#runtimeObservers.get(id)?.();
+        this.#runtimeObservers.delete(id);
         this.#runtimes.delete(id);
       }
+      this.#publishState(id);
       return this.#view(this.#stored(id));
     });
   }
@@ -318,10 +396,11 @@ export class SessionService {
         abortFailed: false,
       };
       this.#turns.set(id, slot);
+      this.#publishState(id, true);
       setImmediate(() => {
         void this.#executeTurn(slot, request.message)
           .catch(() => {
-            this.#storageFaults.add(id);
+            this.#storageFault(id);
           })
           .finally(finish);
       });
@@ -387,7 +466,7 @@ export class SessionService {
         slot?.runId === runId &&
         (!(error instanceof SessionError) || error.code === "storage_unavailable")
       ) {
-        this.#storageFaults.add(id);
+        this.#storageFault(id);
         try {
           await slot.runtime?.stop();
         } catch {
@@ -418,8 +497,9 @@ export class SessionService {
   #writeTurn(turn: StoredTurn): void {
     try {
       this.#catalog.updateTurn(turn);
+      this.#publishState(turn.sessionId, true);
     } catch {
-      this.#storageFaults.add(turn.sessionId);
+      this.#storageFault(turn.sessionId);
       throw new SessionError(
         503,
         "storage_unavailable",
@@ -447,6 +527,7 @@ export class SessionService {
     const id = slot.sessionId;
     let markedHistory = false;
     let historyWasExpected = false;
+    let unobserve: (() => void) | undefined;
     try {
       await this.#checkpoint?.("accepted", turnView(this.#storedTurn(id, slot.runId)));
       this.#checkStorage(id);
@@ -460,6 +541,7 @@ export class SessionService {
       const source = this.#stored(id);
       if (source.historyExpected && !(await this.#history(source))) {
         this.#catalog.update({ ...source, error: HISTORY_UNAVAILABLE, updatedAt: this.#now() });
+        this.#publishState(id);
         throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
       }
       const before = new Set((await runtime.getEntries()).entries.map((entry) => entry.id));
@@ -474,6 +556,7 @@ export class SessionService {
         updatedAt: this.#now(),
       });
       markedHistory = true;
+      this.#publishState(id, true);
       await this.#checkpoint?.("dispatching", turnView(turn));
       turn = this.#storedTurn(id, slot.runId);
       this.#checkStorage(id);
@@ -487,6 +570,13 @@ export class SessionService {
         });
         return;
       }
+      this.#events.beginTurn(id, slot.runId);
+      unobserve = runtime.subscribe(
+        (event) => {
+          this.#events.observe(id, slot.runId, event);
+        },
+        { interactive: false },
+      );
       slot.dispatched = true;
       const run = runtime.startRun(message);
       const disposition = await run.accepted;
@@ -543,7 +633,7 @@ export class SessionService {
             },
           });
       } catch {
-        this.#storageFaults.add(id);
+        this.#storageFault(id);
       }
       if (slot.dispatched || this.#storageFaults.has(id)) {
         try {
@@ -562,7 +652,7 @@ export class SessionService {
             updatedAt: this.#now(),
           });
         } catch {
-          this.#storageFaults.add(id);
+          this.#storageFault(id);
         }
       }
       if (slot.abort) {
@@ -572,7 +662,10 @@ export class SessionService {
           /* The runtime is already being stopped. */
         }
       }
+      unobserve?.();
       if (this.#turns.get(id) === slot) this.#turns.delete(id);
+      this.#events.endTurn(id, slot.runId);
+      this.#publishState(id, true);
     }
   }
 
@@ -609,7 +702,10 @@ export class SessionService {
         }),
       );
       await Promise.all(slots.map((slot) => slot.done));
+      for (const unobserve of this.#runtimeObservers.values()) unobserve();
+      this.#runtimeObservers.clear();
       this.#runtimes.clear();
+      this.#events.close();
       this.#catalog.close();
       if (failed) throw new Error("Session shutdown could not save all runtime metadata.");
     })();
@@ -711,7 +807,10 @@ export class SessionService {
     for (const [id, runtime] of this.#runtimes)
       if (runtime.state === "failed" || runtime.state === "exited") {
         await runtime.stop();
+        this.#runtimeObservers.get(id)?.();
+        this.#runtimeObservers.delete(id);
         this.#runtimes.delete(id);
+        this.#publishState(id);
       }
   }
 
@@ -796,6 +895,7 @@ export class SessionService {
     const resumeFile = await this.#history(stored);
     if (stored.historyExpected && !resumeFile) {
       this.#catalog.update({ ...stored, updatedAt: this.#now(), error: HISTORY_UNAVAILABLE });
+      this.#publishState(stored.id);
       throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
     }
     let runtime: PiProcess;
@@ -840,6 +940,13 @@ export class SessionService {
       };
       this.#catalog.update(ready);
       this.#runtimes.set(stored.id, runtime);
+      this.#runtimeObservers.set(
+        stored.id,
+        runtime.subscribeState(() => {
+          this.#publishState(stored.id);
+        }),
+      );
+      this.#publishState(stored.id);
       return this.#view(ready);
     } catch (error) {
       await runtime.stop();
@@ -864,8 +971,9 @@ export class SessionService {
         error: latest.historyExpected && file === undefined ? HISTORY_UNAVAILABLE : latest.error,
         updatedAt: this.#now(),
       });
+      this.#publishState(stored.id);
     } catch {
-      this.#storageFaults.add(stored.id);
+      this.#storageFault(stored.id);
       throw new SessionError(
         503,
         "storage_unavailable",

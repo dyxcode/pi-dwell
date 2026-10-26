@@ -44,6 +44,11 @@ export type PiEntry = Record<string, unknown> & {
   parentId: string | null;
 };
 type Listener = (event: RpcRecord) => void | Promise<void>;
+type StateListener = (state: RuntimeState) => void | Promise<void>;
+interface Subscription {
+  listener: Listener;
+  interactive: boolean;
+}
 interface Run {
   resolve(result: RunResult): void;
   reject(error: Error): void;
@@ -164,7 +169,8 @@ export class PiProcess {
   #state: RuntimeState = "starting";
   readonly #child: ChildProcessWithoutNullStreams;
   readonly #rpc: PiRpc;
-  readonly #listeners = new Set<Listener>();
+  readonly #listeners = new Set<Subscription>();
+  readonly #stateListeners = new Set<StateListener>();
   readonly #dialogs = new Map<string, { method: string; timer: ReturnType<typeof setTimeout> }>();
   readonly #requestMs: number;
   readonly #shutdownMs: number;
@@ -211,7 +217,7 @@ export class PiProcess {
         );
         this.#run = undefined;
         this.#clearDialogs();
-        if (this.#state === "stopping") this.#state = "exited";
+        if (this.#state === "stopping") this.#setState("exited");
         resolve();
       });
     });
@@ -294,7 +300,7 @@ export class PiProcess {
         throw new Error("Pi did not preserve the requested session identity.");
       if (runtime.#state !== "starting")
         throw runtime.#error ?? new Error("Pi stopped during startup.");
-      runtime.#state = "ready";
+      runtime.#setState("ready");
       return runtime;
     } catch (error) {
       await runtime.stop();
@@ -312,15 +318,19 @@ export class PiProcess {
     return this.#stderr;
   }
 
-  subscribe(listener: Listener): () => void {
-    this.#listeners.add(listener);
+  subscribe(listener: Listener, options: { interactive?: boolean } = {}): () => void {
+    const subscription = { listener, interactive: options.interactive ?? true };
+    this.#listeners.add(subscription);
     return () => {
-      this.#listeners.delete(listener);
-      if (this.#listeners.size === 0) {
-        for (const id of this.#dialogs.keys())
-          void this.respondToUi({ id, cancelled: true }).catch(() => {});
-      }
+      if (!this.#listeners.delete(subscription)) return;
+      if (!this.#hasInteractiveObservers()) this.#cancelDialogs();
     };
+  }
+
+  subscribeState(listener: StateListener): () => void {
+    this.#stateListeners.add(listener);
+    this.#notifyStateListener(listener, this.#state);
+    return () => this.#stateListeners.delete(listener);
   }
 
   async getState(): Promise<SessionState> {
@@ -386,7 +396,7 @@ export class PiProcess {
     // Install run state before sending: Pi can emit events before its prompt response.
     const run: Run = { resolve: resolveSettled, reject: rejectSettled, aborted: false };
     this.#run = run;
-    this.#state = "running";
+    this.#setState("running");
 
     void this.#rpc.request("prompt", { message }).then(
       (data) => {
@@ -452,7 +462,7 @@ export class PiProcess {
       await this.#closed;
       return;
     }
-    if (this.#state !== "failed") this.#state = "stopping";
+    if (this.#state !== "failed") this.#setState("stopping");
     this.#rpc.close(new Error("Pi runtime is stopping; execution outcome may be unknown."));
     this.#child.stdin.end();
     const terminate = setTimeout(() => this.#child.kill("SIGTERM"), this.#shutdownMs);
@@ -469,7 +479,7 @@ export class PiProcess {
     if (this.#run !== run) return;
     this.#run = undefined;
     this.#clearDialogs();
-    if (this.#state === "running") this.#state = "ready";
+    if (this.#state === "running") this.#setState("ready");
     run.resolve(result);
   }
 
@@ -477,14 +487,14 @@ export class PiProcess {
     if (this.#run !== run) return;
     this.#run = undefined;
     this.#clearDialogs();
-    if (this.#state === "running") this.#state = "ready";
+    if (this.#state === "running") this.#setState("ready");
     run.reject(error);
   }
 
   #fail(error: Error): void {
     if (this.#state === "failed" || this.#state === "exited") return;
     this.#error = error;
-    this.#state = "failed";
+    this.#setState("failed");
     this.#rpc.close(error);
     this.#run?.reject(error);
     this.#run = undefined;
@@ -515,7 +525,7 @@ export class PiProcess {
     } else if (record.type === "extension_ui_request") {
       this.#uiRequest(record);
     }
-    for (const listener of [...this.#listeners]) {
+    for (const { listener } of [...this.#listeners]) {
       try {
         const result = listener(record);
         if (result) void result.catch(() => {});
@@ -523,6 +533,32 @@ export class PiProcess {
         /* Observation failures must not stop Pi execution. */
       }
     }
+  }
+
+  #setState(state: RuntimeState): void {
+    if (this.#state === state) return;
+    this.#state = state;
+    for (const listener of [...this.#stateListeners]) {
+      this.#notifyStateListener(listener, state);
+    }
+  }
+
+  #notifyStateListener(listener: StateListener, state: RuntimeState): void {
+    try {
+      const result = listener(state);
+      if (result) void result.catch(() => {});
+    } catch {
+      /* State observation failures must not stop Pi execution. */
+    }
+  }
+
+  #hasInteractiveObservers(): boolean {
+    return [...this.#listeners].some((subscription) => subscription.interactive);
+  }
+
+  #cancelDialogs(): void {
+    for (const id of this.#dialogs.keys())
+      void this.respondToUi({ id, cancelled: true }).catch(() => {});
   }
 
   #uiRequest(record: RpcRecord): void {
@@ -559,8 +595,7 @@ export class PiProcess {
         void this.respondToUi({ id, cancelled: true }).catch(() => {});
       }, timeout);
       this.#dialogs.set(id, { method: record.method, timer });
-      if (this.#listeners.size === 0)
-        void this.respondToUi({ id: record.id, cancelled: true }).catch(() => {});
+      if (!this.#hasInteractiveObservers()) this.#cancelDialogs();
     }
   }
 

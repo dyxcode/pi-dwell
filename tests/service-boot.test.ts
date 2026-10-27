@@ -174,6 +174,68 @@ test("Linux user unit leaves ordering to the user manager and retains default.ta
   assert.match(unit, /^WantedBy=default\.target$/m);
 });
 
+test("first install refuses a loaded systemd unit from a different registration path", async (t) => {
+  const calls: Call[] = [];
+  const options = await createLinuxOptions(t);
+  const foreignFragment = join(options.homeDirectory, "another-pi-dwell.service");
+  options.runner = async (command, args) => {
+    recordCalls(calls, command, args);
+    if (command === SYSTEMCTL && args[0] === "--user" && args[1] === "show") {
+      return managerState(options, 0, "inactive", foreignFragment);
+    }
+    if (isUnitFileStateQuery(command, args)) return success("disabled\n");
+    if (isLingerQuery(command, args)) return success("no\n");
+    return success();
+  };
+
+  await assert.rejects(runServiceCommand("install", options), /different systemd unit file/);
+  await assert.rejects(stat(unitPath(options)), { code: "ENOENT" });
+  assert.ok(
+    !calls.some(
+      ({ command, args }) =>
+        command === SYSTEMCTL && args[0] === "--user" && args[1] === "daemon-reload",
+    ),
+    "first install must not reload systemd after finding a foreign unit",
+  );
+});
+
+test("first install rechecks systemd when an identical registration wins the create race", async (t) => {
+  const options = await createLinuxOptions(t);
+  await installCurrentUnit(options);
+  const registration = unitPath(options);
+  const content = await readFile(registration, "utf8");
+  await rm(registration);
+
+  const calls: Call[] = [];
+  const foreignFragment = join(options.homeDirectory, "another-pi-dwell.service");
+  let inspectCalls = 0;
+  options.runner = async (command, args) => {
+    recordCalls(calls, command, args);
+    if (command === SYSTEMCTL && args[0] === "--user" && args[1] === "show") {
+      inspectCalls += 1;
+      if (inspectCalls === 1) {
+        await writeFile(registration, content, { mode: 0o600 });
+        return managerNotFound();
+      }
+      return managerState(options, 0, "inactive", foreignFragment);
+    }
+    if (isUnitFileStateQuery(command, args)) return success("disabled\n");
+    if (isLingerQuery(command, args)) return success("no\n");
+    return success();
+  };
+
+  await assert.rejects(runServiceCommand("install", options), /different systemd unit file/);
+  assert.equal(inspectCalls, 2, "the create-race branch must verify the manager unit again");
+  assert.equal(await readFile(registration, "utf8"), content);
+  assert.ok(
+    !calls.some(
+      ({ command, args }) =>
+        command === SYSTEMCTL && args[0] === "--user" && args[1] === "daemon-reload",
+    ),
+    "install must not reload systemd after the race recheck finds a foreign unit",
+  );
+});
+
 test("install atomically upgrades only the exact previous unit and keeps an enabled running service untouched", async (t) => {
   const calls: Call[] = [];
   const options = await createLinuxOptions(t);

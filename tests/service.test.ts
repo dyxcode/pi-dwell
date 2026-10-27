@@ -62,6 +62,10 @@ function systemdState(
   return success(`${order.map((property) => `${property}=${values[property]}`).join("\n")}\n`);
 }
 
+function systemdNotFound(): ServiceCommandResult {
+  return success("LoadState=not-found\n");
+}
+
 test("macOS install writes a private, non-login-autoload LaunchAgent with a fixed production command", async (t) => {
   const options = await createOptions("darwin", t, {
     runner: async () => success(),
@@ -102,6 +106,14 @@ test("Linux install writes a private systemd user unit without enabling login st
     entryPath: "/home/example/app source/cli.ts",
     runner: async (command, args) => {
       calls.push({ command, args });
+      if (
+        command === "/usr/bin/systemctl" &&
+        args[0] === "--user" &&
+        args[1] === "show" &&
+        args.includes("--property=LoadState")
+      ) {
+        return systemdNotFound();
+      }
       if (args.includes("--property=UnitFileState")) return success("disabled\n");
       if (command === "/usr/bin/loginctl") return success("no\n");
       return success();
@@ -140,7 +152,8 @@ test("systemd serialization preserves literal path characters without shell or s
   const options = await createOptions("linux", t, {
     homeDirectory: await realpath(unusualHome),
     entryPath: '/home/example/100% "$HOME"/app source/cli.ts',
-    runner: async () => success(),
+    runner: async (_command, args) =>
+      args.includes("--property=LoadState") ? systemdNotFound() : success(),
   });
   await runServiceCommand("install", options);
   const unit = await readFile(
@@ -195,7 +208,10 @@ test("install is idempotent for its own registration and refuses to overwrite un
 });
 
 test("service registration reads reject hard links and oversized files", async (t) => {
-  const options = await createOptions("linux", t, { runner: async () => success() });
+  const options = await createOptions("linux", t, {
+    runner: async (_command, args) =>
+      args.includes("--property=LoadState") ? systemdNotFound() : success(),
+  });
   const registration = join(
     options.homeDirectory,
     ".config",
@@ -245,7 +261,10 @@ test("service status reports a systemd activation transition", async (t) => {
 });
 
 test("FIFO registration is rejected promptly instead of blocking the CLI", async (t) => {
-  const options = await createOptions("linux", t, { runner: async () => success() });
+  const options = await createOptions("linux", t, {
+    runner: async (_command, args) =>
+      args.includes("--property=LoadState") ? systemdNotFound() : success(),
+  });
   const registration = join(
     options.homeDirectory,
     ".config",

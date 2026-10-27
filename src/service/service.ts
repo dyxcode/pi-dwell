@@ -468,6 +468,10 @@ async function writePrivateRegistration(
     return "unchanged";
   }
 
+  // First install must check that systemd has not already loaded this name
+  // from a different unit file before creating the local registration.
+  if (paths.platform === "linux") await inspectLinux(paths);
+
   let handle: FileHandle;
   try {
     handle = await open(
@@ -478,7 +482,12 @@ async function writePrivateRegistration(
   } catch (error: unknown) {
     if (error instanceof Error && "code" in error && error.code === "EEXIST") {
       const raced = await readPrivateRegistration(paths.registrationPath, paths.userId);
-      if (raced === content) return "unchanged";
+      if (raced === content) {
+        // Another installer may have created this exact file after preflight.
+        // Verify the manager again before install proceeds to daemon-reload.
+        if (paths.platform === "linux") await inspectLinux(paths);
+        return "unchanged";
+      }
       throw new Error(
         `Refusing to replace existing service registration: ${paths.registrationPath}`,
       );

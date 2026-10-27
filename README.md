@@ -66,3 +66,5 @@ sudo loginctl enable-linger "$(id -un)"
 ```
 
 Use `npm run dwell -- service status` to check the service and `npm run dwell -- service stop` to stop it. On macOS, the user service runs while you are logged in.
+
+The service reads Pi’s saved authentication and configuration from its host user’s home. If you use environment variables for provider credentials, a custom Pi directory, or tool paths, configure them in your user service manager and restart Dwell with `npm run dwell -- service restart`.

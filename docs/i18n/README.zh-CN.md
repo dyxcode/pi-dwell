@@ -66,3 +66,5 @@ sudo loginctl enable-linger "$(id -un)"
 ```
 
 使用 `npm run dwell -- service status` 查看服务状态，使用 `npm run dwell -- service stop` 停止服务。在 macOS 上，用户服务在登录期间运行。
+
+后台服务会读取主机用户 home 下 Pi 已保存的认证与配置。如果你通过环境变量配置 provider 凭据、自定义 Pi 目录或工具路径，请在用户服务管理器中设置这些变量，再运行 `npm run dwell -- service restart` 重启 Dwell。

@@ -21,3 +21,48 @@ Let the host carry on with tasks while you step away. Come back to see what fini
 ### Make it your own
 
 Choose where Pi lives and which capabilities it uses. Bring conversations, scheduled work, and Pi extensions into a personal environment that grows with your needs.
+
+## Installation
+
+Use macOS or Linux with systemd, Node.js **22.19+**, npm, Git, and [Pi](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) **1.4.0**. Configure your provider and default model in Pi first.
+
+From your projects directory:
+
+```sh
+git clone https://github.com/dyxcode/pi-dwell.git
+cd pi-dwell
+npm ci --ignore-scripts
+npm run dwell -- service install
+npm run dwell -- service start
+```
+
+Connect Dwell to your installed Pi using the absolute path to its binary:
+
+```sh
+npm run dwell -- pi configure --executable /absolute/path/to/pi
+```
+
+For npm-installed Pi, configure Node and Pi's entry point instead:
+
+```sh
+npm run dwell -- pi configure \
+  --executable "$(node -p 'process.execPath')" \
+  --entry-point "$(npm root -g)/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+```
+
+Generate a browser pairing code:
+
+```sh
+npm run dwell -- pair
+```
+
+Open [http://127.0.0.1:8787](http://127.0.0.1:8787) on the host, enter the code, and select a directory to start a conversation. The code expires after five minutes. Dwell runs in the background after you close the terminal.
+
+On Linux, enable startup at boot and keep the service running after logout:
+
+```sh
+systemctl --user enable pi-dwell.service
+sudo loginctl enable-linger "$(id -un)"
+```
+
+Use `npm run dwell -- service status` to check the service and `npm run dwell -- service stop` to stop it. On macOS, the user service runs while you are logged in.

@@ -21,3 +21,48 @@ Pi Dwell 希望让 Pi 成为一个可以从不同设备随时回到的个人 age
 ### 建立自己的使用环境
 
 选择 Pi 驻留的位置和使用的能力。将对话、定时工作和 Pi extensions 组合成适合自己的个人环境，随着需求逐步扩展。
+
+## 安装
+
+准备 macOS 或使用 systemd 的 Linux、Node.js **22.19+**、npm、Git，以及 [Pi](https://github.com/earendil-works/pi/tree/main/packages/coding-agent) **1.4.0**。先在 Pi 中配置 provider 和默认模型。
+
+在你的项目目录中运行：
+
+```sh
+git clone https://github.com/dyxcode/pi-dwell.git
+cd pi-dwell
+npm ci --ignore-scripts
+npm run dwell -- service install
+npm run dwell -- service start
+```
+
+使用已安装 Pi 的二进制文件绝对路径配置 Dwell：
+
+```sh
+npm run dwell -- pi configure --executable /absolute/path/to/pi
+```
+
+如果 Pi 通过 npm 安装，改用 Node 和 Pi 入口文件配置：
+
+```sh
+npm run dwell -- pi configure \
+  --executable "$(node -p 'process.execPath')" \
+  --entry-point "$(npm root -g)/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+```
+
+生成浏览器配对码：
+
+```sh
+npm run dwell -- pair
+```
+
+在主机上打开 [http://127.0.0.1:8787](http://127.0.0.1:8787)，输入配对码，再选择目录开始对话。配对码有效期为五分钟。关闭终端后，Dwell 继续在后台运行。
+
+在 Linux 上启用开机启动，并允许退出登录后继续运行：
+
+```sh
+systemctl --user enable pi-dwell.service
+sudo loginctl enable-linger "$(id -un)"
+```
+
+使用 `npm run dwell -- service status` 查看服务状态，使用 `npm run dwell -- service stop` 停止服务。在 macOS 上，用户服务在登录期间运行。

@@ -811,4 +811,25 @@ main>header{display:flex;height:52px;min-height:52px;padding:0 16px;gap:8px;bord
  #open-nav .menu{font-size:16px;line-height:1}
  #close-session-dialog{padding:22px}
 }
+
+/* Quiet process details share the response's text edge; arrows sit in the gutter. */
+#conversation .thinking-run{margin:0 0 6px;padding:0;border:0;background:none;box-shadow:none}
+#conversation .thinking-run>summary{display:flex;align-items:center;width:fit-content;max-width:100%;min-height:36px;padding:0;list-style:none;font:12px/1.5 var(--sans);color:#797267}
+#conversation .thinking-content{margin:0;padding:2px 0 8px;color:#797267;font:13px/1.65 var(--sans);background:none;border:0}
+#conversation .thinking-content h1,#conversation .thinking-content h2,#conversation .thinking-content h3{font:500 13px/1.65 var(--sans);margin:8px 0}
+#conversation .message-body .tool-run{margin:8px 0 12px;padding:0;background:none;border:0;border-radius:0;box-shadow:none;overflow:visible}
+#conversation .tool-run>summary{min-height:40px;padding:6px 0;gap:8px;font:12px/1.6 var(--mono);color:#797267}
+#conversation .tool-run>summary code{font:inherit;color:inherit;background:none;border:0;border-radius:0;box-shadow:none;padding:0;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
+#conversation .tool-run .tool-status{margin-left:auto;padding:0 2px 0 8px;color:#797267;font-size:11px}
+#conversation .tool-run .tool-output{margin:0;padding:0 0 8px;background:none;border:0;color:#797267;font:12px/1.65 var(--mono);white-space:pre;overflow-x:auto;max-height:220px}
+#conversation .tool-run.error .tool-status{color:var(--close-ink,#904d3c)}
+#conversation .session-details summary::before{content:'';display:block;width:5px;height:5px;flex:0 0 5px;margin:0 4px 0 2px;border:solid currentColor;border-width:1px 1px 0 0;box-sizing:border-box;transform:rotate(45deg);transform-origin:center}
+#conversation .session-details[open]>summary::before,#conversation .context-source[open]>summary::before{transform:rotate(135deg)}
+#conversation :is(.thinking-run,.tool-run)>summary{position:relative;text-decoration:none}
+#conversation :is(.thinking-run,.tool-run)>summary::before{content:'';position:absolute;left:-11px;top:50%;width:5px;height:5px;margin:0;border:solid currentColor;border-width:1px 1px 0 0;transform:translateY(-50%) rotate(45deg);transform-origin:center;box-sizing:border-box}
+#conversation :is(.thinking-run,.tool-run)[open]>summary::before{transform:translateY(-50%) rotate(135deg)}
+#conversation :is(.thinking-run,.tool-run)>summary:focus-visible{outline:1px dotted #797267;outline-offset:2px;text-decoration:none}
+@media(max-width:760px){#conversation .thinking-run>summary{min-height:40px}}
+
+#conversation .tool-run .tool-caption{padding:0 0 4px;font:11px/1.6 var(--mono);color:#797267}
 `;

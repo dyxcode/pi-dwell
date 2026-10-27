@@ -25,6 +25,8 @@ let sessions = [
       [
         "assistant",
         {
+          thinking:
+            "## Clarifying the contents\n\nThe request covers the message layout and command output. I’ll check them together.",
           intro: "I’ll check the test suite.",
           command: "npm test",
           output: "24 tests passed\n0 failed · 1.2s",
@@ -178,12 +180,37 @@ function message(role, text) {
     }
   } else if (typeof text === "string") renderMarkdown(body, text);
   else {
+    if (text.thinking) {
+      const details = document.createElement("details");
+      details.className = "thinking-preview";
+      details.open = Boolean(text.thinkingOpen);
+      const summary = document.createElement("summary");
+      const firstHeading = /^(?:#{1,6}\s+([^\n]+)|\*\*([^\n]+)\*\*)\s*(?:\n|$)/.exec(text.thinking);
+      const title = firstHeading?.[1] || firstHeading?.[2];
+      const useTitle = title && title.length <= 72;
+      summary.textContent = useTitle ? title : "Thinking";
+      summary.setAttribute("aria-label", "Thinking details: " + summary.textContent);
+      const content = document.createElement("div");
+      content.className = "thinking-preview-content markdown";
+      renderMarkdown(
+        content,
+        useTitle ? text.thinking.slice(firstHeading[0].length) : text.thinking,
+      );
+      details.append(summary, content);
+      details.addEventListener("toggle", () => {
+        text.thinkingOpen = details.open;
+      });
+      body.append(details);
+    }
     const intro = document.createElement("div");
     renderMarkdown(intro, text.intro);
     body.append(intro);
     const run = document.createElement("details");
     run.className = "tool-run";
-    run.open = Boolean(text.failed);
+    run.open = text.toolOpen ?? Boolean(text.failed);
+    run.addEventListener("toggle", () => {
+      text.toolOpen = run.open;
+    });
     const summary = document.createElement("summary");
     summary.setAttribute("aria-label", "Bash command and output");
     const command = document.createElement("code");

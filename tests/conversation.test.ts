@@ -1,7 +1,33 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { HistoryEntry } from "../src/shared/history.ts";
-import { groupConversationEntries, pairToolResults } from "../src/clients/web/conversation.ts";
+import {
+  groupConversationEntries,
+  pairToolResults,
+  thinkingPresentation,
+} from "../src/clients/web/conversation.ts";
+
+test("thinking uses a short existing heading without repeating it in the body", () => {
+  assert.deepEqual(thinkingPresentation("## Checking the output\n\nDetails."), {
+    title: "Checking the output",
+    text: "Details.",
+  });
+  assert.deepEqual(thinkingPresentation("**Checking the output**\n\nDetails."), {
+    title: "Checking the output",
+    text: "Details.",
+  });
+  assert.deepEqual(thinkingPresentation("## Code example\n\n    const value = 1;"), {
+    title: "Code example",
+    text: "    const value = 1;",
+  });
+  for (const text of [
+    "",
+    "Plain thinking.",
+    "**Inline** explanation",
+    `## ${"x".repeat(73)}\nBody`,
+  ])
+    assert.deepEqual(thinkingPresentation(text), { title: "Thinking", text });
+});
 
 function saved(
   id: string,

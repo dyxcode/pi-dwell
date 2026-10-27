@@ -131,6 +131,13 @@ function appendMarkdownBlocks(
   }
 }
 
+export function thinkingPresentation(source: string): { title: string; text: string } {
+  const heading = /^(?:#{1,6}[ \t]+([^\r\n]+)|\*\*([^\r\n]+)\*\*)[ \t]*(?:\r?\n|$)/.exec(source);
+  const title = (heading?.[1] ?? heading?.[2])?.trim();
+  if (!heading || !title || title.length > 72) return { title: "Thinking", text: source };
+  return { title, text: source.slice(heading[0].length).replace(/^(?:[ \t]*\r?\n)+/, "") };
+}
+
 function thinkingDetails(
   entry: HistoryEntry,
   block: HistoryBlock,
@@ -138,9 +145,12 @@ function thinkingDetails(
 ): HTMLDetailsElement {
   const details = keyed(node("details"), `thinking:${entry.id}:${index}`, entry.id);
   details.className = "thinking-run";
-  details.append(node("summary", "Thinking"));
+  const presentation = thinkingPresentation(block.text);
+  const summary = node("summary", presentation.title);
+  summary.setAttribute("aria-label", `Thinking details: ${presentation.title}`);
+  details.append(summary);
   const content = node("div", "", "thinking-content");
-  markdown(content, block.text);
+  markdown(content, presentation.text);
   details.append(content);
   return details;
 }

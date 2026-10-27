@@ -142,6 +142,209 @@ async function assertComposerLayout(page: BrowserPage, viewport: string): Promis
   );
 }
 
+async function assertQuietProcessPresentation(page: BrowserPage, viewport: string): Promise<void> {
+  assert.equal(
+    await page.evaluate(`(async()=>{
+      const {renderSavedConversation}=await import("/conversation.js");
+      const block=(type,text,callId=null,name=null)=>({type,text,callId,name});
+      const entry=(id,role,type,blocks,extra={})=>({
+        id,parentId:null,timestamp:"2026-10-27T00:00:00.000Z",type,role,blocks,
+        toolCallId:null,toolName:null,targetId:null,truncated:false,...extra
+      });
+      const longTitle="L".repeat(73);
+      const entries=[
+        entry("quiet-thinking","assistant","message",[
+          block("thinking","# Planning the answer\\n\\nFirst reasoning sentence."),
+          block("thinking","**Checking a boundary**\\n\\nSecond reasoning sentence."),
+          block("thinking","Reasoning without a heading."),
+          block("thinking","# "+longTitle+"\\n\\nLong heading body stays intact."),
+          block("text","# Ordinary Markdown\\n\\n\`\`\`ts\\nconst answer = 42;\\n\`\`\`")
+        ]),
+        entry("quiet-success-call","assistant","message",[
+          block("tool_call",'{"value":"safe"}',"quiet-success","echo")
+        ]),
+        entry("quiet-success-result","toolResult","toolResult",[
+          block("text","synthetic success output")
+        ],{toolCallId:"quiet-success",toolName:"echo"}),
+        entry("quiet-error-call","assistant","message",[
+          block("tool_call",'{"value":"error"}',"quiet-error","echo")
+        ]),
+        entry("quiet-error-result","toolResult","toolResult",[
+          block("text","synthetic error output")
+        ],{toolCallId:"quiet-error",toolName:"echo",error:true})
+      ];
+      const fixture=document.createElement("div");
+      fixture.id="quiet-process-test-fixture";
+      const focusSource=document.createElement("button");
+      focusSource.id="quiet-process-focus-source";
+      focusSource.type="button";
+      focusSource.textContent="Keyboard focus source";
+      focusSource.style.cssText="position:fixed;width:1px;height:1px;left:0;top:0;opacity:.01";
+      fixture.append(focusSource,renderSavedConversation(entries));
+      document.querySelector("#conversation").append(fixture);
+      return true;
+    })()`),
+    true,
+    `${viewport} imports and renders saved synthetic entries through the production conversation module`,
+  );
+
+  try {
+    const rendered = await page.evaluate(`(()=>{
+      const fixture=document.querySelector("#quiet-process-test-fixture");
+      const thinking=[...fixture.querySelectorAll(".thinking-run")];
+      const titles=thinking.map(details=>details.querySelector(":scope>summary").textContent);
+      const bodies=thinking.map(details=>details.querySelector(".thinking-content").textContent);
+      const tools=[...fixture.querySelectorAll(".tool-run")];
+      const success=tools.find(details=>!details.classList.contains("error"));
+      const error=tools.find(details=>details.classList.contains("error"));
+      const code=fixture.querySelector(".markdown .code-block");
+      return {
+        titles,bodies,thinkingOpen:thinking.map(details=>details.open),
+        successOpen:success.open,errorOpen:error.open,
+        successStatus:success.querySelector(".tool-status").textContent,
+        errorStatus:error.querySelector(".tool-status").textContent,
+        thinkingTitleSize:getComputedStyle(thinking[0].querySelector(":scope>summary")).fontSize,
+        thinkingBodySize:getComputedStyle(thinking[0].querySelector(".thinking-content")).fontSize,
+        toolBackground:getComputedStyle(success).backgroundColor,
+        toolErrorBackground:getComputedStyle(error).backgroundColor,
+        toolTitleSize:getComputedStyle(success.querySelector(":scope>summary")).fontSize,
+        toolOutputSize:getComputedStyle(success.querySelector(".tool-output")).fontSize,
+        successStatusColor:getComputedStyle(success.querySelector(".tool-status")).color,
+        errorStatusColor:getComputedStyle(error.querySelector(".tool-status")).color,
+        markdownCodeBackground:getComputedStyle(code).backgroundColor,
+        markdownCodeSize:getComputedStyle(code.querySelector("pre code")).fontSize,
+        markdownCodeText:code.querySelector("pre code").textContent
+      };
+    })()`);
+    const presentation = record(rendered);
+    assert.ok(Array.isArray(presentation.bodies));
+    const bodies = presentation.bodies;
+    assert.deepEqual(presentation.titles, [
+      "Planning the answer",
+      "Checking a boundary",
+      "Thinking",
+      "Thinking",
+    ]);
+    assert.deepEqual(presentation.thinkingOpen, [false, false, false, false]);
+    assert.ok(!String(bodies[0]).includes("Planning the answer"));
+    assert.ok(!String(bodies[1]).includes("Checking a boundary"));
+    assert.ok(String(bodies[0]).includes("First reasoning sentence."));
+    assert.ok(String(bodies[1]).includes("Second reasoning sentence."));
+    assert.ok(String(bodies[2]).includes("Reasoning without a heading."));
+    assert.ok(String(bodies[3]).includes("L".repeat(73)));
+    assert.ok(String(bodies[3]).includes("Long heading body stays intact."));
+    assert.equal(presentation.thinkingTitleSize, "12px");
+    assert.equal(presentation.thinkingBodySize, "13px");
+    assert.equal(presentation.successOpen, false);
+    assert.equal(presentation.errorOpen, true);
+    assert.equal(presentation.successStatus, "✓");
+    assert.equal(presentation.errorStatus, "Error");
+    assert.notEqual(presentation.successStatusColor, presentation.errorStatusColor);
+    assert.equal(presentation.toolBackground, "rgba(0, 0, 0, 0)");
+    assert.equal(presentation.toolErrorBackground, "rgba(0, 0, 0, 0)");
+    assert.equal(presentation.toolTitleSize, "12px");
+    assert.equal(presentation.toolOutputSize, "12px");
+    assert.equal(presentation.markdownCodeBackground, "rgb(235, 230, 219)");
+    assert.equal(presentation.markdownCodeSize, "12px");
+    assert.equal(presentation.markdownCodeText, "const answer = 42;");
+
+    const context = record(
+      await page.evaluate(`(()=>{
+        const details=document.querySelector("#conversation .session-details");
+        if(!details) return {present:false};
+        const summary=details.querySelector(":scope>summary");
+        const body=details.querySelector(".session-details-body");
+        const titleLeft=()=>{
+          const range=document.createRange();range.selectNodeContents(summary);
+          return range.getBoundingClientRect().left;
+        };
+        const closedLeft=titleLeft();
+        const marker=getComputedStyle(summary,"::before");
+        details.open=true;
+        const openLeft=titleLeft();
+        details.open=false;
+        return {
+          present:true,closedLeft,openLeft,
+          arrowWidth:marker.width,
+          background:getComputedStyle(body).backgroundColor,
+          divider:getComputedStyle(summary,"::after").backgroundColor
+        };
+      })()`),
+    );
+    assert.equal(context.present, true, "the existing saved Context remains present");
+    assert.equal(context.background, "rgb(238, 232, 221)");
+    assert.equal(context.divider, "rgb(221, 213, 200)");
+    assert.equal(context.arrowWidth, "5px");
+    assert.ok(Math.abs(Number(context.closedLeft) - Number(context.openLeft)) < 0.5);
+
+    const arrow = record(
+      await page.evaluate(`(()=>{
+        const details=document.querySelector("#quiet-process-test-fixture .thinking-run");
+        const summary=details.querySelector(":scope>summary");
+        const geometry=()=>{
+          const range=document.createRange();range.selectNodeContents(summary);
+          const rect=range.getBoundingClientRect();
+          const marker=getComputedStyle(summary,"::before");
+          const summaryRect=summary.getBoundingClientRect();
+          return {
+            titleLeft:rect.left,titleTop:rect.top,summaryLeft:summaryRect.left,
+            markerLeft:marker.left,markerTop:marker.top,markerWidth:marker.width,
+            markerHeight:marker.height,markerX:summaryRect.left+Number.parseFloat(marker.left)
+          };
+        };
+        const closed=geometry();
+        details.open=true;
+        const open=geometry();
+        details.open=false;
+        const scroll=document.querySelector("#scroll");
+        return {
+          closed,open,scrollLeft:scroll.getBoundingClientRect().left,
+          scrollRight:scroll.getBoundingClientRect().right,
+          scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth,
+          documentWidth:document.documentElement.scrollWidth,viewportWidth:innerWidth
+        };
+      })()`),
+    );
+    const openGeometry = record(arrow.open);
+    const closedGeometry = record(arrow.closed);
+    for (const key of [
+      "titleLeft",
+      "titleTop",
+      "summaryLeft",
+      "markerLeft",
+      "markerTop",
+      "markerWidth",
+      "markerHeight",
+    ])
+      assert.equal(
+        openGeometry[key],
+        closedGeometry[key],
+        `the ${key} of the left arrow/title stays fixed when toggled`,
+      );
+    assert.ok(Number(closedGeometry.markerX) >= Number(arrow.scrollLeft));
+    assert.ok(Number(closedGeometry.markerX) < Number(arrow.scrollRight));
+    assert.ok(Number(arrow.scrollWidth) <= Number(arrow.clientWidth) + 1);
+    assert.ok(Number(arrow.documentWidth) <= Number(arrow.viewportWidth) + 1);
+
+    await page.evaluate('document.querySelector("#quiet-process-focus-source").focus()');
+    const tab = { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 };
+    await page.call("Input.dispatchKeyEvent", tab);
+    await page.call("Input.dispatchKeyEvent", { ...tab, type: "keyUp" });
+    const focus = record(
+      await page.evaluate(`(()=>{
+        const summary=document.querySelector("#quiet-process-test-fixture .thinking-run>summary");
+        const style=getComputedStyle(summary);
+        return {active:document.activeElement===summary,outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth};
+      })()`),
+    );
+    assert.equal(focus.active, true, "Tab moves keyboard focus to the thinking disclosure");
+    assert.notEqual(focus.outlineStyle, "none", "keyboard focus has a visible outline");
+    assert.notEqual(focus.outlineWidth, "0px", "keyboard focus outline has nonzero width");
+  } finally {
+    await page.evaluate('document.querySelector("#quiet-process-test-fixture")?.remove()');
+  }
+}
+
 async function assertInputGrows(page: BrowserPage, viewport: string): Promise<void> {
   const before = Number(
     await page.evaluate('document.querySelector("#message").getBoundingClientRect().height'),
@@ -878,6 +1081,7 @@ for (const mode of modes) {
     });
     await assertComposerLayout(second, "mobile");
     await assertInputGrows(second, "mobile");
+    await assertQuietProcessPresentation(second, "mobile");
     await second.click("#open-nav");
     assert.ok(await second.evaluate('document.querySelector("#rail").classList.contains("open")'));
     await second.click("#close-nav");
@@ -1245,6 +1449,7 @@ for (const mode of modes) {
       mobile: false,
     });
     await assertComposerLayout(second, "desktop");
+    await assertQuietProcessPresentation(second, "desktop");
     await second.until(
       'document.querySelector("#attach-image").title==="Add images" && !document.querySelector("#attach-image").disabled',
     );

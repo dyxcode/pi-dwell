@@ -15,7 +15,9 @@ if (
   process.exitCode = 1;
 } else {
   const test = fileURLToPath(new URL("../tests/runtime.test.ts", import.meta.url));
-  const child = spawn(process.execPath, ["--test", "--test-timeout=30000", test], {
+  // The installed binary suite starts Pi repeatedly; allow the file to finish while
+  // keeping each test's explicit timeout in runtime.test.ts.
+  const child = spawn(process.execPath, ["--test", "--test-timeout=60000", test], {
     stdio: "inherit",
     env: {
       ...process.env,

@@ -106,6 +106,7 @@ interface ActiveTurn {
   sessionId: string;
   runId: string;
   done: Promise<void>;
+  historyAbort: AbortController;
   runtime?: PiProcess;
   dispatched: boolean;
   abort?: Promise<void>;
@@ -202,6 +203,7 @@ export class SessionService {
   readonly #events = new SessionEvents();
   readonly #historyPages = new HistoryPages();
   readonly #reads = new Set<Promise<unknown>>();
+  readonly #shutdownController = new AbortController();
   #modelDiscovery: Promise<PiModelOption[]> | undefined;
   readonly #modelCapabilityDiscoveries = new Map<string, Promise<ModelCapabilitiesResponse>>();
   readonly #checkpoint: SessionServiceOptions["turnCheckpoint"];
@@ -657,7 +659,7 @@ export class SessionService {
   }
 
   getHistory(id: string, cursor?: string): Promise<HistoryPage> {
-    return this.#read(async () => {
+    return this.#read(async (signal) => {
       const stored = this.#stored(id);
       const file = await this.#history(stored);
       if (!file) {
@@ -694,6 +696,7 @@ export class SessionService {
         piSessionId: stored.piSessionId,
         directory: stored.directory,
         ...(cursor === undefined ? {} : { cursor }),
+        signal,
       });
       const session = this.#view(this.#stored(id));
       const latest = this.#catalog.latestTurn(id);
@@ -776,7 +779,7 @@ export class SessionService {
     entryId: string,
     imageIndex: number,
   ): Promise<{ mimeType: string; data: Buffer } | null> {
-    return this.#read(async () => {
+    return this.#read(async (signal) => {
       const stored = this.#stored(id);
       const file = await this.#history(stored);
       if (!file) {
@@ -791,6 +794,7 @@ export class SessionService {
         directory: stored.directory,
         entryId,
         imageIndex,
+        signal,
       });
     });
   }
@@ -853,6 +857,7 @@ export class SessionService {
         sessionId: id,
         runId: turn.runId,
         done,
+        historyAbort: new AbortController(),
         dispatched: false,
         abortFailed: false,
         historyMaterialized: this.#stored(id).historyExpected,
@@ -877,7 +882,7 @@ export class SessionService {
   }
 
   getTurnResult(id: string, runId: string): Promise<{ runId: string; entries: PiEntry[] }> {
-    return this.#read(async () => {
+    return this.#read(async (signal) => {
       this.#checkStorage(id);
       const turn = this.#storedTurn(id, runId);
       if (active(turn))
@@ -890,6 +895,8 @@ export class SessionService {
         file,
         piSessionId: stored.piSessionId,
         directory: stored.directory,
+        signal,
+        cancelQueuedOnly: true,
       });
       const byId = new Map(entries.map((entry) => [entry.id, entry]));
       const selected: PiEntry[] = [];
@@ -936,6 +943,7 @@ export class SessionService {
         updatedAt: this.#now(),
       });
       if (slot.dispatched) await this.#abortRuntime(slot);
+      else slot.historyAbort.abort();
       return turnView(this.#storedTurn(id, runId));
     } catch (error) {
       // Persistence failure must not strand work behind a now-unusable cancel endpoint.
@@ -1056,8 +1064,22 @@ export class SessionService {
     try {
       await this.#checkpoint?.("accepted", turnView(this.#storedTurn(id, slot.runId)));
       this.#checkStorage(id);
-      if (!active(this.#storedTurn(id, slot.runId))) return;
-      await this.#mutate(() => this.#open(this.#stored(id)));
+      const accepted = this.#storedTurn(id, slot.runId);
+      if (!active(accepted)) return;
+      if (this.#stopping) {
+        this.#writeTurn({
+          ...accepted,
+          cancellationRequested: true,
+          status: "aborted",
+          updatedAt: this.#now(),
+        });
+        return;
+      }
+      const historySignal = AbortSignal.any([
+        this.#shutdownController.signal,
+        slot.historyAbort.signal,
+      ]);
+      await this.#mutate(() => this.#open(this.#stored(id), { signal: historySignal }));
       const runtime = this.#runtimes.get(id);
       if (!runtime)
         throw new SessionError(503, "runtime_unavailable", "Pi runtime is unavailable.");
@@ -1075,7 +1097,7 @@ export class SessionService {
           "unsupported_image_model",
           "The selected Pi model does not accept image input.",
         );
-      const historyBefore = await this.#savedHistory(source);
+      const historyBefore = await this.#savedHistory(source, { signal: historySignal });
       const savedBefore = historyBefore?.entries ?? [];
       const identityBefore = this.#identityForHistory(historyBefore);
       this.#historyIdentity.set(id, identityBefore);
@@ -1152,23 +1174,31 @@ export class SessionService {
       const rejectedPrompt = error instanceof RpcCommandError && error.command === "prompt";
       try {
         const turn = this.#storedTurn(id, slot.runId);
+        const shutdownBeforeDispatch = this.#stopping && !slot.dispatched;
         if (active(turn))
           this.#writeTurn({
             ...turn,
-            status: slot.dispatched && !rejectedPrompt ? "interrupted" : "failed",
+            status: shutdownBeforeDispatch
+              ? "aborted"
+              : slot.dispatched && !rejectedPrompt
+                ? "interrupted"
+                : "failed",
+            cancellationRequested: shutdownBeforeDispatch ? true : turn.cancellationRequested,
             updatedAt: this.#now(),
-            error: {
-              code:
-                error instanceof SessionError
-                  ? error.code
-                  : slot.dispatched && !rejectedPrompt
-                    ? "outcome_unknown"
-                    : "execution_rejected",
-              message:
-                error instanceof SessionError
-                  ? error.message
-                  : "Execution did not complete reliably. No automatic retry was performed.",
-            },
+            error: shutdownBeforeDispatch
+              ? null
+              : {
+                  code:
+                    error instanceof SessionError
+                      ? error.code
+                      : slot.dispatched && !rejectedPrompt
+                        ? "outcome_unknown"
+                        : "execution_rejected",
+                  message:
+                    error instanceof SessionError
+                      ? error.message
+                      : "Execution did not complete reliably. No automatic retry was performed.",
+                },
           });
       } catch {
         this.#storageFault(id);
@@ -1210,9 +1240,28 @@ export class SessionService {
   shutdown(): Promise<void> {
     if (this.#shutdown) return this.#shutdown;
     this.#stopping = true;
+    let failedBeforeQueue = false;
+    for (const slot of this.#turns.values()) {
+      if (slot.dispatched) continue;
+      try {
+        const turn = this.#storedTurn(slot.sessionId, slot.runId);
+        if (active(turn))
+          this.#writeTurn({
+            ...turn,
+            cancellationRequested: true,
+            status: "aborted",
+            updatedAt: this.#now(),
+          });
+        slot.historyAbort.abort();
+      } catch {
+        failedBeforeQueue = true;
+        slot.historyAbort.abort();
+      }
+    }
+    this.#shutdownController.abort();
     this.#shutdown = (async () => {
       await this.#queue;
-      let failed = false;
+      let failed = failedBeforeQueue;
       const slots = [...this.#turns.values()];
       for (const slot of slots) {
         try {
@@ -1285,7 +1334,7 @@ export class SessionService {
     return result;
   }
 
-  #read<T>(operation: () => Promise<T>): Promise<T> {
+  #read<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
     try {
       this.#admit();
       if (this.#reads.size >= 2)
@@ -1297,11 +1346,14 @@ export class SessionService {
     } catch (error) {
       return Promise.reject(error);
     }
+    const signal = this.#shutdownController.signal;
     const result = Promise.resolve()
-      .then(operation)
+      .then(() => operation(signal))
       .catch((error: unknown) => {
         if (error instanceof HistoryReadError)
           throw new SessionError(error.status, error.code, error.message);
+        if (signal.aborted && error instanceof Error && error.name === "AbortError")
+          throw new SessionError(503, "shutting_down", "Dwell sessions are stopping.");
         throw error;
       });
     this.#reads.add(result);
@@ -1444,7 +1496,10 @@ export class SessionService {
     }
   }
 
-  async #savedHistory(stored: StoredSession): Promise<SavedHistory | undefined> {
+  async #savedHistory(
+    stored: StoredSession,
+    options: { signal?: AbortSignal; cancelQueuedOnly?: boolean } = {},
+  ): Promise<SavedHistory | undefined> {
     const file = await this.#history(stored);
     if (!file) {
       if (stored.historyExpected)
@@ -1455,6 +1510,8 @@ export class SessionService {
       file,
       piSessionId: stored.piSessionId,
       directory: stored.directory,
+      ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.cancelQueuedOnly ? { cancelQueuedOnly: true } : {}),
     });
   }
 
@@ -1469,10 +1526,19 @@ export class SessionService {
     return this.#identityForEntries(history.entries);
   }
 
-  async #captureHistoryIdentity(stored: StoredSession): Promise<HistoryIdentity> {
+  async #captureHistoryIdentity(
+    stored: StoredSession,
+    signal?: AbortSignal,
+  ): Promise<HistoryIdentity> {
     try {
-      return this.#identityForHistory(await this.#savedHistory(stored));
-    } catch {
+      const history = await this.#savedHistory(stored, {
+        signal: signal ?? this.#shutdownController.signal,
+        cancelQueuedOnly: signal === undefined,
+      });
+      if (signal?.aborted) throw signal.reason;
+      return this.#identityForHistory(history);
+    } catch (error) {
+      if (signal?.aborted) throw error;
       // Without a complete saved baseline, native messages stay unmatched in the client.
       return { known: false, counts: new Map() };
     }
@@ -1597,7 +1663,10 @@ export class SessionService {
   }
 
   async #refreshNativeHistory(sessionId: string, executionId: string): Promise<void> {
-    const history = await this.#savedHistory(this.#stored(sessionId));
+    const history = await this.#savedHistory(this.#stored(sessionId), {
+      signal: this.#shutdownController.signal,
+      cancelQueuedOnly: true,
+    });
     const record = this.#nativeExecutions.get(sessionId);
     if (record?.info.id !== executionId || record.info.status === "running") return;
     if (!this.#runtimeObservers.has(sessionId)) return;
@@ -1618,7 +1687,8 @@ export class SessionService {
       this.#historyIdentity.set(sessionId, this.#identityForHistory(history));
   }
 
-  async #open(stored: StoredSession): Promise<SessionInfo> {
+  async #open(stored: StoredSession, options: { signal?: AbortSignal } = {}): Promise<SessionInfo> {
+    if (options.signal?.aborted) throw options.signal.reason;
     const existing = this.#runtimes.get(stored.id);
     if (existing && existing.state === "ready") return this.#view(stored);
     if (existing && existing.state === "running")
@@ -1644,7 +1714,8 @@ export class SessionService {
       this.#publishState(stored.id);
       throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
     }
-    this.#historyIdentity.set(stored.id, await this.#captureHistoryIdentity(stored));
+    const historyIdentity = await this.#captureHistoryIdentity(stored, options.signal);
+    if (options.signal?.aborted) throw options.signal.reason;
     let runtime: PiProcess;
     try {
       runtime = await PiProcess.start({
@@ -1666,6 +1737,7 @@ export class SessionService {
       );
     }
     this.#runtimes.set(stored.id, runtime);
+    this.#historyIdentity.set(stored.id, historyIdentity);
     this.#observeRuntime(stored.id, runtime);
     try {
       let state = await runtime.getState();

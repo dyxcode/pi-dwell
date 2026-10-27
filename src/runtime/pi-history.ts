@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
+import { HistoryReadBudgetError, runWithHistoryReadBudget } from "./pi-history-budget.ts";
 import type { PiEntry } from "./pi-process.ts";
 
 const MAX_SOURCE_BYTES = 128 * 1024 * 1024; // Several image-bearing turns, bounded per read.
@@ -36,11 +37,14 @@ export interface SavedHistory {
   incompleteTail: boolean;
 }
 
-interface ReadOptions {
+export interface SavedHistoryReadOptions {
   file: string;
   piSessionId: string;
   directory: string;
   prefix?: HistoryPrefix;
+  signal?: AbortSignal;
+  /** Let an admitted public read use a free permit after shutdown, but never wait in the queue. */
+  cancelQueuedOnly?: boolean;
 }
 
 function changed(): HistoryReadError {
@@ -60,6 +64,14 @@ function overLimit(): HistoryReadError {
     413,
     "history_limit",
     "Saved session history exceeds its size limits.",
+  );
+}
+
+function busy(): HistoryReadError {
+  return new HistoryReadError(
+    429,
+    "history_busy",
+    "Two history reads are already active. Try again shortly.",
   );
 }
 
@@ -181,7 +193,7 @@ function parseRecord(buffer: Buffer): Record<string, unknown> | null {
 function parseEntries(
   content: Buffer,
   completeBytes: number,
-  options: ReadOptions,
+  options: SavedHistoryReadOptions,
 ): { entries: PiEntry[]; leafId: string | null } {
   const entries: PiEntry[] = [];
   const ids = new Set<string>();
@@ -255,9 +267,10 @@ function completedBytes(content: Buffer): number {
   return content.lastIndexOf(0x0a) + 1;
 }
 
-/** Reads a bounded, immutable snapshot of a saved Pi v3 JSONL session. */
-export async function readSavedHistory(options: ReadOptions): Promise<SavedHistory> {
-  const prefixBytes = validatePrefix(options.prefix);
+async function readSavedHistorySnapshot(
+  options: SavedHistoryReadOptions,
+  prefixBytes: number | undefined,
+): Promise<SavedHistory> {
   const hasPrefix = prefixBytes !== undefined;
   let handle: Awaited<ReturnType<typeof open>>;
   try {
@@ -316,5 +329,20 @@ export async function readSavedHistory(options: ReadOptions): Promise<SavedHisto
     throw unavailable();
   } finally {
     await handle.close().catch(() => {});
+  }
+}
+
+/** Reads a bounded, immutable snapshot of a saved Pi v3 JSONL session. */
+export async function readSavedHistory(options: SavedHistoryReadOptions): Promise<SavedHistory> {
+  const prefixBytes = validatePrefix(options.prefix);
+  try {
+    return await runWithHistoryReadBudget(
+      () => readSavedHistorySnapshot(options, prefixBytes),
+      options.signal,
+      { cancelQueuedOnly: options.cancelQueuedOnly ?? false },
+    );
+  } catch (error) {
+    if (error instanceof HistoryReadBudgetError) throw busy();
+    throw error;
   }
 }

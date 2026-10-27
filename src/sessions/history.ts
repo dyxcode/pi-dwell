@@ -1,5 +1,5 @@
-import { savedMessageKeys } from "../runtime/message-identity.ts";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { savedMessageKeys } from "../runtime/message-identity.ts";
 import {
   type HistoryPrefix,
   HistoryReadError,
@@ -383,6 +383,7 @@ export class HistoryPages {
     piSessionId: string;
     directory: string;
     cursor?: string;
+    signal?: AbortSignal;
   }): Promise<HistorySlice> {
     const cursor =
       options.cursor === undefined ? undefined : this.#cursor(options.cursor, options.sessionId);
@@ -391,6 +392,7 @@ export class HistoryPages {
       piSessionId: options.piSessionId,
       directory: options.directory,
       ...(cursor ? { prefix: cursor } : {}),
+      ...(options.signal ? { signal: options.signal, cancelQueuedOnly: true } : {}),
     });
     const nativeKeys = savedMessageKeys(history.entries).keys;
     const byId = new Map(history.entries.map((entry) => [entry.id, entry]));
@@ -471,9 +473,15 @@ export class HistoryPages {
     directory: string;
     entryId: string;
     imageIndex: number;
+    signal?: AbortSignal;
   }): Promise<{ mimeType: string; data: Buffer } | null> {
     if (!Number.isSafeInteger(options.imageIndex) || options.imageIndex < 0) return null;
-    const history = await readSavedHistory(options);
+    const history = await readSavedHistory({
+      file: options.file,
+      piSessionId: options.piSessionId,
+      directory: options.directory,
+      ...(options.signal ? { signal: options.signal, cancelQueuedOnly: true } : {}),
+    });
     const byId = new Map(history.entries.map((entry) => [entry.id, entry]));
     const branch = new Set<string>();
     let id = history.leafId;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  visibleLiveContent,
   SSEDecoder,
   SseDecodeError,
   emptyConversationState,
@@ -838,4 +839,55 @@ test("reduceFrame ignores frames from another session and handles epoch replacem
   const changed = reduceFrame(initial, replacement);
   assert.equal(changed.cursor, cursor(1, OTHER_EPOCH));
   assert.equal(changed.liveIncomplete, true);
+});
+
+test("saved native identities take over live content while repeated text stays distinct", () => {
+  const key = `${"a".repeat(64)}:1`;
+  const nextKey = `${"a".repeat(64)}:2`;
+  const state = emptyConversationState(SESSION_ID);
+  state.messages = [
+    { id: MESSAGE_ID, text: "Same", finished: true, truncated: false, nativeKey: key, order: 1 },
+    {
+      id: SECOND_MESSAGE_ID,
+      text: "Same",
+      finished: true,
+      truncated: false,
+      nativeKey: nextKey,
+      order: 4,
+    },
+  ];
+  state.tools = [
+    {
+      id: TOOL_ID,
+      callId: "native-tool",
+      ownerKey: key,
+      order: 2,
+      name: "bash",
+      input: "{}",
+      output: "done",
+      status: "completed",
+      truncated: false,
+    },
+  ];
+  const saved = {
+    ...historyEntry("saved", null),
+    role: "assistant" as const,
+    nativeKey: key,
+    blocks: [{ type: "tool_call" as const, text: "{}", callId: "native-tool", name: "bash" }],
+  };
+  assert.deepEqual(
+    visibleLiveContent(state, [saved]).map((item) => item.id),
+    [SECOND_MESSAGE_ID],
+  );
+  assert.ok(
+    visibleLiveContent(
+      { ...state, tools: state.tools.map((tool) => ({ ...tool, ownerKey: nextKey })) },
+      [saved],
+    ).some((item) => item.id === TOOL_ID),
+    "reused call IDs belong to their own assistant message",
+  );
+  assert.deepEqual(
+    visibleLiveContent(state, []).map((item) => item.id),
+    [MESSAGE_ID, TOOL_ID, SECOND_MESSAGE_ID],
+  );
 });

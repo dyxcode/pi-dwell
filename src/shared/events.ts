@@ -18,6 +18,8 @@ export interface TurnProjection {
 }
 
 export interface LiveMessage {
+  nativeKey?: string;
+  order?: number;
   id: string;
   text: string;
   finished: boolean;
@@ -31,6 +33,9 @@ export interface LiveMessageDelta {
 }
 
 export interface LiveTool {
+  ownerKey?: string;
+  callId?: string;
+  order?: number;
   id: string;
   name: string;
   input: string;
@@ -209,7 +214,16 @@ function isTurnProjection(value: unknown): value is TurnProjection {
 function isLiveMessage(value: unknown): value is LiveMessage {
   return (
     isRecord(value) &&
-    hasExactKeys(value, MESSAGE_KEYS) &&
+    hasExactKeys(value, [
+      ...MESSAGE_KEYS,
+      ...(value.nativeKey === undefined ? [] : ["nativeKey"]),
+      ...(value.order === undefined ? [] : ["order"]),
+    ]) &&
+    (value.nativeKey === undefined ||
+      (typeof value.nativeKey === "string" &&
+        /^[a-f0-9]{64}:[1-9][0-9]{0,8}$/.test(value.nativeKey))) &&
+    (value.order === undefined ||
+      (Number.isSafeInteger(value.order) && Number(value.order) >= 0)) &&
     typeof value.id === "string" &&
     UUID.test(value.id) &&
     isBoundedString(value.text, STREAM_EVENT_MAX_BYTES) &&
@@ -232,7 +246,19 @@ function isLiveMessageDelta(value: unknown): value is LiveMessageDelta {
 function isLiveTool(value: unknown): value is LiveTool {
   return (
     isRecord(value) &&
-    hasExactKeys(value, TOOL_KEYS) &&
+    hasExactKeys(value, [
+      ...TOOL_KEYS,
+      ...(value.callId === undefined ? [] : ["callId"]),
+      ...(value.ownerKey === undefined ? [] : ["ownerKey"]),
+      ...(value.order === undefined ? [] : ["order"]),
+    ]) &&
+    (value.ownerKey === undefined ||
+      (typeof value.ownerKey === "string" &&
+        /^[a-f0-9]{64}:[1-9][0-9]{0,8}$/.test(value.ownerKey))) &&
+    (value.callId === undefined ||
+      (isBoundedString(value.callId, 1024) && value.callId.length > 0)) &&
+    (value.order === undefined ||
+      (Number.isSafeInteger(value.order) && Number(value.order) >= 0)) &&
     typeof value.id === "string" &&
     UUID.test(value.id) &&
     isBoundedString(value.name, 512) &&

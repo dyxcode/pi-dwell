@@ -227,11 +227,15 @@ function scriptedStream(
 
     const turnLog = process.env.DWELL_TEST_TURN_LOG;
     if (turnLog) await appendFile(turnLog, `${prompt}\n`, { mode: 0o600 });
-    if (prompt === "tool") {
+    if (prompt === "tool" || prompt === "tool-stream") {
       const echoResult = latestEchoResult(context);
       if (echoResult === undefined) {
         emitToolCall(stream, message);
       } else {
+        if (prompt === "tool-stream") {
+          await emitGatedText(stream, message, options);
+          return;
+        }
         const response = `Echo complete: ${echoResult}`;
         emitText(stream, message, response, ["Echo ", "complete: ", echoResult]);
       }

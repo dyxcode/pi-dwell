@@ -1,3 +1,4 @@
+import { savedMessageKeys } from "../runtime/message-identity.ts";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   type HistoryPrefix,
@@ -391,6 +392,7 @@ export class HistoryPages {
       directory: options.directory,
       ...(cursor ? { prefix: cursor } : {}),
     });
+    const nativeKeys = savedMessageKeys(history.entries).keys;
     const byId = new Map(history.entries.map((entry) => [entry.id, entry]));
     const branch: PiEntry[] = [];
     let id = history.leafId;
@@ -402,6 +404,22 @@ export class HistoryPages {
       id = entry.parentId;
     }
     branch.reverse();
+    const owners = new Map<string, string>();
+    const resultOwners = new Map<string, string>();
+    for (const entry of branch) {
+      const message = entry.message;
+      if (!isRecord(message)) continue;
+      const nativeKey = nativeKeys.get(entry.id);
+      if (nativeKey && Array.isArray(message.content)) {
+        for (const block of message.content) {
+          if (isRecord(block) && block.type === "toolCall" && typeof block.id === "string")
+            owners.set(block.id, nativeKey);
+        }
+      } else if (message.role === "toolResult" && typeof message.toolCallId === "string") {
+        const owner = owners.get(message.toolCallId);
+        if (owner) resultOwners.set(entry.id, owner);
+      }
+    }
     const before = cursor?.before ?? branch.length;
     if (before > branch.length)
       throw new HistoryReadError(400, "invalid_cursor", "Invalid history page boundary.");
@@ -416,6 +434,10 @@ export class HistoryPages {
       if (!entry) break;
       const view = project(entry);
       if (view) {
+        const nativeKey = nativeKeys.get(entry.id);
+        if (nativeKey) view.nativeKey = nativeKey;
+        const toolOwnerKey = resultOwners.get(entry.id);
+        if (toolOwnerKey) view.toolOwnerKey = toolOwnerKey;
         const size = Buffer.byteLength(JSON.stringify(view)) + 1;
         if (bytes + size > entryBudget) break;
         entries.push(view);

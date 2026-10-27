@@ -10,6 +10,7 @@ import { isHostStatus } from "../../shared/protocol.ts";
 import { isSessionInfo, type SessionInfo } from "../../shared/sessions.ts";
 import { isTurnInfo, type TurnInfo } from "../../shared/turns.ts";
 import {
+  visibleLiveContent,
   emptyConversationState,
   mergeHistoryEntries,
   reconcileHistory,
@@ -988,7 +989,13 @@ function renderConversation(): void {
     conversation.append(empty);
   } else {
     conversation.append(
-      renderSavedConversation(entries, contextSources, contextSourcesTruncated, historyImage),
+      renderSavedConversation(
+        entries,
+        contextSources,
+        contextSourcesTruncated,
+        historyImage,
+        state.tools,
+      ),
     );
     for (const element of Array.from(
       conversation.querySelectorAll<HTMLDetailsElement>("details[data-key]"),
@@ -1002,13 +1009,14 @@ function renderConversation(): void {
         body = node("div", "", "message-body");
       article.setAttribute("aria-label", "Pi live response");
       article.append(body);
-      const order = [...liveOrder];
-      for (const item of state.messages)
-        if (!order.some((value) => value.kind === "message" && value.id === item.id))
-          order.push({ kind: "message", id: item.id });
-      for (const item of state.tools)
-        if (!order.some((value) => value.kind === "tool" && value.id === item.id))
-          order.push({ kind: "tool", id: item.id });
+      const visible = visibleLiveContent(state, entries);
+      const order = visible.some((item) => item.order > 0)
+        ? visible
+        : visible.sort(
+            (left, right) =>
+              liveOrder.findIndex((item) => item.id === left.id) -
+              liveOrder.findIndex((item) => item.id === right.id),
+          );
       for (const item of order) {
         if (item.kind === "message") {
           const live = state.messages.find((value) => value.id === item.id);
@@ -1037,7 +1045,10 @@ function renderConversation(): void {
             /* incomplete live input */
           }
           const detail = node("details", "", "tool-run");
-          detail.dataset.key = `live-tool:${tool.id}`;
+          detail.dataset.key =
+            tool.callId && tool.ownerKey
+              ? `tool-call:${tool.ownerKey}/${tool.callId}`
+              : `live-tool:${tool.id}`;
           const summary = node("summary");
           const status = node("span", "", "tool-status");
           if (tool.status === "running" || tool.status === "failed")

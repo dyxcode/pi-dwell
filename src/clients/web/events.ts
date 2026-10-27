@@ -685,3 +685,31 @@ export function reconcileHistory(state: ConversationState, page: HistoryPage): C
   const history = copyHistory(page);
   return applyCoveredHistory({ ...state, sessionId: page.sessionId, history });
 }
+
+/** Saved native identities own persisted content; equal display text is not an identity. */
+export function visibleLiveContent(
+  state: Pick<ConversationState, "messages" | "tools">,
+  entries: readonly HistoryEntry[],
+): { kind: "message" | "tool"; id: string; order: number }[] {
+  const messages = new Set(entries.flatMap((entry) => (entry.nativeKey ? [entry.nativeKey] : [])));
+  const calls = new Set(
+    entries.flatMap((entry) => [
+      ...(entry.toolCallId && entry.toolOwnerKey
+        ? [`${entry.toolOwnerKey}/${entry.toolCallId}`]
+        : []),
+      ...entry.blocks.flatMap((block) =>
+        block.callId && entry.nativeKey ? [`${entry.nativeKey}/${block.callId}`] : [],
+      ),
+    ]),
+  );
+  return [
+    ...state.messages
+      .filter((item) => !item.nativeKey || !messages.has(item.nativeKey))
+      .map((item) => ({ kind: "message" as const, id: item.id, order: item.order ?? 0 })),
+    ...state.tools
+      .filter(
+        (item) => !item.callId || !item.ownerKey || !calls.has(`${item.ownerKey}/${item.callId}`),
+      )
+      .map((item) => ({ kind: "tool" as const, id: item.id, order: item.order ?? 0 })),
+  ].sort((left, right) => left.order - right.order);
+}

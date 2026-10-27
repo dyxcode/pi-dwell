@@ -17,6 +17,8 @@ export interface ContextSource {
 
 /** Display projection of a saved native entry; never a model-context reconstruction. */
 export interface HistoryEntry {
+  toolOwnerKey?: string;
+  nativeKey?: string;
   id: string;
   parentId: string | null;
   timestamp: string;
@@ -122,7 +124,18 @@ function entry(value: unknown): value is HistoryEntry {
   ];
   return (
     record(value) &&
-    (exact(value, fields) || exact(value, [...fields, "error"])) &&
+    exact(value, [
+      ...fields,
+      ...(value.error === undefined ? [] : ["error"]),
+      ...(value.nativeKey === undefined ? [] : ["nativeKey"]),
+      ...(value.toolOwnerKey === undefined ? [] : ["toolOwnerKey"]),
+    ]) &&
+    (value.toolOwnerKey === undefined ||
+      (typeof value.toolOwnerKey === "string" &&
+        /^[a-f0-9]{64}:[1-9][0-9]{0,8}$/.test(value.toolOwnerKey))) &&
+    (value.nativeKey === undefined ||
+      (typeof value.nativeKey === "string" &&
+        /^[a-f0-9]{64}:[1-9][0-9]{0,8}$/.test(value.nativeKey))) &&
     text(value.id) &&
     optionalText(value.parentId) &&
     text(value.timestamp, 100) &&

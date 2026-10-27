@@ -1,3 +1,4 @@
+import { nextMessageKey } from "../runtime/message-identity.ts";
 import { randomUUID } from "node:crypto";
 import {
   STREAM_EVENT_MAX_BYTES,
@@ -68,6 +69,8 @@ interface CachedView {
 }
 
 interface LiveState extends LiveProjection {
+  messageCounts: Map<string, number>;
+  toolOwners: Map<string, string>;
   readonly toolIds: Map<string, string>;
   readonly limited: Set<ProjectionLimitScope>;
   projectionErrorReported: boolean;
@@ -201,6 +204,8 @@ function equalJson(left: unknown, right: unknown): boolean {
 
 function emptyLiveState(): LiveState {
   return {
+    messageCounts: new Map(),
+    toolOwners: new Map(),
     message: null,
     tools: [],
     truncated: false,
@@ -440,7 +445,7 @@ export class SessionEvents {
     }
   }
 
-  beginTurn(sessionId: string, runId: string): void {
+  beginTurn(sessionId: string, runId: string, messageCounts = new Map<string, number>()): void {
     try {
       if (this.#closed || !UUID.test(sessionId) || !UUID.test(runId)) return;
       const stream = this.#getOrCreate(sessionId);
@@ -452,6 +457,7 @@ export class SessionEvents {
       if (stream.activeRunId === runId) return;
       stream.activeRunId = runId;
       stream.live = emptyLiveState();
+      stream.live.messageCounts = new Map(messageCounts);
       this.#touch(stream);
     } catch {
       // Live observation is optional and never owns execution.
@@ -494,6 +500,8 @@ export class SessionEvents {
     const stream = this.#streams.get(sessionId);
     if (!stream || stream.activeRunId !== runId) return;
     stream.activeRunId = null;
+    stream.live.messageCounts.clear();
+    stream.live.toolOwners.clear();
     this.#touch(stream);
   }
 
@@ -874,12 +882,21 @@ export class SessionEvents {
     }
     if (event.message.role !== "assistant") return;
     const text = this.#messageText(event.message);
+    const nativeKey = nextMessageKey(event.message, stream.live.messageCounts);
+    stream.live.toolOwners.clear();
+    if (nativeKey && Array.isArray(event.message.content)) {
+      for (const block of event.message.content.slice(0, MAX_TOOLS)) {
+        if (isRecord(block) && block.type === "toolCall" && typeof block.id === "string")
+          stream.live.toolOwners.set(block.id, nativeKey);
+      }
+    }
     const current = stream.live.message;
-    if (!current) this.#setMessage(stream, text, true, "message.finished");
+    if (!current) this.#setMessage(stream, text, true, "message.finished", nativeKey);
     else {
       const bounded = boundedJsonString(text, MAX_MESSAGE_JSON_BYTES);
       const message: LiveMessage = {
         ...current,
+        ...(nativeKey ? { nativeKey } : {}),
         text: bounded.value,
         finished: true,
         truncated: current.truncated || bounded.truncated,
@@ -915,9 +932,12 @@ export class SessionEvents {
     text: string,
     finished: boolean,
     type: "message.started" | "message.finished",
+    nativeKey?: string,
   ): void {
     const bounded = boundedJsonString(text, MAX_MESSAGE_JSON_BYTES);
     const message: LiveMessage = {
+      ...(nativeKey ? { nativeKey } : {}),
+      order: stream.sequence + 1,
       id: randomUUID(),
       text: bounded.value,
       finished,
@@ -1003,7 +1023,9 @@ export class SessionEvents {
     name: string,
     input: BoundedText,
   ): LiveTool | undefined {
-    const existingId = stream.live.toolIds.get(rawId);
+    const ownerKey = stream.live.toolOwners.get(rawId);
+    const correlation = `${ownerKey ?? stream.live.message?.id ?? "unknown"}:${rawId}`;
+    const existingId = stream.live.toolIds.get(correlation);
     const existing = existingId
       ? stream.live.tools.find((tool) => tool.id === existingId)
       : undefined;
@@ -1014,6 +1036,9 @@ export class SessionEvents {
     }
     const boundedName = boundedJsonString(name, MAX_TOOL_NAME_JSON_BYTES);
     const tool: LiveTool = {
+      ...(ownerKey ? { ownerKey } : {}),
+      callId: rawId,
+      order: stream.sequence + 1,
       id: randomUUID(),
       name: boundedName.value,
       input: input.value,
@@ -1022,7 +1047,7 @@ export class SessionEvents {
       truncated: input.truncated || boundedName.truncated,
     };
     stream.live.tools.push(tool);
-    stream.live.toolIds.set(rawId, tool.id);
+    stream.live.toolIds.set(correlation, tool.id);
     if (input.truncated) this.#limited(stream, "tool_input", MAX_TOOL_FIELD_JSON_BYTES);
     if (boundedName.truncated) this.#limited(stream, "tool_name", MAX_TOOL_NAME_JSON_BYTES);
     return tool;

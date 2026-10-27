@@ -1,3 +1,9 @@
+import {
+  emptyConversationState,
+  reduceFrame,
+  reconcileHistory,
+  visibleLiveContent,
+} from "../src/clients/web/events.ts";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -247,4 +253,49 @@ test("a first admitted turn has pending history before dispatch and read admissi
   assert.equal(pages[0]?.status, "available");
   assert.equal(pages[1]?.status, "available");
   await assert.rejects(restored.getHistory(session.id), /stopping/i);
+});
+
+test("active saved tool records take over live output across a multi-step reconnect", async (t) => {
+  const { service, session, gate, send } = await setup(t);
+  await send("hello");
+  let state = emptyConversationState(session.id);
+  const frames: StreamFrame[] = [];
+  const sub = service.subscribeEvents(session.id, undefined, (frame) => {
+    frames.push(frame);
+    state = reduceFrame(state, frame);
+  });
+  t.after(sub.unsubscribe);
+  const { turn } = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "tool-stream",
+  });
+  await until(
+    () =>
+      frames.some(
+        (frame) => frame.type === "message.delta" && frame.payload.text.includes("stream-first"),
+      ),
+    Boolean,
+  );
+  const saved = await service.getHistory(session.id);
+  assert.equal(saved.activeTurnId, turn.runId);
+  assert.equal(saved.coveredTurnId, null);
+  assert.ok(saved.entries.some((entry) => entry.role === "toolResult"));
+  assert.ok(state.tools.length > 0);
+  assert.ok(state.messages.some((message) => message.finished && message.nativeKey));
+  state = reconcileHistory(state, saved);
+  const visible = visibleLiveContent(state, saved.entries);
+  assert.equal(visible.filter((item) => item.kind === "tool").length, 0);
+  assert.equal(visible.filter((item) => item.kind === "message").length, 1);
+  assert.equal(state.messages.find((item) => item.id === visible[0]?.id)?.text, "stream-first-");
+  const fresh = service.subscribeEvents(session.id, undefined, () => {});
+  t.after(fresh.unsubscribe);
+  let reconnected = emptyConversationState(session.id);
+  for (const frame of fresh.initial) reconnected = reduceFrame(reconnected, frame);
+  assert.deepEqual(visibleLiveContent(reconnected, saved.entries), visible);
+  await writeFile(gate, "release");
+  await until(() => service.getTurn(session.id, turn.runId).status === "completed", Boolean);
+  const completed = await service.getHistory(session.id);
+  state = reconcileHistory(state, completed);
+  assert.equal(state.tools.length, 0);
+  assert.equal(state.messages.length, 0);
 });

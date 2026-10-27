@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+import type { LiveTool } from "../../shared/events.ts";
 
 import type { ContextSource, HistoryBlock, HistoryEntry } from "../../shared/history.ts";
 import { actionIcon } from "./icons.ts";
@@ -202,9 +203,10 @@ function toolRun(
   result: HistoryEntry | undefined,
   renderImage: SavedImageRenderer,
   key: string,
-  options: { shell?: boolean; orphan?: boolean } = {},
+  options: { shell?: boolean; orphan?: boolean; live?: LiveTool | undefined } = {},
 ): HTMLDetailsElement {
-  const isError = owner.error === true || result?.error === true;
+  const live = result ? undefined : options.live;
+  const isError = owner.error === true || result?.error === true || live?.status === "failed";
   const details = keyed(node("details"), key, owner.id);
   details.className = `tool-run${isError ? " error" : ""}`;
   details.open = isError;
@@ -217,13 +219,15 @@ function toolRun(
   else summary.append(node("code", label));
   const status = isError
     ? "Error"
-    : result
+    : result || live?.status === "completed"
       ? "✓"
-      : options.shell
-        ? "Saved"
-        : options.orphan
-          ? "Orphan result"
-          : "No result saved";
+      : live?.status === "running"
+        ? "Running"
+        : options.shell
+          ? "Saved"
+          : options.orphan
+            ? "Orphan result"
+            : "No result saved";
   const indicator = node("span", status === "✓" ? "" : status, "tool-status");
   if (status === "✓") {
     indicator.append(actionIcon("check"));
@@ -245,6 +249,8 @@ function toolRun(
     appendRawOutput(body, result, renderImage, result.blocks);
     if (result.truncated)
       body.append(node("p", "This saved result was truncated for display.", "footnote"));
+  } else if (live) {
+    body.append(node("pre", live.output, "tool-output"));
   } else if (shell && call) {
     body.append(node("p", "No matching result was saved.", "footnote"));
   } else if (options.orphan) {
@@ -276,6 +282,7 @@ function renderUser(entry: HistoryEntry, renderImage: SavedImageRenderer): HTMLE
 function renderAssistant(
   entries: readonly HistoryEntry[],
   renderImage: SavedImageRenderer,
+  liveTools: readonly LiveTool[],
 ): HTMLElement {
   const article = node("article", "", "message assistant");
   article.dataset.entryId = entries[0]?.id ?? "";
@@ -327,7 +334,25 @@ function renderAssistant(
       if (block.type === "tool_call") {
         const key = `${entry.id}:${index}`;
         const result = pairs.byCall.get(key);
-        body.append(toolRun(entry, block, result, renderImage, `tool:${key}`));
+        body.append(
+          toolRun(
+            entry,
+            block,
+            result,
+            renderImage,
+            block.callId && entry.nativeKey
+              ? `tool-call:${entry.nativeKey}/${block.callId}`
+              : `tool:${key}`,
+            {
+              live: liveTools.find(
+                (tool) =>
+                  tool.ownerKey !== undefined &&
+                  tool.ownerKey === entry.nativeKey &&
+                  tool.callId === block.callId,
+              ),
+            },
+          ),
+        );
       } else if (block.type === "image") appendImage(body, entry, block, renderImage);
       else markdown(body, block.text);
     }
@@ -417,13 +442,14 @@ export function renderSavedConversation(
     unavailable.dataset.mimeType = mimeType;
     return unavailable;
   },
+  liveTools: readonly LiveTool[] = [],
 ): DocumentFragment {
   const fragment = document.createDocumentFragment();
   const context = renderContext(contextSources, contextSourcesTruncated);
   if (context) fragment.append(context);
   for (const group of groupConversationEntries(entries)) {
     if (group.kind === "user") fragment.append(renderUser(group.entry, renderImage));
-    else fragment.append(renderAssistant(group.entries, renderImage));
+    else fragment.append(renderAssistant(group.entries, renderImage, liveTools));
   }
   return fragment;
 }

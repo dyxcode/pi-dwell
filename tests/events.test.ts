@@ -438,12 +438,12 @@ test("Pi messages and tools become capped Dwell projections without raw record l
   assert.equal(tool.output, "done");
   assert.equal(tool.status, "completed");
   assert.notEqual(tool.id, "private-tool-call-id");
+  assert.equal(tool.callId, "private-tool-call-id"); // Native correlation is an explicit public field.
 
   const serialized = JSON.stringify(received);
   for (const forbidden of [
     "private-entry-id",
     "private-parent-call-id",
-    "private-tool-call-id",
     "providerMetadata",
     "assistantMessageEvent",
     '"details"',
@@ -658,4 +658,45 @@ test("stream.error is delivered as a bounded projection and close clears subscri
   hub.fail(SESSION_ID, "ignored", "closed");
   assert.equal(seen.length, 1);
   subscription.unsubscribe();
+});
+
+test("native message identities distinguish identical occurrences and retain tool references", () => {
+  const hub = new SessionEvents();
+  const frames: StreamFrame[] = [];
+  const sub = connect(
+    hub,
+    withTurn(session(), RUN_ID, RUN_ID),
+    turn(),
+    turn(),
+    undefined,
+    (frame) => frames.push(frame),
+  );
+  hub.beginTurn(SESSION_ID, RUN_ID);
+  const message = {
+    role: "assistant",
+    content: [{ type: "text", text: "Same text" }],
+    timestamp: 1,
+  };
+  for (let i = 0; i < 2; i++) {
+    hub.observe(SESSION_ID, RUN_ID, makeRecord("message_start", { message }));
+    hub.observe(SESSION_ID, RUN_ID, makeRecord("message_end", { message }));
+  }
+  const finished = frames.filter((f) => f.type === "message.finished");
+  assert.equal(finished.length, 2);
+  assert.match(JSON.stringify(finished[0]), /"nativeKey":"[a-f0-9]{64}:1"/);
+  assert.match(JSON.stringify(finished[1]), /"nativeKey":"[a-f0-9]{64}:2"/);
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("tool_execution_start", {
+      toolCallId: "native-tool",
+      toolName: "bash",
+      args: { command: "echo test" },
+    }),
+  );
+  const tool = frames.find((f) => f.type === "tool.started");
+  assert.match(JSON.stringify(tool), /"callId":"native-tool"/);
+  assert.ok(frames.every(isStreamFrame));
+  sub.unsubscribe();
+  hub.close();
 });

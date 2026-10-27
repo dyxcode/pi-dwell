@@ -1,3 +1,4 @@
+import { savedMessageKeys } from "../runtime/message-identity.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { open, readdir, realpath, stat } from "node:fs/promises";
@@ -897,7 +898,10 @@ export class SessionService {
           "unsupported_image_model",
           "The selected Pi model does not accept image input.",
         );
-      const before = new Set((await this.#savedEntries(source)).map((entry) => entry.id));
+      const { before, messageCounts } = await this.#savedEntries(source).then((entries) => ({
+        before: new Set(entries.map((entry) => entry.id)),
+        messageCounts: savedMessageKeys(entries).counts,
+      }));
       let turn = this.#storedTurn(id, slot.runId);
       if (!active(turn)) return;
       const stored = this.#stored(id);
@@ -923,7 +927,7 @@ export class SessionService {
         });
         return;
       }
-      this.#events.beginTurn(id, slot.runId);
+      this.#events.beginTurn(id, slot.runId, messageCounts);
       unobserve = runtime.subscribe(
         (event) => {
           this.#events.observe(id, slot.runId, event);

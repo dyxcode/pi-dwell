@@ -7,10 +7,10 @@ import { fileURLToPath } from "node:url";
 import { isRecord } from "../src/runtime/pi-rpc.ts";
 import { startHost } from "../src/server/http.ts";
 import { SessionError, SessionService } from "../src/sessions/service.ts";
-import { SessionCatalog } from "../src/storage/catalog.ts";
 import type { StreamFrame } from "../src/shared/events.ts";
 import { isSessionInfo } from "../src/shared/sessions.ts";
 import { isTurnInfo, type TurnInfo } from "../src/shared/turns.ts";
+import { SessionCatalog } from "../src/storage/catalog.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
 interface NativeExecutionView {
@@ -163,6 +163,163 @@ test("startup native execution preserves Pi thinking when the saved Dwell settin
     (value) => value?.status === "aborted",
     "the startup native execution to abort",
   );
+});
+
+test("native extension model and thinking changes refresh the session catalog after settlement", {
+  timeout: 20_000,
+}, async (t) => {
+  const environment = await createPiEnvironment();
+  const dataDir = join(environment.root, "dwell");
+  const nativeStateReport = join(environment.root, "native-state.txt");
+  const stateExtension = fileURLToPath(new URL("./fixtures/pi-native-state.ts", import.meta.url));
+  const service = await SessionService.create({
+    dataDir,
+    env: {
+      ...environment.env,
+      DWELL_TEST_NATIVE_PROMPT: "hello",
+      DWELL_TEST_NATIVE_STATE_CHANGE: "1",
+      DWELL_TEST_NATIVE_STATE_REPORT: nativeStateReport,
+    },
+    extensions: [environment.extensionPath, stateExtension],
+  });
+  t.after(async () => {
+    await service.shutdown();
+    await environment.cleanup();
+  });
+  await service.configure({
+    executable: process.execPath,
+    entryPoint: fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry")),
+  });
+  const session = await service.createSession({
+    requestId: randomUUID(),
+    directory: environment.cwd,
+    provider: "dwell-test",
+    model: "dwell-test",
+  });
+  assert.equal(session.status, "ready");
+  const frames: StreamFrame[] = [];
+  const subscription = service.subscribeEvents(session.id, undefined, (frame) => {
+    frames.push(frame);
+  });
+  t.after(subscription.unsubscribe);
+
+  const { turn } = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await waitFor(
+    () => Promise.resolve(service.getTurn(session.id, turn.runId)),
+    (value) => value.status === "completed",
+    "the initiating Dwell turn to complete",
+  );
+
+  const native = await waitFor(
+    () => Promise.resolve(nativeExecution(service.getSession(session.id))),
+    (value) => value?.status === "completed",
+    "the extension follow-up execution to complete",
+  );
+  assert.ok(native);
+  assert.equal(await readFile(nativeStateReport, "utf8"), "changed\n");
+  const refreshed = await waitFor(
+    () => Promise.resolve(service.getSession(session.id)),
+    (value) =>
+      isSessionInfo(value) &&
+      value.provider === "dwell-test" &&
+      value.model === "dwell-test-reasoning" &&
+      value.thinkingLevel === "high",
+    "the catalog to reflect Pi's native model and thinking state",
+  );
+  assert.ok(isSessionInfo(refreshed));
+  assert.ok(
+    frames.some(
+      (frame) =>
+        frame.type === "session.updated" &&
+        isSessionInfo(frame.payload) &&
+        frame.payload.model === "dwell-test-reasoning" &&
+        frame.payload.thinkingLevel === "high",
+    ),
+  );
+});
+
+test("host restart reconciles stale session model metadata from the saved Pi transcript", {
+  timeout: 20_000,
+}, async (t) => {
+  const environment = await createPiEnvironment();
+  const dataDir = join(environment.root, "dwell");
+  let service: SessionService | undefined;
+  let reopenedService: SessionService | undefined;
+  t.after(async () => {
+    await service?.shutdown();
+    await reopenedService?.shutdown();
+    await environment.cleanup();
+  });
+
+  service = await SessionService.create({
+    dataDir,
+    env: environment.env,
+    extensions: [environment.extensionPath],
+  });
+  await service.configure({
+    executable: process.execPath,
+    entryPoint: fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry")),
+  });
+  const session = await service.createSession({
+    requestId: randomUUID(),
+    directory: environment.cwd,
+    provider: "dwell-test",
+    model: "dwell-test",
+  });
+  const selected = await service.setSessionModel(session.id, {
+    provider: "dwell-test",
+    model: "dwell-test-reasoning",
+    thinkingLevel: "high",
+  });
+  assert.equal(selected.status, "ready");
+  const { turn } = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  const completed = await waitFor(
+    () => Promise.resolve(service?.getTurn(session.id, turn.runId)),
+    (value) => value?.status === "completed",
+    "the transcript-backed turn to complete",
+  );
+  assert.ok(completed);
+  await service.closeSession(session.id);
+  await service.shutdown();
+  service = undefined;
+
+  const catalog = await SessionCatalog.open(dataDir);
+  try {
+    const stored = catalog.get(session.id);
+    assert.ok(stored);
+    catalog.update({
+      ...stored,
+      provider: "dwell-test",
+      model: "dwell-test",
+      thinkingLevel: "low",
+    });
+  } finally {
+    catalog.close();
+  }
+
+  reopenedService = await SessionService.create({
+    dataDir,
+    env: { ...environment.env, DWELL_TEST_NATIVE_ON_START: "slow" },
+    extensions: [environment.extensionPath],
+  });
+  const reopened = await reopenedService.openSession(session.id);
+  assert.equal(reopened.status, "ready");
+  assert.equal(reopened.provider, "dwell-test");
+  assert.equal(reopened.model, "dwell-test-reasoning");
+  assert.equal(reopened.thinkingLevel, "high");
+  const native = await waitFor(
+    () => Promise.resolve(nativeExecution(reopenedService?.getSession(session.id))),
+    (value) => value?.status === "running",
+    "the startup native follow-up to remain active",
+  );
+  assert.ok(native);
+  await reopenedService.abortNativeExecution(session.id, native.id);
 });
 
 test("native extension runs stay outside the turn ledger and reconcile live events with saved history", {

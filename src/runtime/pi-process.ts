@@ -322,7 +322,7 @@ export class PiProcess {
       "rpc",
       "--session-dir",
       sessionDirectory,
-      ...(provider !== undefined && model !== undefined
+      ...(resumeFile === undefined && provider !== undefined && model !== undefined
         ? ["--provider", provider, "--model", model]
         : []),
       ...(options.resourcePolicy === "isolated"
@@ -364,6 +364,7 @@ export class PiProcess {
       if (options.sessionId && state.sessionId !== options.sessionId)
         throw new Error("Pi did not preserve the requested session identity.");
       if (
+        resumeFile === undefined &&
         provider !== undefined &&
         model !== undefined &&
         (state.model.provider !== provider || state.model.id !== model)

@@ -130,6 +130,16 @@ interface NativeExecutionRecord {
   abort?: Promise<void>;
 }
 
+interface NativeStateRefreshRequest {
+  runtime: PiProcess;
+  executionId: string;
+}
+
+interface NativeStateRefresh {
+  pending: NativeStateRefreshRequest | undefined;
+  promise: Promise<void>;
+}
+
 function isMessageAfterBaseline(key: string, baseline: ReadonlyMap<string, number>): boolean {
   const separator = key.lastIndexOf(":");
   if (separator < 0) return false;
@@ -198,11 +208,13 @@ export class SessionService {
   readonly #runtimeObservers = new Map<string, () => void>();
   readonly #historyIdentity = new Map<string, HistoryIdentity>();
   readonly #nativeExecutions = new Map<string, NativeExecutionRecord>();
+  readonly #nativeStateRefreshes = new Map<string, NativeStateRefresh>();
   readonly #turns = new Map<string, ActiveTurn>();
   readonly #storageFaults = new Set<string>();
   readonly #events = new SessionEvents();
   readonly #historyPages = new HistoryPages();
   readonly #reads = new Set<Promise<unknown>>();
+  readonly #nativeRefreshes = new Set<Promise<void>>();
   readonly #shutdownController = new AbortController();
   #modelDiscovery: Promise<PiModelOption[]> | undefined;
   readonly #modelCapabilityDiscoveries = new Map<string, Promise<ModelCapabilitiesResponse>>();
@@ -1295,6 +1307,7 @@ export class SessionService {
       this.#events.close();
       await Promise.allSettled([
         ...this.#reads,
+        ...this.#nativeRefreshes,
         ...(this.#modelDiscovery ? [this.#modelDiscovery] : []),
         ...this.#modelCapabilityDiscoveries.values(),
       ]);
@@ -1660,6 +1673,8 @@ export class SessionService {
       () => this.#reads.delete(refresh),
       () => this.#reads.delete(refresh),
     );
+    const runtime = this.#runtimes.get(sessionId);
+    if (runtime) this.#scheduleNativeStateRefresh(sessionId, event.executionId, runtime);
   }
 
   async #refreshNativeHistory(sessionId: string, executionId: string): Promise<void> {
@@ -1685,6 +1700,87 @@ export class SessionService {
     }
     if (history && !history.incompleteTail)
       this.#historyIdentity.set(sessionId, this.#identityForHistory(history));
+  }
+
+  #scheduleNativeStateRefresh(sessionId: string, executionId: string, runtime: PiProcess): void {
+    const current = this.#nativeStateRefreshes.get(sessionId);
+    if (current) {
+      current.pending = { runtime, executionId };
+      return;
+    }
+
+    const refresh: NativeStateRefresh = { pending: undefined, promise: Promise.resolve() };
+    const run = async (): Promise<void> => {
+      let request: NativeStateRefreshRequest | undefined = { runtime, executionId };
+      while (request) {
+        await this.#refreshNativeSessionState(sessionId, request.executionId, request.runtime);
+        request = refresh.pending;
+        refresh.pending = undefined;
+      }
+    };
+    refresh.promise = run()
+      .catch(() => {})
+      .finally(() => {
+        if (this.#nativeStateRefreshes.get(sessionId) === refresh)
+          this.#nativeStateRefreshes.delete(sessionId);
+      });
+    this.#nativeStateRefreshes.set(sessionId, refresh);
+    this.#nativeRefreshes.add(refresh.promise);
+    void refresh.promise.then(
+      () => this.#nativeRefreshes.delete(refresh.promise),
+      () => this.#nativeRefreshes.delete(refresh.promise),
+    );
+  }
+
+  async #refreshNativeSessionState(
+    sessionId: string,
+    executionId: string,
+    runtime: PiProcess,
+  ): Promise<void> {
+    const before = this.#nativeExecutions.get(sessionId);
+    if (before?.info.id !== executionId || before.info.status === "running") return;
+    try {
+      const storedBefore = this.#stored(sessionId);
+      const state = await runtime.getState();
+      const current = this.#nativeExecutions.get(sessionId);
+      if (
+        this.#runtimes.get(sessionId) !== runtime ||
+        !this.#runtimeObservers.has(sessionId) ||
+        current?.info.id !== executionId ||
+        current.info.status === "running"
+      )
+        return;
+      const stored = this.#stored(sessionId);
+      if (
+        state.sessionId !== stored.piSessionId ||
+        !state.model ||
+        stored.provider !== storedBefore.provider ||
+        stored.model !== storedBefore.model ||
+        stored.thinkingLevel !== storedBefore.thinkingLevel
+      )
+        return;
+      if (
+        state.model.provider === stored.provider &&
+        state.model.id === stored.model &&
+        state.thinkingLevel === stored.thinkingLevel
+      )
+        return;
+      try {
+        this.#catalog.update({
+          ...stored,
+          provider: state.model.provider,
+          model: state.model.id,
+          thinkingLevel: state.thinkingLevel,
+          updatedAt: this.#now(),
+        });
+      } catch {
+        this.#storageFault(sessionId);
+        return;
+      }
+      this.#publishState(sessionId);
+    } catch {
+      /* Native state observation does not change the execution's settled outcome. */
+    }
   }
 
   async #open(stored: StoredSession, options: { signal?: AbortSignal } = {}): Promise<SessionInfo> {
@@ -1724,7 +1820,7 @@ export class SessionService {
         env: this.#env,
         sessionDirectory: join(this.#dataDir, "sessions", stored.id),
         ...(resumeFile ? { resumeFile } : { sessionId: stored.piSessionId }),
-        ...(stored.provider !== null && stored.model !== null
+        ...(resumeFile === undefined && stored.provider !== null && stored.model !== null
           ? { provider: stored.provider, model: stored.model }
           : {}),
         extensions: this.#extensions,
@@ -1744,8 +1840,9 @@ export class SessionService {
       if (
         state.sessionId !== stored.piSessionId ||
         !state.model ||
-        (stored.provider !== null && state.model.provider !== stored.provider) ||
-        (stored.model !== null && state.model.id !== stored.model) ||
+        (resumeFile === undefined &&
+          ((stored.provider !== null && state.model.provider !== stored.provider) ||
+            (stored.model !== null && state.model.id !== stored.model))) ||
         !state.sessionFile
       )
         throw new SessionError(
@@ -1754,6 +1851,7 @@ export class SessionService {
           "Pi did not use the requested session and model selection.",
         );
       if (
+        resumeFile === undefined &&
         stored.thinkingLevel !== null &&
         state.thinkingLevel !== stored.thinkingLevel &&
         runtime.activeExecution?.source !== "native"
@@ -1765,8 +1863,9 @@ export class SessionService {
         !state.model ||
         state.sessionId !== stored.piSessionId ||
         !state.sessionFile ||
-        (stored.provider !== null && state.model.provider !== stored.provider) ||
-        (stored.model !== null && state.model.id !== stored.model)
+        (resumeFile === undefined &&
+          ((stored.provider !== null && state.model.provider !== stored.provider) ||
+            (stored.model !== null && state.model.id !== stored.model)))
       )
         throw new SessionError(503, "runtime_mismatch", "Pi did not restore the saved session.");
       const ready: StoredSession = {

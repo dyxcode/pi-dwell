@@ -415,6 +415,23 @@ test("Pi thinking capabilities are model-specific, clamped, and restored from th
   assert.equal(await readFile(join(environment.agentDir, "settings.json"), "utf8"), settings);
 });
 
+test("reopening a saved Pi transcript keeps its native model and thinking despite stale launch selections", async (t) => {
+  const { pi, options } = await runtime(t);
+  await pi.setModel("dwell-test", "dwell-test-reasoning");
+  await pi.setThinkingLevel("high");
+  assert.equal((await pi.run("hello")).outcome, "completed");
+  const saved = await pi.getState();
+  assert.ok(saved.sessionFile);
+
+  await pi.stop();
+  const reopened = await PiProcess.start({ ...options, resumeFile: saved.sessionFile });
+  t.after(() => reopened.stop());
+  const resumed = await reopened.getState();
+  assert.equal(resumed.model?.provider, "dwell-test");
+  assert.equal(resumed.model?.id, "dwell-test-reasoning");
+  assert.equal(resumed.thinkingLevel, "high");
+});
+
 test("real Pi performs a tool turn, saves history, and reopens the same session", async (t) => {
   const { pi, options } = await runtime(t);
   const initial = await pi.getState();

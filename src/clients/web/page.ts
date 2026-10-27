@@ -68,7 +68,7 @@ export const HOST_PAGE = `<!doctype html>
 <footer id="composer-footer">
 <div id="composer-context" class="composer-context" hidden>
 <span id="composer-directory" aria-label="Current directory"></span>
-<button id="choose-model" type="button" aria-label="Choose model" aria-haspopup="dialog" disabled><span id="model-label"></span><span id="thinking-label"></span><span aria-hidden="true">⌄</span></button>
+<button id="choose-model" type="button" aria-label="Choose model" aria-haspopup="dialog" disabled><span id="model-label"></span><span id="thinking-label"></span><svg class="model-chevron" aria-hidden="true" viewBox="0 0 12 12" fill="none"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 </div>
 <form id="composer">
 <label for="message" class="sr-only">Message Pi</label>
@@ -93,13 +93,12 @@ export const HOST_PAGE = `<!doctype html>
 </div>
 <div class="panel-heading">
 <div>
-<div class="eyebrow">NEW CONVERSATION</div>
-<h2 id="new-title">Start where you are.</h2>
+<h2 id="new-title">New session</h2>
 </div>
 <button id="close-new" class="icon" aria-label="Close panel">×</button>
 </div>
 <form id="new-form" class="form">
-<label for="directory">HOST DIRECTORY</label>
+<label for="directory">Directory</label>
 <div class="directory-input">
 <input id="directory" required autocomplete="off">
 <button id="browse" type="button" class="text-button">Browse</button>
@@ -108,7 +107,7 @@ export const HOST_PAGE = `<!doctype html>
 </div>
 <p id="create-error" class="feedback" role="status">
 </p>
-<button id="create-button" class="action" type="submit">Start conversation ↗</button>
+<button id="create-button" class="action" type="submit">Start session</button>
 </form>
 </dialog>
 <dialog id="model-dialog" aria-labelledby="model-title">
@@ -507,7 +506,9 @@ button:disabled{opacity:.55;cursor:default}
 /* Model and thinking selection. */
 #choose-model{min-width:0;gap:5px}
 #model-label{flex:1;min-width:0}
-#thinking-label{white-space:nowrap;flex-shrink:0;color:var(--muted);font-size:9px}
+#choose-model{line-height:16px}
+#choose-model .model-chevron{display:block;flex:0 0 12px;width:12px;height:12px}
+#thinking-label{line-height:inherit;white-space:nowrap;flex-shrink:0;color:var(--muted);font-size:9px}
 #model-dialog .panel-heading{margin-bottom:16px}
 #model-dialog #model-options{max-height:44dvh}
 #model-dialog .model-option{min-height:60px}
@@ -800,7 +801,7 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #confirm-session-close:disabled{opacity:.55;cursor:wait}
 #conversation .user .message-body,#conversation .assistant .message-body{font-size:15px}
 #composer #message,#composer.expanded #message{font-family:var(--sans);font-size:15px;font-weight:400;line-height:24px}
-#message::placeholder{font-size:14px;font-weight:400;opacity:1;letter-spacing:normal}
+#message::placeholder{font-size:13px;font-weight:400;opacity:1;letter-spacing:normal}
 @media(min-width:761px){#open-nav{display:none}}
 @media(max-width:760px){
  #rail{width:min(360px,calc(100vw - 24px))}
@@ -835,4 +836,52 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 @media(max-width:760px){#conversation .thinking-run>summary{min-height:40px}}
 
 #conversation .tool-run .tool-caption{padding:0 0 4px;font:11px/1.6 var(--mono);color:#797267}
+
+/* Proportional sidebar and tighter conversation spacing. */
+#rail{width:min(280px,25vw)}
+#conversation .message{margin:0}
+#conversation .message+.message{margin-top:16px}
+#conversation .user+.assistant{margin-top:10px}
+#conversation .assistant+.assistant{margin-top:8px}
+#conversation .markdown p{margin-bottom:8px}
+#conversation .markdown p:last-child{margin-bottom:0}
+#conversation .session-details{margin-bottom:6px}
+#conversation .thinking-run{margin:0 0 4px}
+#conversation .thinking-run>summary{min-height:32px}
+#conversation .thinking-content{padding:2px 0 6px}
+#conversation .message-body .tool-run{margin:4px 0 6px}
+#conversation .tool-run .tool-output{padding-bottom:4px}
+@media(max-width:760px){#rail{width:min(360px,85vw)}#conversation .thinking-run>summary{min-height:36px}}
+
+/* Shared geometry for text actions, independent of font glyph baselines. */
+.action-icon{display:block;width:12px;height:12px;flex:0 0 12px}
+.icon-label,#composer #send,#composer #attach-image{display:inline-flex;align-items:center;gap:6px;line-height:16px}
+.icon-label .control-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:16px}
+#composer #send{justify-content:flex-end}
+#composer #send .control-label{font:inherit;line-height:16px}
+.icon .action-icon{width:18px;height:18px;flex-basis:18px}
+.icon,.image-chip-remove{display:inline-flex;align-items:center;justify-content:center}
+.tool-status,.model-option .tick,.model-option .option-arrow{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* A compact creation panel uses the same typography as the other dialogs. */
+#new-dialog{width:min(420px,calc(100vw - 32px));padding:18px;box-shadow:4px 4px var(--lilac)}
+#new-dialog .panel-heading{margin-bottom:12px;gap:12px}
+#new-dialog h2{font:600 18px/1.4 var(--sans);letter-spacing:0;margin:0}
+#new-dialog #close-new{width:32px;height:32px;margin:0}
+#new-dialog label{font:11px/1.5 var(--mono);margin:0 0 6px;letter-spacing:0}
+#new-dialog #directory{height:38px;padding:8px;font-size:13px;min-width:0}
+#new-dialog .directory-input{gap:8px}
+#new-dialog #browse{font-size:12px;min-height:38px}
+#new-dialog #directories{margin-top:8px}
+#new-dialog .directory-row{justify-content:space-between;min-height:40px;padding:8px;font-size:12px}
+#new-dialog #create-error:empty{display:none}
+#new-dialog #create-button{justify-content:center;margin-top:14px;min-height:40px;padding:8px 12px;font:12px/16px var(--mono);box-shadow:2px 2px var(--lilac)}
+@media(max-width:760px){#new-dialog{width:100%;max-width:none;padding:12px 16px max(16px,env(safe-area-inset-bottom));box-shadow:0 -3px var(--lilac)}#new-dialog .handle{margin-bottom:12px}}
+
+/* Keep the slot number and state/close icon in the same columns. */
+#status-list .status-tab{display:grid;grid-template-columns:20px 18px;column-gap:6px;align-items:stretch;padding:0 10px;width:66px;flex:0 0 66px}
+#status-list .status-tab .tab-select{grid-column:1 / -1;display:grid;grid-template-columns:20px 18px;column-gap:6px;justify-content:center;align-items:center;padding:0;min-width:0}
+#status-list .status-tab .tab-select>span{justify-self:center}
+#status-list .status-tab.close-armed .tab-select{grid-column:1;grid-template-columns:20px;gap:0}
+#status-list .status-tab .tab-close{grid-column:2;display:flex;align-items:center;justify-content:center;width:18px;padding:0}
 `;

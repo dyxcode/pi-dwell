@@ -1,5 +1,53 @@
 import { marked } from "/marked.js";
 const $ = (id) => document.getElementById(id);
+function actionIcon(name) {
+  const paths = {
+    up: "M6 10V2m-3 3 3-3 3 3",
+    left: "M10 6H2m3-3-3 3 3 3",
+    right: "m4.5 3 3 3-3 3",
+    open: "M3 9 9 3H3m6 0v6",
+    plus: "M6 2v8M2 6h8",
+    check: "m2 6 2.5 2.5L10 3",
+    close: "m3 3 6 6m0-6-6 6",
+  };
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.classList.add("action-icon");
+  svg.setAttribute("viewBox", "0 0 12 12");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", paths[name]);
+  svg.append(path);
+  return svg;
+}
+function labelWithIcon(button, text, name, leading = false) {
+  const label = document.createElement("span");
+  label.className = "control-label";
+  label.textContent = text;
+  const icon = actionIcon(name);
+  button.classList.add("icon-label");
+  button.replaceChildren(...(leading ? [icon, label] : [label, icon]));
+}
+labelWithIcon($("send"), "Send", "up");
+labelWithIcon($("attach-image"), "Image", "plus", true);
+labelWithIcon($("load-older"), "Load earlier messages", "up");
+labelWithIcon($("create-button"), "Start session", "open");
+labelWithIcon($("reopen-session"), "Open session", "open");
+labelWithIcon($("new-session"), "New session", "plus");
+for (const id of [
+  "close-nav",
+  "close-new",
+  "close-host",
+  "close-model",
+  "close-image",
+  "dismiss-notice",
+])
+  $(id).replaceChildren(actionIcon("close"));
+$("new-mobile").replaceChildren(actionIcon("plus"));
 const models = [
   { name: "GPT-5.4", provider: "OpenAI", levels: ["low", "medium", "high", "xhigh"] },
   { name: "GPT-5.4 mini", provider: "OpenAI", levels: ["low", "medium", "high"] },
@@ -217,7 +265,8 @@ function message(role, text) {
     command.textContent = "$ " + text.command;
     const status = document.createElement("span");
     status.className = "tool-status";
-    status.textContent = text.failed ? "Failed" : "✓";
+    if (text.failed) status.textContent = "Failed";
+    else status.append(actionIcon("check"));
     status.setAttribute("aria-label", text.failed ? "Failed" : "Completed");
     summary.append(command, status);
     const output = document.createElement("pre");
@@ -580,10 +629,7 @@ function directories() {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "directory-choice" + ($("directory").value === path ? " selected" : "");
-    b.textContent = path.split("/").at(-1);
-    const arrow = document.createElement("span");
-    arrow.textContent = $("directory").value === path ? "✓" : "↗";
-    b.append(arrow);
+    labelWithIcon(b, path.split("/").at(-1), $("directory").value === path ? "check" : "open");
     b.onclick = () => {
       $("directory").value = path;
       directories();
@@ -636,7 +682,7 @@ function optionButton(title, subtitle, current, kind) {
   b.append(text);
   const end = document.createElement("span");
   end.className = current ? "tick" : "option-arrow";
-  end.textContent = current ? "✓" : kind === "model-choice" ? "›" : "";
+  if (current || kind === "model-choice") end.append(actionIcon(current ? "check" : "right"));
   b.append(end);
   return b;
 }
@@ -668,7 +714,7 @@ function showThinking(model) {
   $("model-title").textContent = "Thinking level";
   $("model-search").hidden = true;
   $("back-models").hidden = false;
-  $("back-models").textContent = "← " + model.name;
+  labelWithIcon($("back-models"), model.name, "left", true);
   $("model-options").replaceChildren();
   for (const level of model.levels) {
     const current = model === currentModel && level === currentThinking;
@@ -816,7 +862,7 @@ function imageChip(image, attachments) {
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "image-chip-remove";
-  remove.textContent = "×";
+  remove.append(actionIcon("close"));
   remove.setAttribute("aria-label", "Remove " + label);
   remove.onclick = () => {
     sessions[selected].attachments = sessions[selected].attachments.filter(

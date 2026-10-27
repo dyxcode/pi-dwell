@@ -62,7 +62,7 @@
 </div>
 </div>
 <footer>
-<div class="composer-context"><span id="composer-directory" aria-label="Current directory"></span><button id="choose-model" type="button" aria-label="Choose model" aria-haspopup="dialog"><span id="model-label">GPT-5.4</span><span id="thinking-label">· Medium</span><span aria-hidden="true">⌄</span></button></div><form id="composer">
+<div class="composer-context"><span id="composer-directory" aria-label="Current directory"></span><button id="choose-model" type="button" aria-label="Choose model" aria-haspopup="dialog"><span id="model-label">GPT-5.4</span><span id="thinking-label">· Medium</span><svg class="model-chevron" aria-hidden="true" viewBox="0 0 12 12" fill="none"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><form id="composer">
 <input id="image-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
 <div class="text-editor"><div id="message" contenteditable="true" role="textbox" aria-label="Message Pi" aria-multiline="true" data-placeholder="Message Pi…" spellcheck="true"></div></div>
 <div class="composer-actions">
@@ -87,13 +87,12 @@
 </div>
 <div class="panel-heading">
 <div>
-<div class="eyebrow">NEW CONVERSATION</div>
-<h2 id="new-title">Start where you are.</h2>
+<h2 id="new-title">New session</h2>
 </div>
 <button id="close-new" class="icon" aria-label="Close panel">×</button>
 </div>
 <form id="new-form" class="form">
-<label for="directory">HOST DIRECTORY</label>
+<label for="directory">Directory</label>
 <div class="directory-input">
 <input id="directory" required autocomplete="off">
 <button id="browse" type="button" class="text-button">Browse</button>

@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 
 import type { ContextSource, HistoryBlock, HistoryEntry } from "../../shared/history.ts";
+import { actionIcon } from "./icons.ts";
 import { renderMarkdown } from "./markdown.ts";
 
 export type SavedConversationGroup =
@@ -222,7 +223,12 @@ function toolRun(
         : options.orphan
           ? "Orphan result"
           : "No result saved";
-  summary.append(node("span", status, "tool-status"));
+  const indicator = node("span", status === "✓" ? "" : status, "tool-status");
+  if (status === "✓") {
+    indicator.append(actionIcon("check"));
+    indicator.setAttribute("aria-label", "Completed");
+  }
+  summary.append(indicator);
   details.append(summary);
 
   const body = node("div", "", "tool-run-body");

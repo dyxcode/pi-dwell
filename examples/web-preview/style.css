@@ -1,6 +1,6 @@
 @import url('/base.css');
 #message{display:block;min-width:0;width:100%;white-space:pre-wrap;overflow-wrap:anywhere;outline:none;background:none;border:0}
-#message[data-empty="true"]::before{content:attr(data-placeholder);color:#a09686;pointer-events:none;float:left;height:0;font-size:14px;font-weight:400;line-height:24px}
+#message[data-empty="true"]::before{content:attr(data-placeholder);color:#a09686;pointer-events:none;float:left;height:0;font-size:13px;font-weight:400;line-height:24px}
 /* Two optional-extension presentations; preview controls are demo-only. */
 .preview-mode-label{display:block;font:9px/1.5 var(--mono);color:var(--muted);letter-spacing:1px;margin-bottom:6px}
 #preview-mode{width:100%;padding:8px 5px;margin-bottom:10px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;color:var(--dark);font:11px var(--mono)}
@@ -33,7 +33,7 @@
 #memory-search{width:100%;min-width:0;min-height:38px;margin:16px 0 10px;padding:8px;border:1px solid var(--line);border-radius:0;background:var(--surface);font:12px var(--sans);color:var(--ink)}
 #memory-preview .memory-note summary{font-family:var(--sans);font-size:12px}
 #conversation-heading[hidden],#session-list[hidden],#top-session-controls[hidden]{display:none}
-@media(min-width:761px){.with-distill #open-nav{display:none}.with-distill #new-mobile{display:block;width:36px;min-height:36px;height:36px;font-size:20px}}
+@media(min-width:761px){.with-distill #open-nav{display:none}.with-distill #new-mobile{display:grid;width:36px;min-height:36px;height:36px;font-size:20px}}
 @media(max-width:760px){.with-distill main>header{height:44px;min-height:44px;padding:0 10px;gap:7px}.with-distill #memory-preview{margin-top:6px}#top-session-more{font-size:18px}}
 .with-distill #rail #new-session{display:none}
 
@@ -61,3 +61,55 @@
 #conversation :is(.thinking-preview,.tool-run)[open]>summary::before{transform:translateY(-50%) rotate(135deg)}
 #conversation :is(.thinking-preview,.tool-run)>summary:focus-visible{outline:1px dotted #797267;outline-offset:2px;text-decoration:none}
 @media(max-width:760px){#conversation .thinking-preview>summary{min-height:40px}}
+
+/* Proportional sidebar and tighter conversation spacing. */
+#rail{width:min(280px,25vw)}
+#conversation .message{margin:0}
+#conversation .message+.message{margin-top:16px}
+#conversation .user+.assistant{margin-top:10px}
+#conversation .assistant+.assistant{margin-top:8px}
+#conversation .markdown p{margin-bottom:8px}
+#conversation .markdown p:last-child{margin-bottom:0}
+#conversation .session-details{margin-bottom:6px}
+#conversation .thinking-preview{margin:0 0 4px}
+#conversation .thinking-preview>summary{min-height:32px}
+#conversation .thinking-preview-content{padding:2px 0 6px}
+#conversation .message-body .tool-run{margin:4px 0 6px}
+#conversation .tool-run .tool-output{padding-bottom:4px}
+@media(max-width:760px){#rail{width:min(360px,85vw)}#conversation .thinking-preview>summary{min-height:36px}}
+
+/* Shared geometry for text actions, independent of font glyph baselines. */
+.action-icon{display:block;width:12px;height:12px;flex:0 0 12px}
+.icon-label,#composer #send,#composer #attach-image{display:inline-flex;align-items:center;gap:6px;line-height:16px}
+.icon-label .control-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:16px}
+#composer #send{justify-content:flex-end}
+#composer #send .control-label{font:inherit;line-height:16px}
+.icon .action-icon{width:18px;height:18px;flex-basis:18px}
+.icon,.image-chip-remove{display:inline-flex;align-items:center;justify-content:center}
+.tool-status,.model-option .tick,.model-option .option-arrow{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.memory-note>summary::before{content:'';width:5px;height:5px;flex:0 0 5px;margin:0 5px 0 2px;border:solid currentColor;border-width:1px 1px 0 0;box-sizing:border-box;transform:rotate(45deg);transform-origin:center}
+.memory-note[open]>summary::before{content:'';transform:rotate(135deg)}
+
+/* A compact creation panel uses the same typography as the other dialogs. */
+#new-dialog{width:min(420px,calc(100vw - 32px));padding:18px;box-shadow:4px 4px var(--lilac)}
+#new-dialog .panel-heading{margin-bottom:12px;gap:12px}
+#new-dialog h2{font:600 18px/1.4 var(--sans);letter-spacing:0;margin:0}
+#new-dialog #close-new{width:32px;height:32px;margin:0}
+#new-dialog label{font:11px/1.5 var(--mono);margin:0 0 6px;letter-spacing:0}
+#new-dialog #directory{height:38px;padding:8px;font-size:13px;min-width:0}
+#new-dialog .directory-input{gap:8px}
+#new-dialog #browse{font-size:12px;min-height:38px}
+#new-dialog #directories{margin-top:8px}
+#new-dialog .directory-choice{min-height:40px;padding:8px;font-size:12px}
+#new-dialog #create-error:empty{display:none}
+#new-dialog #create-button{justify-content:center;margin-top:14px;min-height:40px;padding:8px 12px;font:12px/16px var(--mono);box-shadow:2px 2px var(--lilac)}
+@media(max-width:760px){#new-dialog{width:100%;max-width:none;padding:12px 16px max(16px,env(safe-area-inset-bottom));box-shadow:0 -3px var(--lilac)}#new-dialog .handle{margin-bottom:12px}}
+
+/* Keep the slot number and state/close icon in the same columns. */
+#status-list .status-tab{display:grid;grid-template-columns:20px 18px;column-gap:6px;align-items:stretch;padding:0 10px;width:66px;flex:0 0 66px}
+#status-list .status-tab .tab-select{grid-column:1 / -1;display:grid;grid-template-columns:20px 18px;column-gap:6px;justify-content:center;align-items:center;padding:0;min-width:0}
+#status-list .status-tab .tab-select>span{justify-self:center}
+#status-list .status-tab.close-armed .tab-select{grid-column:1;grid-template-columns:20px;gap:0}
+#status-list .status-tab .tab-close{grid-column:2;display:flex;align-items:center;justify-content:center;width:18px;padding:0}
+.with-distill #status-list .status-tab{width:40px;flex-basis:40px;grid-template-columns:1fr;padding:0;gap:0}
+.with-distill #status-list .status-tab .tab-select,.with-distill #status-list .status-tab .tab-close{grid-column:1;display:flex;justify-content:center;width:100%;padding:0}

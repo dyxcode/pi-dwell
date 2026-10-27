@@ -102,7 +102,7 @@ async function assertComposerLayout(page: BrowserPage, viewport: string): Promis
     await page.evaluate(
       'getComputedStyle(document.querySelector("#message"),"::placeholder").fontSize',
     ),
-    "14px",
+    "13px",
   );
   assert.equal(
     await page.evaluate('getComputedStyle(document.querySelector(".tab-symbol")).width'),
@@ -138,7 +138,14 @@ async function assertComposerLayout(page: BrowserPage, viewport: string): Promis
       const button=choose.getBoundingClientRect();
       const field=input.getBoundingClientRect();
       const form=document.querySelector("#composer");
+      const arrow=choose.querySelector("svg");
+      const model=document.querySelector("#model-label");
+      const thinking=document.querySelector("#thinking-label");
+      if(!arrow || !model || !thinking) return false;
+      const center=element=>{const rect=element.getBoundingClientRect();return (rect.top+rect.bottom)/2;};
       return row.height<=44 &&
+        Math.abs(center(arrow)-center(model))<=1 &&
+        Math.abs(center(arrow)-center(thinking))<=1 &&
         Math.abs((path.top+path.bottom)/2-(button.top+button.bottom)/2)<=8 &&
         row.bottom<=field.top+1 && field.top-row.bottom<=18 &&
         row.left>=0 && row.right<=innerWidth+1 &&
@@ -199,16 +206,33 @@ async function assertSidebarLabel(
 }
 
 async function assertMobileDrawerWidth(page: BrowserPage): Promise<void> {
-  const width = record(
-    await page.evaluate(`(()=>{
-      const rail=document.querySelector("#rail");
-      const rect=rail.getBoundingClientRect();
-      return {width:rect.width,right:rect.right,viewportWidth:innerWidth};
-    })()`),
-  );
-  assert.equal(width.viewportWidth, 390);
-  assert.equal(width.width, 360, "the mobile drawer uses its requested 360px maximum");
-  assert.ok(Number(width.right) <= Number(width.viewportWidth));
+  const measure = async () =>
+    record(
+      await page.evaluate(`(()=>{
+        const rect=document.querySelector("#rail").getBoundingClientRect();
+        return {width:rect.width,right:rect.right,viewportWidth:innerWidth,documentWidth:document.documentElement.scrollWidth};
+      })()`),
+    );
+  const assertWidth = (width: Record<string, unknown>, viewportWidth: number) => {
+    assert.equal(width.viewportWidth, viewportWidth);
+    const expected = Math.min(360, viewportWidth * 0.85);
+    assert.ok(
+      Math.abs(Number(width.width) - expected) < 0.5,
+      `the mobile drawer follows min(360px, 85vw): ${JSON.stringify(width)}`,
+    );
+    assert.ok(Number(width.right) <= Number(width.viewportWidth));
+    assert.ok(Number(width.documentWidth) <= Number(width.viewportWidth) + 1);
+  };
+
+  assertWidth(await measure(), 390);
+
+  await page.call("Emulation.setDeviceMetricsOverride", {
+    width: 500,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  assertWidth(await measure(), 500);
 
   await page.call("Emulation.setDeviceMetricsOverride", {
     width: 320,
@@ -216,22 +240,198 @@ async function assertMobileDrawerWidth(page: BrowserPage): Promise<void> {
     deviceScaleFactor: 1,
     mobile: true,
   });
-  const narrow = record(
-    await page.evaluate(`(()=>{
-      const rect=document.querySelector("#rail").getBoundingClientRect();
-      return {width:rect.width,right:rect.right,viewportWidth:innerWidth,documentWidth:document.documentElement.scrollWidth};
-    })()`),
-  );
-  assert.equal(narrow.viewportWidth, 320);
-  assert.equal(narrow.width, 296, "the drawer leaves 24px of a narrow viewport clear");
-  assert.ok(Number(narrow.right) <= Number(narrow.viewportWidth));
-  assert.ok(Number(narrow.documentWidth) <= Number(narrow.viewportWidth) + 1);
+  assertWidth(await measure(), 320);
   await page.call("Emulation.setDeviceMetricsOverride", {
     width: 390,
     height: 844,
     deviceScaleFactor: 1,
     mobile: true,
   });
+}
+
+async function assertDesktopSidebarWidth(page: BrowserPage): Promise<void> {
+  const assertWidth = async (viewportWidth: number) => {
+    const width = record(
+      await page.evaluate(`(()=>{
+        const rect=document.querySelector("#rail").getBoundingClientRect();
+        return {width:rect.width,viewportWidth:innerWidth};
+      })()`),
+    );
+    assert.equal(width.viewportWidth, viewportWidth);
+    const expected = Math.min(280, viewportWidth * 0.25);
+    assert.ok(
+      Math.abs(Number(width.width) - expected) < 0.5,
+      `the desktop sidebar follows min(280px, 25vw): ${JSON.stringify(width)}`,
+    );
+  };
+
+  await assertWidth(1280);
+  await page.call("Emulation.setDeviceMetricsOverride", {
+    width: 800,
+    height: 900,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  try {
+    await assertWidth(800);
+  } finally {
+    await page.call("Emulation.setDeviceMetricsOverride", {
+      width: 1280,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+  }
+}
+
+async function assertNewSessionHeading(page: BrowserPage, viewport: string): Promise<void> {
+  const presentation = record(
+    await page.evaluate(`(()=>{
+      const heading=document.querySelector("#new-title");
+      const button=document.querySelector("#create-button");
+      const label=button?.querySelector(".control-label");
+      const icon=button?.querySelector("svg.action-icon");
+      const rect=element=>{const value=element.getBoundingClientRect();return {x:value.x,y:value.y,width:value.width,height:value.height};};
+      if(!(button instanceof HTMLElement)||!(label instanceof HTMLElement)||!(icon instanceof SVGElement)) return {present:false};
+      const labelRect=rect(label),iconRect=rect(icon),buttonRect=rect(button);
+      return {
+        present:true,tag:heading?.tagName,text:heading?.textContent?.trim(),fontSize:heading?getComputedStyle(heading).fontSize:null,
+        buttonText:label.textContent?.trim(),label:labelRect,icon:iconRect,button:buttonRect,
+        iconSize:getComputedStyle(icon).width
+      };
+    })()`),
+  );
+  assert.equal(
+    presentation.present,
+    true,
+    `${viewport} new-session action exposes its label and icon`,
+  );
+  assert.equal(presentation.tag, "H2", `${viewport} new-session title remains a heading`);
+  assert.equal(presentation.text, "New session", `${viewport} new-session title is concise`);
+  assert.equal(presentation.fontSize, "18px", `${viewport} new-session title uses 18px type`);
+  assert.equal(presentation.buttonText, "Start session");
+  assert.equal(presentation.iconSize, "12px");
+  const label = record(presentation.label);
+  const icon = record(presentation.icon);
+  const button = record(presentation.button);
+  assert.equal(icon.width, 12);
+  assert.equal(icon.height, 12);
+  assert.ok(
+    Math.abs(
+      Math.min(Number(label.x), Number(icon.x)) +
+        (Math.max(Number(label.x) + Number(label.width), Number(icon.x) + Number(icon.width)) -
+          Math.min(Number(label.x), Number(icon.x))) /
+          2 -
+        (Number(button.x) + Number(button.width) / 2),
+    ) <= 1,
+    `${viewport} new-session label and SVG are centered together`,
+  );
+  for (const item of [label, icon])
+    assert.ok(
+      Math.abs(
+        Number(item.y) + Number(item.height) / 2 - (Number(button.y) + Number(button.height) / 2),
+      ) <= 1,
+      `${viewport} new-session SVG and label are vertically centered`,
+    );
+}
+
+async function saveScreenshotIfRequested(page: BrowserPage, filename: string): Promise<void> {
+  const directory = process.env.DWELL_WEB_SCREENSHOT_DIR;
+  if (!directory) return;
+  await mkdir(directory, { recursive: true });
+  const result = record(await page.call("Page.captureScreenshot", { format: "png" }));
+  await writeFile(join(directory, filename), Buffer.from(String(result.data), "base64"));
+}
+
+async function assertActionIconGeometry(page: BrowserPage, viewport: string): Promise<void> {
+  const controls = record(
+    await page.evaluate(`(()=>{
+      const inspect=(id)=>{
+        const button=document.querySelector(id);
+        const label=button?.querySelector(".control-label");
+        const icon=button?.querySelector("svg.action-icon");
+        if(!(button instanceof HTMLElement)||!(label instanceof HTMLElement)||!(icon instanceof SVGElement)) return null;
+        const rect=element=>{const value=element.getBoundingClientRect();return {x:value.x,y:value.y,width:value.width,height:value.height};};
+        return {
+          text:label.textContent?.trim(),fontSize:getComputedStyle(label).fontSize,
+          label:rect(label),button:rect(button),icon:rect(icon),iconDisplay:getComputedStyle(icon).display
+        };
+      };
+      return {send:inspect("#send"),image:inspect("#attach-image")};
+    })()`),
+  );
+  for (const [name, text] of [
+    ["send", "Send"],
+    ["image", "Image"],
+  ] as const) {
+    const control = record(controls[name]);
+    const label = record(control.label);
+    const button = record(control.button);
+    const icon = record(control.icon);
+    assert.equal(control.text, text, `${viewport} ${name} action keeps its short label`);
+    assert.equal(control.fontSize, "11px", `${viewport} ${name} action label stays 11px`);
+    assert.equal(control.iconDisplay, "block");
+    assert.equal(icon.width, 12);
+    assert.equal(icon.height, 12);
+    assert.ok(
+      Math.abs(
+        Number(label.y) + Number(label.height) / 2 - (Number(button.y) + Number(button.height) / 2),
+      ) <= 1,
+      `${viewport} ${name} label is vertically centered`,
+    );
+    assert.ok(
+      Math.abs(
+        Number(icon.y) + Number(icon.height) / 2 - (Number(button.y) + Number(button.height) / 2),
+      ) <= 1,
+      `${viewport} ${name} SVG is vertically centered`,
+    );
+  }
+}
+
+async function assertStatusCloseGeometry(page: BrowserPage, viewport: string): Promise<void> {
+  await page.until('document.querySelector("#status-list .status-tab.active .tab-symbol")');
+  const before = record(
+    await page.evaluate(`(()=>{
+      const tab=document.querySelector("#status-list .status-tab.active");
+      const select=tab?.querySelector(".tab-select");
+      const number=tab?.querySelector(".tab-select>span:first-child");
+      const icon=tab?.querySelector(".tab-select .tab-symbol");
+      const rect=element=>{const value=element.getBoundingClientRect();return {x:value.x,y:value.y,width:value.width,height:value.height};};
+      if(!(select instanceof HTMLElement)||!(number instanceof HTMLElement)||!(icon instanceof HTMLElement)) return {present:false};
+      const style=getComputedStyle(select);
+      return {present:true,number:rect(number),icon:rect(icon),gap:style.columnGap,columns:style.gridTemplateColumns};
+    })()`),
+  );
+  assert.equal(before.present, true, `${viewport} selected tab shows its state icon`);
+  assert.equal(before.gap, "6px", `${viewport} number and icon columns have a 6px gap`);
+  assert.equal(before.columns, "20px 18px", `${viewport} number and icon use fixed columns`);
+
+  await page.click("#status-list .status-tab.active .tab-select");
+  await page.until(
+    'document.querySelector("#status-list .status-tab.active.close-armed .tab-close .tab-symbol")',
+  );
+  const after = record(
+    await page.evaluate(`(()=>{
+      const tab=document.querySelector("#status-list .status-tab.active.close-armed");
+      const number=tab?.querySelector(".tab-select>span:first-child");
+      const icon=tab?.querySelector(".tab-close .tab-symbol");
+      const rect=element=>{const value=element.getBoundingClientRect();return {x:value.x,y:value.y,width:value.width,height:value.height};};
+      if(!(number instanceof HTMLElement)||!(icon instanceof HTMLElement)) return {present:false};
+      return {present:true,number:rect(number),icon:rect(icon)};
+    })()`),
+  );
+  assert.equal(after.present, true, `${viewport} armed tab keeps the number and close icon`);
+  for (const part of ["number", "icon"] as const) {
+    const first = record(before[part]);
+    const second = record(after[part]);
+    for (const coordinate of ["x", "y", "width", "height"] as const)
+      assert.ok(
+        Math.abs(Number(first[coordinate]) - Number(second[coordinate])) < 0.5,
+        `${viewport} ${part} ${coordinate} stays fixed while close is armed`,
+      );
+  }
+  await page.click("#status-list .status-tab.active .tab-select");
+  await page.until('!document.querySelector("#status-list .status-tab.active.close-armed")');
 }
 
 async function assertQuietProcessPresentation(page: BrowserPage, viewport: string): Promise<void> {
@@ -272,7 +472,15 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
       focusSource.type="button";
       focusSource.textContent="Keyboard focus source";
       focusSource.style.cssText="position:fixed;width:1px;height:1px;left:0;top:0;opacity:.01";
-      fixture.append(focusSource,renderSavedConversation(entries));
+      const rhythm=document.createElement("div");
+      rhythm.id="quiet-rhythm-test-fixture";
+      rhythm.append(renderSavedConversation([
+        entry("rhythm-user","user","message",[block("text","A short question.")]),
+        entry("rhythm-answer","assistant","message",[block("text","First paragraph.\\n\\nSecond paragraph.")]),
+        entry("rhythm-followup","user","message",[block("text","A follow-up question.")]),
+        entry("rhythm-followup-answer","assistant","message",[block("text","A short reply.")])
+      ]));
+      fixture.append(focusSource,renderSavedConversation(entries),rhythm);
       document.querySelector("#conversation").append(fixture);
       return true;
     })()`),
@@ -294,6 +502,8 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
         titles,bodies,thinkingOpen:thinking.map(details=>details.open),
         successOpen:success.open,errorOpen:error.open,
         successStatus:success.querySelector(".tool-status").textContent,
+        successStatusAccessible:success.querySelector(".tool-status").getAttribute("aria-label"),
+        successStatusIcon:!!success.querySelector(".tool-status svg"),
         errorStatus:error.querySelector(".tool-status").textContent,
         thinkingTitleSize:getComputedStyle(thinking[0].querySelector(":scope>summary")).fontSize,
         thinkingBodySize:getComputedStyle(thinking[0].querySelector(".thinking-content")).fontSize,
@@ -329,7 +539,9 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.equal(presentation.thinkingBodySize, "13px");
     assert.equal(presentation.successOpen, false);
     assert.equal(presentation.errorOpen, true);
-    assert.equal(presentation.successStatus, "✓");
+    assert.equal(presentation.successStatus, "");
+    assert.equal(presentation.successStatusAccessible, "Completed");
+    assert.equal(presentation.successStatusIcon, true);
     assert.equal(presentation.errorStatus, "Error");
     assert.notEqual(presentation.successStatusColor, presentation.errorStatusColor);
     assert.equal(presentation.toolBackground, "rgba(0, 0, 0, 0)");
@@ -339,6 +551,45 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.equal(presentation.markdownCodeBackground, "rgb(235, 230, 219)");
     assert.equal(presentation.markdownCodeSize, "12px");
     assert.equal(presentation.markdownCodeText, "const answer = 42;");
+
+    const rhythm = record(
+      await page.evaluate(`(()=>{
+        const root=document.querySelector("#quiet-rhythm-test-fixture");
+        const messages=[...root.querySelectorAll(".message")];
+        const paragraphs=messages[1].querySelectorAll(".markdown p");
+        const rect=element=>{const value=element.getBoundingClientRect();return {top:value.top,bottom:value.bottom};};
+        const user=rect(messages[0]),answer=rect(messages[1]),followup=rect(messages[2]);
+        const firstParagraph=rect(paragraphs[0]),secondParagraph=rect(paragraphs[1]);
+        const thinking=[...document.querySelectorAll("#quiet-process-test-fixture .thinking-run")];
+        const tools=[...document.querySelectorAll("#quiet-process-test-fixture .tool-run")];
+        const lastThinking=rect(thinking[1]);
+        const nextThinking=rect(thinking[2]);
+        const firstTool=rect(tools[0]);
+        const nextTool=rect(tools[1]);
+        return {
+          messageCount:messages.length,paragraphCount:paragraphs.length,
+          userToAssistant:answer.top-user.bottom,assistantToUser:followup.top-answer.bottom,
+          paragraphGap:secondParagraph.top-firstParagraph.bottom,
+          thinkingGap:nextThinking.top-lastThinking.bottom,
+          toolGap:nextTool.top-firstTool.bottom
+        };
+      })()`),
+    );
+    assert.equal(rhythm.messageCount, 4);
+    assert.equal(rhythm.paragraphCount, 2);
+    for (const [key, label, expected] of [
+      ["userToAssistant", "user reply gap", 10],
+      ["assistantToUser", "between-turn gap", 16],
+      ["paragraphGap", "paragraph gap", 8],
+      ["thinkingGap", "thinking detail gap", 4],
+      ["toolGap", "tool detail gap", 6],
+    ] as const) {
+      const value = Number(rhythm[key]);
+      assert.ok(
+        Math.abs(value - expected) <= 0.5,
+        `${viewport} ${label} measures ${value}px (expected ${expected}px)`,
+      );
+    }
 
     const context = record(
       await page.evaluate(`(()=>{
@@ -993,6 +1244,7 @@ for (const mode of modes) {
       "the existing default text model is reported as image-incompatible",
     );
     console.log(`PASS ${mode} real browser pairing and session selection`);
+    await assertStatusCloseGeometry(first, "desktop");
     if (proxy) {
       const proxyOrigin = proxy.origin;
       const certificate = proxy.certificate;
@@ -1039,6 +1291,8 @@ for (const mode of modes) {
     }
     await first.click("#new-mobile");
     await first.until('document.querySelector("#new-dialog").open');
+    await assertNewSessionHeading(first, "desktop");
+    await saveScreenshotIfRequested(first, `${mode}-desktop-new-session.png`);
     assert.equal(
       await first.evaluate(
         'document.querySelector("#model") === null && document.querySelector("#session-name") === null',
@@ -1113,6 +1367,8 @@ for (const mode of modes) {
       "a new session uses the configured image-capable Pi default",
     );
     await assertComposerLayout(first, "desktop");
+    await assertDesktopSidebarWidth(first);
+    await assertActionIconGeometry(first, "desktop");
     await assertInputGrows(first, "desktop");
     console.log(`PASS ${mode} directory-only browser creation uses the native Pi default model`);
     await first.type("#message", "hello");
@@ -1298,6 +1554,8 @@ for (const mode of modes) {
       mobile: true,
     });
     await assertComposerLayout(second, "mobile");
+    await assertStatusCloseGeometry(second, "mobile");
+    await assertActionIconGeometry(second, "mobile");
     await assertInputGrows(second, "mobile");
     await assertQuietProcessPresentation(second, "mobile");
     await second.click("#open-nav");
@@ -1324,6 +1582,8 @@ for (const mode of modes) {
     );
     await second.click("#new-mobile");
     await second.until('document.querySelector("#new-dialog").open');
+    await assertNewSessionHeading(second, "mobile");
+    await saveScreenshotIfRequested(second, `${mode}-mobile-new-session.png`);
     await second.click("#close-new");
     console.log(
       "PASS " +
@@ -1679,15 +1939,7 @@ for (const mode of modes) {
     console.log(
       `PASS ${mode} close confirmation, abort ownership, closed history, all-closed refresh and explicit reopen`,
     );
-    const shots = process.env.DWELL_WEB_SCREENSHOT_DIR;
-    if (shots) {
-      await mkdir(shots, { recursive: true });
-      const result = record(await second.call("Page.captureScreenshot", { format: "png" }));
-      await writeFile(
-        join(shots, `${mode}-mobile.png`),
-        Buffer.from(String(result.data), "base64"),
-      );
-    }
+    await saveScreenshotIfRequested(second, `${mode}-mobile.png`);
     await second.call("Emulation.setDeviceMetricsOverride", {
       width: 1280,
       height: 900,
@@ -1771,13 +2023,7 @@ for (const mode of modes) {
     await second.until(
       'document.querySelectorAll(".sent-image img").length===5 && [...document.querySelectorAll(".sent-image img")].every(image=>image.naturalWidth===64)',
     );
-    if (shots) {
-      const result = record(await second.call("Page.captureScreenshot", { format: "png" }));
-      await writeFile(
-        join(shots, `${mode}-desktop.png`),
-        Buffer.from(String(result.data), "base64"),
-      );
-    }
+    await saveScreenshotIfRequested(second, `${mode}-desktop.png`);
     assert.equal(
       await second.evaluate(
         '(()=>{const chat=document.querySelector("#scroll");return chat.scrollHeight-chat.clientHeight-chat.scrollTop<3})()',

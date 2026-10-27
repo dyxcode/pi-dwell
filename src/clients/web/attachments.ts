@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+import { actionIcon } from "./icons.ts";
 import {
   type ImageContent,
   imageByteLength,
@@ -172,7 +173,7 @@ export class Attachments {
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "image-chip-remove";
-      remove.textContent = "×";
+      remove.append(actionIcon("close"));
       remove.disabled = this.#disabled;
       remove.setAttribute("aria-label", `Remove ${label}`);
       remove.onclick = () => {

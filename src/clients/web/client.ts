@@ -10,6 +10,7 @@ import { isHostStatus } from "../../shared/protocol.ts";
 import { isSessionInfo, type SessionInfo } from "../../shared/sessions.ts";
 import { isTurnInfo, type TurnInfo } from "../../shared/turns.ts";
 import { emptyConversationState, reconcileHistory, reduceFrame, SSEDecoder } from "./events.ts";
+import { actionIcon, labelWithIcon } from "./icons.ts";
 import { Attachments } from "./attachments.ts";
 import { renderMarkdown } from "./markdown.ts";
 import { renderSavedConversation } from "./conversation.ts";
@@ -79,6 +80,22 @@ const levelNames: Record<ThinkingLevel, string> = {
 let modelSession: string | null = null,
   changingModel: string | null = null;
 const older = el("load-older", HTMLButtonElement);
+
+labelWithIcon(el("attach-image", HTMLButtonElement), "Image", "plus", true);
+labelWithIcon(older, "Load earlier messages", "up");
+labelWithIcon(createButton, "Start session", "open");
+labelWithIcon(el("new-session", HTMLButtonElement), "New session", "plus");
+for (const id of [
+  "close-nav",
+  "close-new",
+  "close-host",
+  "close-model",
+  "close-image",
+  "dismiss-notice",
+])
+  el(id, HTMLButtonElement).replaceChildren(actionIcon("close"));
+el("new-mobile", HTMLButtonElement).replaceChildren(actionIcon("plus"));
+
 const names = new Map<string, string>(),
   drafts = new Map<string, string>();
 const turns = new Map<string, TurnInfo>();
@@ -608,7 +625,12 @@ function navigation(): void {
     changingModel === selected ||
     attachments.busy ||
     (!busy && !pendingSend && !input.value.trim() && attachments.count === 0);
-  send.textContent = busy ? "Stop □" : pendingSend?.session === selected ? "Retry ↻" : "Send ↑";
+  const retry = pendingSend?.session === selected;
+  labelWithIcon(
+    send,
+    busy ? "Stop" : retry ? "Retry" : "Send",
+    busy ? "stop" : retry ? "retry" : "up",
+  );
   send.setAttribute(
     "aria-label",
     busy
@@ -992,14 +1014,14 @@ function renderConversation(): void {
           const detail = node("details", "", "tool-run");
           detail.dataset.key = `live-tool:${tool.id}`;
           const summary = node("summary");
-          summary.append(
-            node("code", title),
-            node(
-              "span",
-              tool.status === "running" ? "Running" : tool.status === "failed" ? "Failed" : "✓",
-              "tool-status",
-            ),
-          );
+          const status = node("span", "", "tool-status");
+          if (tool.status === "running" || tool.status === "failed")
+            status.textContent = tool.status === "running" ? "Running" : "Failed";
+          else {
+            status.append(actionIcon("check"));
+            status.setAttribute("aria-label", "Completed");
+          }
+          summary.append(node("code", title), status);
           detail.append(
             summary,
             node("pre", [input, tool.output].filter(Boolean).join("\n\n"), "tool-output"),
@@ -1503,7 +1525,8 @@ async function browse(path?: string): Promise<void> {
     directory.value = value.path;
     container.replaceChildren();
     if ("parent" in value && typeof value.parent === "string") {
-      const parent = node("button", "↑ Parent directory", "directory-row");
+      const parent = node("button", "", "directory-row");
+      labelWithIcon(parent, "Parent directory", "up");
       parent.type = "button";
       parent.onclick = () => {
         if (typeof value.parent === "string") void browse(value.parent);
@@ -1515,7 +1538,8 @@ async function browse(path?: string): Promise<void> {
         node("p", "Showing the first directories. Enter a full path to reach others.", "footnote"),
       );
     for (const item of value.directories) {
-      const child = node("button", item.name, "directory-row");
+      const child = node("button", "", "directory-row");
+      labelWithIcon(child, item.name, "open");
       child.type = "button";
       const target = item.path;
       child.onclick = () => {
@@ -1544,7 +1568,9 @@ function renderModels(): void {
     const text = node("span");
     text.append(node("strong", item.id), node("small", item.provider));
     button.append(text);
-    if (current) button.append(node("span", "✓", "tick"));
+    const indicator = node("span", "", current ? "tick" : "option-arrow");
+    indicator.append(actionIcon(current ? "check" : "right"));
+    button.append(indicator);
     button.onclick = () => {
       void showThinking(item);
     };
@@ -1600,7 +1626,7 @@ async function showThinking(choice: PiModelOption): Promise<void> {
   el("model-title", HTMLElement).textContent = "Thinking level";
   const back = el("back-models", HTMLButtonElement);
   back.hidden = false;
-  back.textContent = `← ${choice.id}`;
+  labelWithIcon(back, choice.id, "left", true);
   const container = el("model-options", HTMLElement);
   container.replaceChildren(node("p", "Checking Pi capabilities…", "footnote"));
   el("model-error", HTMLElement).textContent = "";
@@ -1633,7 +1659,11 @@ async function showThinking(choice: PiModelOption): Promise<void> {
       button.dataset.level = level;
       button.setAttribute("aria-pressed", String(current));
       button.append(node("strong", levelNames[level]));
-      if (current) button.append(node("span", "✓", "tick"));
+      if (current) {
+        const indicator = node("span", "", "tick");
+        indicator.append(actionIcon("check"));
+        button.append(indicator);
+      }
       button.onclick = () => {
         void changeModel(choice, level);
       };

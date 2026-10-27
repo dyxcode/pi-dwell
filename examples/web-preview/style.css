@@ -68,6 +68,7 @@
 #conversation .message+.message{margin-top:16px}
 #conversation .user+.assistant{margin-top:10px}
 #conversation .assistant+.assistant{margin-top:8px}
+#conversation .message-body>p:has(+ .tool-run){margin-bottom:0}
 #conversation .markdown p{margin-bottom:8px}
 #conversation .markdown p:last-child{margin-bottom:0}
 #conversation .session-details{margin-bottom:6px}

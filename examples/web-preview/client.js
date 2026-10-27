@@ -1,37 +1,14 @@
-import { marked } from "/marked.js";
+import { renderSavedConversation } from "/conversation.js";
+import { actionIcon, labelWithIcon } from "/icons.js";
+import {
+  createMarkdownHistory,
+  createMultilineHistory,
+  createSampleHistory,
+  createTextEntry,
+  createUserEntry,
+  SAMPLE_CONTEXT,
+} from "/history-fixture.js";
 const $ = (id) => document.getElementById(id);
-function actionIcon(name) {
-  const paths = {
-    up: "M6 10V2m-3 3 3-3 3 3",
-    left: "M10 6H2m3-3-3 3 3 3",
-    right: "m4.5 3 3 3-3 3",
-    open: "M3 9 9 3H3m6 0v6",
-    plus: "M6 2v8M2 6h8",
-    check: "m2 6 2.5 2.5L10 3",
-    close: "m3 3 6 6m0-6-6 6",
-  };
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.classList.add("action-icon");
-  svg.setAttribute("viewBox", "0 0 12 12");
-  svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "1.2");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.setAttribute("d", paths[name]);
-  svg.append(path);
-  return svg;
-}
-function labelWithIcon(button, text, name, leading = false) {
-  const label = document.createElement("span");
-  label.className = "control-label";
-  label.textContent = text;
-  const icon = actionIcon(name);
-  button.classList.add("icon-label");
-  button.replaceChildren(...(leading ? [icon, label] : [label, icon]));
-}
 labelWithIcon($("send"), "Send", "up");
 labelWithIcon($("attach-image"), "Image", "plus", true);
 labelWithIcon($("load-older"), "Load earlier messages", "up");
@@ -68,287 +45,12 @@ const levelCopy = {
 let sessions = [
   {
     directory: "/home/you/projects/pi-dwell",
-    messages: [
-      ["user", "Run the tests and tell me if this is ready to review."],
-      [
-        "assistant",
-        {
-          thinking:
-            "## Clarifying the contents\n\nThe request covers the message layout and command output. I’ll check them together.",
-          intro: "I’ll check the test suite.",
-          command: "npm test",
-          output: "24 tests passed\n0 failed · 1.2s",
-          text: "All 24 tests passed. The changes are ready to review.",
-        },
-      ],
-      ["user", "What changed?"],
-      [
-        "assistant",
-        "Your messages sit on the right. Pi replies stay on the page, with commands and output tucked into the same response.",
-      ],
-    ],
+    history: createSampleHistory(),
+    context: SAMPLE_CONTEXT,
   },
 ];
 let selected = 0;
 let withDistill = new URLSearchParams(location.search).get("view") === "distill";
-
-function renderMarkdown(parent, source) {
-  const append = (target, tokens) => {
-    for (const token of tokens) {
-      const tag = {
-        paragraph: "p",
-        heading: "h" + token.depth,
-        blockquote: "blockquote",
-        strong: "strong",
-        em: "em",
-        del: "del",
-        br: "br",
-        hr: "hr",
-        codespan: "code",
-      }[token.type];
-      if (token.type === "space" || token.type === "def" || token.type === "checkbox") continue;
-      if (token.type === "code") {
-        const block = document.createElement("figure");
-        block.className = "code-block";
-        if (token.lang) {
-          const label = document.createElement("figcaption");
-          label.textContent = token.lang.split(/\s/)[0];
-          block.append(label);
-        }
-        const pre = document.createElement("pre");
-        pre.tabIndex = 0;
-        const code = document.createElement("code");
-        code.textContent = token.text;
-        pre.append(code);
-        block.append(pre);
-        target.append(block);
-        continue;
-      }
-      if (token.type === "table") {
-        const wrap = document.createElement("div");
-        wrap.className = "table-scroll";
-        wrap.tabIndex = 0;
-        const table = document.createElement("table");
-        const head = document.createElement("thead");
-        const body = document.createElement("tbody");
-        const row = (cells, header) => {
-          const tr = document.createElement("tr");
-          for (const cell of cells) {
-            const td = document.createElement(header ? "th" : "td");
-            if (header) td.scope = "col";
-            if (cell.align) td.style.textAlign = cell.align;
-            append(td, cell.tokens);
-            tr.append(td);
-          }
-          return tr;
-        };
-        head.append(row(token.header, true));
-        for (const cells of token.rows) body.append(row(cells, false));
-        table.append(head, body);
-        wrap.append(table);
-        target.append(wrap);
-        continue;
-      }
-      if (token.type === "list") {
-        const list = document.createElement(token.ordered ? "ol" : "ul");
-        if (token.ordered) list.start = Number(token.start);
-        for (const item of token.items) {
-          const li = document.createElement("li");
-          if (item.task) {
-            li.className = "task-item";
-            const check = document.createElement("input");
-            check.type = "checkbox";
-            check.disabled = true;
-            check.checked = Boolean(item.checked);
-            check.setAttribute("aria-label", item.checked ? "Completed" : "Not completed");
-            li.append(check);
-          }
-          append(li, item.tokens);
-          list.append(li);
-        }
-        target.append(list);
-        continue;
-      }
-      if (token.type === "link" || token.type === "image") {
-        let url;
-        try {
-          url = new URL(token.href, location.href);
-        } catch {}
-        const valid = url && ["http:", "https:", "mailto:"].includes(url.protocol);
-        const link = document.createElement(valid ? "a" : "span");
-        if (valid) {
-          link.href = url.href;
-          link.rel = "noopener noreferrer";
-          link.target = "_blank";
-        }
-        if (token.type === "image") link.textContent = token.text || "Image";
-        else append(link, token.tokens);
-        target.append(link);
-        continue;
-      }
-      if (tag) {
-        const node = document.createElement(tag);
-        if (token.tokens) append(node, token.tokens);
-        else if (token.text) node.textContent = token.text;
-        target.append(node);
-        continue;
-      }
-      if (token.tokens) append(target, token.tokens);
-      else target.append(document.createTextNode(token.text || token.raw || ""));
-    }
-  };
-  parent.classList.add("markdown");
-  append(parent, marked.lexer(source, { gfm: true }));
-}
-
-function commandPresentation(command) {
-  const lines = command.split(/\r\n|\r|\n/);
-  if (/(?:\r\n|\r|\n)$/.test(command)) lines.pop();
-  const lineCount = Math.max(1, lines.length);
-  const multiline = lineCount > 1;
-  const preview = multiline ? (lines.find((line) => line.trim()) || "").trim() : command;
-  return { preview: "$ " + preview, lineCount, multiline };
-}
-
-function appendToolCommand(summary, command) {
-  const presentation = commandPresentation(command);
-  const preview = document.createElement("code");
-  preview.className = "tool-command-preview";
-  preview.textContent = presentation.preview;
-  summary.append(preview);
-  if (!presentation.multiline) return null;
-
-  const count = document.createElement("span");
-  count.className = "tool-command-lines";
-  count.textContent = presentation.lineCount + " lines";
-  summary.append(count);
-
-  const full = document.createElement("pre");
-  full.className = "tool-command-full";
-  full.textContent = command;
-  return full;
-}
-
-function message(role, text) {
-  const article = document.createElement("article");
-  article.className = "message " + role;
-  article.setAttribute("aria-label", role === "user" ? "Your message" : "Pi response");
-  const body = document.createElement("div");
-  body.className = "message-body";
-  if (role === "user" && typeof text === "object" && text.kind === "images") {
-    for (const part of text.parts) {
-      if (part.type === "text") {
-        const prose = document.createElement("div");
-        renderMarkdown(prose, part.text);
-        body.append(prose);
-      } else {
-        const preview = document.createElement("button");
-        preview.type = "button";
-        preview.className = "sent-image";
-        preview.setAttribute("aria-label", "Preview " + part.image.name);
-        const image = document.createElement("img");
-        image.src = part.image.url;
-        image.alt = part.image.name;
-        preview.append(image);
-        preview.onclick = () => showImage(part.image);
-        body.append(preview);
-      }
-    }
-  } else if (typeof text === "string") renderMarkdown(body, text);
-  else {
-    if (text.thinking) {
-      const details = document.createElement("details");
-      details.className = "thinking-preview";
-      details.open = Boolean(text.thinkingOpen);
-      const summary = document.createElement("summary");
-      const firstHeading = /^(?:#{1,6}\s+([^\n]+)|\*\*([^\n]+)\*\*)\s*(?:\n|$)/.exec(text.thinking);
-      const title = firstHeading?.[1] || firstHeading?.[2];
-      const useTitle = title && title.length <= 72;
-      summary.textContent = useTitle ? title : "Thinking";
-      summary.setAttribute("aria-label", "Thinking details: " + summary.textContent);
-      const content = document.createElement("div");
-      content.className = "thinking-preview-content markdown";
-      renderMarkdown(
-        content,
-        useTitle ? text.thinking.slice(firstHeading[0].length) : text.thinking,
-      );
-      details.append(summary, content);
-      details.addEventListener("toggle", () => {
-        text.thinkingOpen = details.open;
-      });
-      body.append(details);
-    }
-    const intro = document.createElement("div");
-    renderMarkdown(intro, text.intro);
-    body.append(intro);
-    const run = document.createElement("details");
-    run.className = "tool-run";
-    run.open = text.toolOpen ?? Boolean(text.failed);
-    run.addEventListener("toggle", () => {
-      text.toolOpen = run.open;
-    });
-    const summary = document.createElement("summary");
-    summary.setAttribute("aria-label", "Bash command and output");
-    const fullCommand = appendToolCommand(summary, text.command);
-    const status = document.createElement("span");
-    status.className = "tool-status";
-    if (text.failed) status.textContent = "Failed";
-    else status.append(actionIcon("check"));
-    status.setAttribute("aria-label", text.failed ? "Failed" : "Completed");
-    summary.append(status);
-    const output = document.createElement("pre");
-    output.className = "tool-output";
-    output.textContent = text.output;
-    run.append(summary);
-    if (fullCommand) run.append(fullCommand);
-    run.append(output);
-    body.append(run);
-    const reply = document.createElement("div");
-    reply.className = "after-tool";
-    renderMarkdown(reply, text.text);
-    body.append(reply);
-  }
-  article.append(body);
-  $("conversation").append(article);
-}
-
-function sessionDetails(session) {
-  if (!session.context?.length) return null;
-  const details = document.createElement("details");
-  details.className = "session-details";
-  details.open = Boolean(session.detailsOpen);
-  const summary = document.createElement("summary");
-  summary.textContent = "Context";
-  details.append(summary);
-  const panel = document.createElement("div");
-  panel.className = "session-details-body";
-  const caption = document.createElement("p");
-  caption.className = "session-details-caption";
-  caption.textContent = "Example instruction sources";
-  panel.append(caption);
-  for (const source of session.context) {
-    const entry = document.createElement("details");
-    entry.className = "context-source";
-    entry.open = Boolean(source.open);
-    const heading = document.createElement("summary");
-    const path = document.createElement("span");
-    path.textContent = source.path;
-    heading.append(path);
-    const content = document.createElement("div");
-    content.className = "context-content";
-    renderMarkdown(content, source.content);
-    entry.append(heading, content);
-    entry.addEventListener("toggle", () => {
-      source.open = entry.open;
-    });
-    panel.append(entry);
-  }
-  details.append(panel);
-  details.addEventListener("toggle", () => {
-    session.detailsOpen = details.open;
-  });
-  return details;
-}
 
 let closeArmed = false;
 let pendingClose = null;
@@ -384,16 +86,11 @@ function assignSlots() {
   }
 }
 function latestPrompt(session) {
-  const message = session.messages.findLast(([role]) => role === "user")?.[1];
-  const text =
-    typeof message === "string"
-      ? message
-      : message?.kind === "images"
-        ? message.parts
-            .filter((p) => p.type === "text")
-            .map((p) => p.text)
-            .join(" ")
-        : "";
+  const message = session.history.findLast((item) => item.role === "user");
+  const text = message?.blocks
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
+    .join(" ") ?? "";
   const short = text.replace(/\s+/g, " ").trim();
   return short.length > 100 ? short.slice(0, 99) + "…" : short;
 }
@@ -564,6 +261,13 @@ $("preview-mode").onchange = () => {
   render();
 };
 function render() {
+  const conversation = $("conversation");
+  const disclosureState = new Map(
+    [...conversation.querySelectorAll("details[data-key]")].map((details) => [
+      details.dataset.key,
+      details.open,
+    ]),
+  );
   assignSlots();
   syncDraft();
   currentModel = sessions[selected].model ?? models[0];
@@ -633,15 +337,48 @@ function render() {
   $("selected-directory").textContent = sessions[selected].directory;
   $("composer-directory").textContent = sessions[selected].directory.replace("/home/you", "~");
   $("composer-directory").title = sessions[selected].directory;
-  const context = sessionDetails(sessions[selected]);
-  if (context) $("conversation").append(context);
-  if (!sessions[selected].messages.length) {
+  const session = sessions[selected];
+  if (!session.history.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.innerHTML = "<h1>Start where you are.</h1><p>What would you like to work on?</p>";
-    $("conversation").append(empty);
+    const heading = document.createElement("h1");
+    heading.textContent = "Start where you are.";
+    const prompt = document.createElement("p");
+    prompt.textContent = "What would you like to work on?";
+    empty.append(heading, prompt);
+    conversation.append(empty);
+  } else {
+    const images = session.savedImages;
+    const renderImage = images
+      ? (entryId, imageIndex) => {
+          const image = images.get(entryId)?.[imageIndex];
+          if (!image) {
+            const unavailable = document.createElement("span");
+            unavailable.className = "footnote";
+            unavailable.textContent = "Saved image unavailable.";
+            return unavailable;
+          }
+          const preview = document.createElement("button");
+          preview.type = "button";
+          preview.className = "sent-image";
+          preview.setAttribute("aria-label", `Preview ${image.name}`);
+          const content = document.createElement("img");
+          content.src = image.url;
+          content.alt = image.name;
+          preview.append(content);
+          preview.onclick = () => showImage(image);
+          return preview;
+        }
+      : undefined;
+    const rendered = renderImage
+      ? renderSavedConversation(session.history, session.context ?? [], false, renderImage)
+      : renderSavedConversation(session.history, session.context ?? []);
+    for (const details of rendered.querySelectorAll("details[data-key]")) {
+      const wasOpen = disclosureState.get(details.dataset.key);
+      if (wasOpen !== undefined) details.open = wasOpen;
+    }
+    conversation.append(rendered);
   }
-  sessions[selected].messages.forEach(([r, t]) => message(r, t));
   $("connection-badge").textContent = "Local UI demo";
 }
 function nav(open) {
@@ -680,7 +417,7 @@ $("new-form").onsubmit = (e) => {
   e.preventDefault();
   const directory = $("directory").value.trim();
   if (!directory) return;
-  sessions.push({ directory, messages: [] });
+  sessions.push({ directory, history: [] });
   selected = sessions.length - 1;
   $("new-dialog").close();
   render();
@@ -946,7 +683,7 @@ async function addImages(files, pasted = false) {
           file.name,
         );
       const name = pasted && generic ? "Pasted image" : file.name || "Image";
-      const image = { id: String(number), number, name, url };
+      const image = { id: String(number), number, name, type: file.type, url };
       session.attachments ??= [];
       session.attachments.push(image);
       updateComposer();
@@ -990,13 +727,18 @@ $("composer").onsubmit = (event) => {
   if (sessions[selected].closed || sessions[selected].pendingImages) return;
   const parts = readParts();
   if (!parts.some((p) => p.type === "image" || p.text.trim())) return;
-  const message = parts.some((p) => p.type === "image")
-    ? { kind: "images", parts }
-    : parts.map((p) => p.text).join("");
-  sessions[selected].messages.push(
-    ["user", message],
-    ["assistant", "This is a local UI preview. Pi is not connected."],
+  const session = sessions[selected];
+  const user = createUserEntry(parts, session.history.at(-1)?.id ?? null);
+  const response = createTextEntry(
+    "assistant",
+    "This is a local UI preview. Pi is not connected.",
+    user.entry.id,
   );
+  session.history.push(user.entry, response);
+  if (user.images.length) {
+    session.savedImages ??= new Map();
+    session.savedImages.set(user.entry.id, user.images);
+  }
   editor.replaceChildren();
   draftSession.draftNodes = [];
   draftSession.attachments = [];
@@ -1031,43 +773,21 @@ const markdownSample = [
 ].join("\n\n");
 
 if (new URLSearchParams(location.search).has("multiline")) {
-  sessions[0].messages = [
-    ["user", "Run the checks in this directory."],
-    ["assistant", {
-      intro: "I’ll run the checks together.",
-      command: ["cd ~/Projects/pi-dwell", "npm run lint", "npm run typecheck", "npm test", "git diff --check"].join("\n"),
-      output: "All checks passed.",
-      text: "The checks passed. The changes are ready to review.",
-    }],
-  ];
+  sessions[0].history = createMultilineHistory();
 }
 
 if (new URLSearchParams(location.search).has("markdown")) {
-  sessions[0].messages = [
-    ["user", markdownUser],
-    ["assistant", markdownSample],
-  ];
+  sessions[0].history = createMarkdownHistory(markdownUser, markdownSample);
 }
-sessions[0].context = [
-  {
-    path: "~/AGENTS.md",
-    content: "# Home layout\n\nUse `~/Projects/` for repositories and `~/Work/` for experiments.",
-  },
-  {
-    path: "~/Projects/example/AGENTS.md",
-    content:
-      "# Project guidance\n\n- Keep changes focused.\n- Follow the existing code style.\n- Verify the behavior you change.",
-  },
-];
 sessions.push(
   {
     directory: "/home/you/projects/website",
-    messages: [["assistant", "Example session: a response is in progress."]],
+    history: [createTextEntry("assistant", "Example session: a response is in progress.")],
     demoState: "working",
   },
   {
     directory: "/home/you/notes",
-    messages: [["assistant", "Example session: the last response needs attention."]],
+    history: [createTextEntry("assistant", "Example session: the last response needs attention.")],
     demoState: "attention",
   },
 );

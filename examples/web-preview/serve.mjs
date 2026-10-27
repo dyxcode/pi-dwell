@@ -1,12 +1,20 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
+import { BROWSER_ASSETS } from "../../src/clients/web/script.ts";
 import { STYLE } from "../../src/clients/web/page.ts";
 
 const files = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/style.css", ["style.css", "text/css; charset=utf-8"]],
   ["/client.js", ["client.js", "text/javascript; charset=utf-8"]],
-  ["/marked.js", ["../../node_modules/marked/lib/marked.esm.js", "text/javascript; charset=utf-8"]],
+  ["/history-fixture.js", ["history-fixture.js", "text/javascript; charset=utf-8"]],
+]);
+const modules = new Set([
+  "/conversation.js",
+  "/icons.js",
+  "/markdown.js",
+  "/tool-command.js",
+  "/vendor/marked.js",
 ]);
 const server = createServer(async (request, response) => {
   try {
@@ -20,6 +28,16 @@ const server = createServer(async (request, response) => {
     if (path === "/base.css") {
       response.setHeader("Content-Type", "text/css; charset=utf-8");
       response.end(STYLE);
+      return;
+    }
+    if (modules.has(path)) {
+      const source = BROWSER_ASSETS.get(path);
+      if (!source) {
+        response.writeHead(404).end();
+        return;
+      }
+      response.setHeader("Content-Type", "text/javascript; charset=utf-8");
+      response.end(source);
       return;
     }
     const file = files.get(path);

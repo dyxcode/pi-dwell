@@ -135,7 +135,7 @@ export const HOST_PAGE = `<!doctype html>
 <dialog id="image-dialog" aria-labelledby="image-title"><div class="panel-heading"><h2 id="image-title">Image</h2><button id="close-image" class="icon" type="button" aria-label="Close image preview">×</button></div><img id="preview-image" alt=""></dialog></body>
 </html>`;
 
-export const STYLE = `:root{--paper:#f3eee3;--surface:#fbf8f0;--rail:#ece6da;--ink:#252329;--muted:#82796c;--line:#c8bfaf;--teal:#3e8983;--dark:#28635e;--pale:#e0ebe3;--lilac:#ccbae2;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+export const STYLE = `:root{--paper:#f3eee3;--surface:#fbf8f0;--rail:#ece6da;--ink:#252329;--muted:#82796c;--line:#c8bfaf;--teal:#3e8983;--dark:#28635e;--pale:#e0ebe3;--lilac:#ccbae2;--close-wash:#f0ded5;--close-line:#bb8270;--close-ink:#904d3c;--close-fill:#a85e4a;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.7 var(--sans);height:100dvh;display:flex;overflow:hidden}
 button,input,textarea{font:inherit;color:inherit}
@@ -147,11 +147,11 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 .icon{width:44px;height:44px;display:grid;place-items:center;font:25px var(--mono);flex-shrink:0}
 .eyebrow{font:9px/1.6 var(--mono);letter-spacing:1.5px;color:var(--muted)}
-#rail{width:266px;flex-shrink:0;background:var(--rail);border-right:1px solid var(--line);padding:30px 21px 20px;display:flex;flex-direction:column;overflow-y:auto}
-.brand{display:flex;align-items:center;gap:9px;font:700 30px var(--mono);letter-spacing:-1.6px;margin-bottom:39px}
+#rail{flex-shrink:0;background:var(--rail);border-right:1px solid var(--line);padding:30px 21px 20px;display:flex;flex-direction:column;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:9px;font:700 27px var(--mono);letter-spacing:-1.6px;margin-bottom:24px}
 .brand>span{font-size:36px;color:var(--teal)}
 #close-nav{display:none;margin-left:auto}
-.new{background:var(--teal);box-shadow:3px 3px var(--lilac);color:var(--surface);width:calc(100% - 3px);min-height:43px;text-align:left;padding:12px;font:600 11px var(--mono);display:flex;justify-content:space-between;align-items:center;margin:0 3px 29px 0}
+.new{background:var(--teal);box-shadow:3px 3px var(--lilac);color:var(--surface);width:calc(100% - 3px);min-height:40px;text-align:left;padding:10px;font:600 11px var(--mono);display:flex;justify-content:space-between;align-items:center;margin:0 3px 22px 0}
 .new span{font-size:17px}
 .section-head{display:flex;justify-content:space-between;align-items:center;font:9px var(--mono);letter-spacing:1px;color:var(--muted);margin:0 8px 13px}
 .section-head small{font-size:9px;letter-spacing:0}
@@ -170,12 +170,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
 #extensions button{font:10px var(--mono);padding:8px 0;min-height:38px}
 #extensions span{color:var(--teal);margin-right:5px}
 main{flex:1;min-width:0;display:flex;flex-direction:column}
-header{height:65px;min-height:65px;padding:0 34px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #d8d0c2}
+header{display:flex;align-items:center}
 #desktop-context{font:10px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .edition{margin-left:auto;font:9px var(--mono);letter-spacing:2px;color:#a49a8c}
 #open-nav,#mobile-state{display:none}
 #scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
-#conversation{max-width:758px;padding:32px 38px 30px;margin:auto}
+#conversation{max-width:960px;padding:16px 22px 18px;margin:auto}
 .date{font:9px var(--mono);letter-spacing:1px;color:#a09687;margin-bottom:30px;display:flex;align-items:center;gap:14px}
 .date:after{height:1px;background:#ddd5c7;content:"";flex:1}
 .message{margin-bottom:33px}
@@ -197,7 +197,7 @@ summary:before{content:'›';font-size:16px;color:var(--muted)}
 details[open]>summary:before{transform:rotate(90deg)}
 summary small{margin-left:auto;font-size:9px;color:var(--muted)}
 .tool-body{border-top:1px dashed var(--line);padding:13px;font:11px/1.8 var(--mono);color:var(--muted)}
-footer{width:100%;max-width:758px;padding:10px 38px 27px;margin:0 auto}
+footer{width:100%;max-width:960px;padding:4px 22px 8px;margin:0 auto}
 #composer{border:1px solid #978a75;background:var(--surface);box-shadow:4px 4px var(--lilac);padding:14px;margin-right:4px}
 #composer:focus-within{border-color:var(--teal)}
 textarea{width:100%;resize:none;border:0;background:none;min-height:53px;display:block;font:15px/1.6 var(--sans);outline:none}
@@ -253,11 +253,9 @@ h2{font:600 24px/1.4 var(--mono);letter-spacing:-.8px;margin:7px 0 0}
 .task p{font:12px/1.8 var(--sans);color:var(--muted)}
 .task small{font:9px var(--mono);color:var(--dark)}
 
-@media(max-width:760px){#rail{position:fixed;inset:0 auto 0 0;width:min(305px,calc(100vw - 42px));transform:translateX(-101%);z-index:10;padding:24px 23px 20px}
+@media(max-width:760px){#rail{position:fixed;inset:0 auto 0 0;transform:translateX(-101%);z-index:10;padding:24px 23px 20px}
 #rail.open{transform:translateX(0)}
 #close-nav{display:grid}
-.brand{margin-bottom:31px}
-header{height:62px;min-height:62px;padding:0 19px;border-bottom-color:var(--line)}
 #desktop-context,.edition{display:none}
 #open-nav{display:flex;align-items:center;gap:12px;font:600 12px var(--mono);padding:0;min-height:44px;min-width:0;text-align:left}
 .menu{font:17px var(--mono);font-weight:400;color:var(--muted)}
@@ -265,15 +263,12 @@ header{height:62px;min-height:62px;padding:0 19px;border-bottom-color:var(--line
 .down{font-size:12px;color:var(--muted)}
 #mobile-state{display:flex;align-items:center;gap:6px;margin-left:auto;white-space:nowrap;font:9px var(--mono);color:var(--dark)}
 .drawer-open #mobile-state{visibility:hidden}
-#conversation{padding:23px 23px 20px}
 .date{font-size:8px;margin-bottom:26px}
-.message{margin-bottom:28px}
 .message-body{font-size:14px;line-height:1.8}
 .byline{font-size:8px}
 .principle{margin:22px 0}
 .principle strong{font-size:13px}
 .principle p{font-size:12px}
-footer{padding:9px 19px max(20px,env(safe-area-inset-bottom))}
 #composer{padding:12px}
 textarea{font-size:16px;min-height:48px}
 textarea::placeholder{font-size:14px}
@@ -286,9 +281,7 @@ dialog{position:fixed;inset:auto 0 0;margin:0;width:100%;max-width:none;max-heig
 }
 
 @media(max-width:350px){#mobile-identity{max-width:125px}
-header{padding:0 15px;gap:9px}
 .message-body{font-size:13px}
-#conversation{padding-left:19px;padding-right:19px}
 }
 
 @media(max-height:620px){#rail{overflow:auto}
@@ -299,7 +292,6 @@ textarea{min-height:28px;height:32px}
 
 
 /* Session switching and state share one top strip in both modes. */
-header{padding:0 25px;gap:13px}
 
 #status-list{display:flex;gap:8px;min-width:0;overflow-x:auto;scrollbar-width:none;align-items:center;padding:5px 2px;flex:1}
 
@@ -318,7 +310,7 @@ header{padding:0 25px;gap:13px}
 .current-context h2{font-size:20px;margin:15px 0 12px;overflow-wrap:anywhere}
 .current-context p{font:9px/1.8 var(--mono);color:var(--muted);overflow-wrap:anywhere}
 
-@media(max-width:760px){header{padding:0 12px;gap:8px}
+@media(max-width:760px){
 #open-nav{width:32px;min-width:32px;justify-content:center}
 .status-chip{min-height:38px;padding:9px;gap:6px}
 }
@@ -336,7 +328,7 @@ header{padding:0 25px;gap:13px}
 
 /* Mobile composer: one line, one action, bounded growth. */
 @media(max-width:760px){
- footer{padding:8px 16px max(16px,env(safe-area-inset-bottom));flex-shrink:0}
+ footer{flex-shrink:0}
 
  #composer{display:grid;grid-template-columns:minmax(0,1fr) 40px;align-items:end;gap:8px;padding:6px;margin-right:3px;box-shadow:3px 3px var(--lilac)}
 
@@ -357,13 +349,6 @@ header{padding:0 25px;gap:13px}
 
 
 /* More room for the conversation; keep readable type and a clear rhythm. */
-#conversation,footer{max-width:960px}
-
-#conversation{padding:25px 28px 24px}
-
-footer{padding-left:28px;padding-right:28px}
-
-.message{margin-bottom:27px}
 
 .byline{margin-bottom:8px}
 
@@ -380,13 +365,7 @@ footer{padding-left:28px;padding-right:28px}
 .message-body details{margin:18px 0 0}
 
 @media(max-width:760px){
- header{height:56px;min-height:56px}
-
- #conversation{padding:18px 16px 20px}
-
  .date{margin-bottom:22px}
-
- .message{margin-bottom:25px}
 
  .message-body{font-size:15px;line-height:1.72}
 
@@ -399,8 +378,6 @@ footer{padding-left:28px;padding-right:28px}
  .principle strong{font-size:13px;line-height:1.65}
 
  .principle p{font-size:12px;line-height:1.75}
-
- footer{padding:6px 12px max(12px,env(safe-area-inset-bottom))}
 
 }
 
@@ -501,7 +478,7 @@ button:disabled{opacity:.55;cursor:default}
 #composer-directory{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font:10px/1.6 var(--mono)}
 #choose-model{border:0;flex-shrink:0;max-width:48%;padding:0 2px;min-height:30px;align-self:auto;font-size:10px;gap:6px}
 #model-label{max-width:180px;min-width:0}
-@media(max-width:760px){.composer-context{gap:12px}#choose-model{min-height:32px}#model-label{max-width:140px}footer{padding-bottom:max(5px,env(safe-area-inset-bottom))}}
+@media(max-width:760px){.composer-context{gap:12px}#choose-model{min-height:32px}#model-label{max-width:140px}}
 
 /* Model and thinking selection. */
 #choose-model{min-width:0;gap:5px}
@@ -669,9 +646,6 @@ button:disabled{opacity:.55;cursor:default}
 @media(max-width:760px){#composer #attach-image,#composer #send{height:44px;min-height:44px}.composer-actions{gap:9px}}
 
 /* Compact shared rhythm; keep readable body text and quiet attachment labels. */
-#conversation{padding:16px 22px 18px}
-footer{padding:4px 22px 8px}
-#conversation .message{margin-bottom:16px}
 #conversation .user{margin-top:22px;margin-bottom:14px}
 #conversation .user .message-body{padding:7px 10px}
 #conversation .user .message-body,#conversation .assistant .message-body{font-size:15px;line-height:1.65}
@@ -691,9 +665,7 @@ footer{padding:4px 22px 8px}
 .code-block pre{padding:9px 10px}
 .markdown th,.markdown td{padding:7px 10px}
 .markdown hr{margin:18px 0}
-#rail{width:228px;padding:22px 16px 16px}
-.brand{font-size:27px;margin-bottom:24px}
-.new{min-height:40px;padding:10px;margin-bottom:22px}
+#rail{padding:22px 16px 16px}
 .section-head{margin-bottom:10px}
 .name-row{min-height:54px;padding:10px 9px;gap:8px}
 .selected-directory{margin-top:14px;padding:0 9px}
@@ -710,11 +682,7 @@ footer{padding:4px 22px 8px}
 .image-chip-remove{position:static;width:24px;height:34px;min-width:24px;padding:0;margin:0;border:0;border-radius:0;background:none;font:16px/1 var(--mono);color:var(--muted);opacity:1}
 #model-dialog .model-option{min-height:44px;padding:6px 10px}
 @media(max-width:760px){
- header{height:52px;min-height:52px;padding:0 10px;gap:7px}
  #open-nav{height:44px;min-width:36px}
- #conversation{padding:10px 14px 14px}
- footer{padding:3px 14px max(4px,env(safe-area-inset-bottom))}
- #conversation .user{margin-top:20px}
  .session-details>summary{min-height:44px}
  .tool-run summary{min-height:44px}
  #choose-model{min-height:30px}
@@ -729,13 +697,9 @@ footer{padding:4px 22px 8px}
 
 /* Further density adjustments apply only to mobile. */
 @media(max-width:760px){
- header{height:48px;min-height:48px}
  #conversation{padding:4px 12px 12px}
- #conversation .message{margin-bottom:14px}
  #conversation .user{margin-top:18px;margin-bottom:12px}
  #conversation .user .message-body{padding:6px 9px}
- #conversation .session-details{margin-bottom:4px}
- .message-body .tool-run{margin:8px 0 10px}
  footer{padding:0 12px max(2px,env(safe-area-inset-bottom))}
  .composer-context{margin:0 3px 0 0;padding:0}
  #choose-model{min-height:26px;gap:4px}
@@ -763,7 +727,6 @@ footer{padding:4px 22px 8px}
 .tool-run.error{border-left:2px solid var(--danger,#a65b51)}
 
 /* Open sessions share one status strip on mobile and desktop. */
-:root{--close-wash:#f0ded5;--close-line:#bb8270;--close-ink:#904d3c;--close-fill:#a85e4a}
 main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;border-bottom:1px solid var(--line)}
 #status-list{flex:1;display:flex;gap:8px;min-width:0;padding:4px 2px;overflow-x:auto;scrollbar-width:none}
 .status-tab{display:flex;flex:0 0 80px;width:80px;height:36px;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
@@ -804,7 +767,6 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #message::placeholder{font-size:13px;font-weight:400;opacity:1;letter-spacing:normal}
 @media(min-width:761px){#open-nav{display:none}}
 @media(max-width:760px){
- #rail{width:min(360px,calc(100vw - 24px))}
  main>header{height:44px;min-height:44px;padding:0 10px;gap:7px}
  #open-nav{height:40px;min-width:40px}
  .status-tab{width:76px;flex-basis:76px;height:34px}

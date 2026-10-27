@@ -2,7 +2,7 @@ export const HOST_PAGE = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <meta name="color-scheme" content="light">
 <title>Pi Dwell</title>
 <link rel="stylesheet" href="/style.css">
@@ -741,6 +741,9 @@ footer{padding:4px 22px 8px}
 
 /* Match the mobile action row to the 26px directory/model row. */
 @media(max-width:760px){
+ body{position:fixed;top:0;left:0;width:100%}
+ main{min-height:0}
+ footer{flex-shrink:0}
  #composer #attach-image,#composer #send,.image-chip-preview,.image-chip-remove,.image-attachment{height:26px;min-height:26px}
  .composer-actions{min-height:26px}
 }

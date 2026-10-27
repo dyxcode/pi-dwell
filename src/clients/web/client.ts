@@ -39,13 +39,13 @@ function node<K extends keyof HTMLElementTagNameMap>(
 }
 const input = el("message", HTMLTextAreaElement);
 const form = el("composer", HTMLFormElement);
-const composer = setupComposer(input, form);
 const rail = el("rail", HTMLElement),
   main = el("chat-main", HTMLElement);
 const gate = el("gate", HTMLElement),
   app = el("app", HTMLElement);
 const scroll = el("scroll", HTMLElement),
   conversation = el("conversation", HTMLElement);
+const composer = setupComposer(input, form, scroll);
 const send = el("send", HTMLButtonElement),
   notice = el("notice", HTMLElement);
 const dialog = el("new-dialog", HTMLDialogElement);

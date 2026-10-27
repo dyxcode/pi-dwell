@@ -13,11 +13,16 @@ const VIEWPORT_HEIGHT_RATIO = 0.28;
 export function setupComposer(
   input: HTMLTextAreaElement,
   form: HTMLFormElement,
+  scroll: HTMLElement,
 ): { resize(): void; dispose(): void } {
   const initialRows = input.rows;
   const initialHeight = input.style.height;
   const initialOverflowY = input.style.overflowY;
   const visualViewport = window.visualViewport;
+  const body = document.body;
+  const initialBodyHeight = body.style.height;
+  const initialBodyTop = body.style.top;
+  let viewportFrame: number | undefined;
   let disposed = false;
   let hold: BackspaceHold | null = null;
   let composing = false;
@@ -27,9 +32,22 @@ export function setupComposer(
 
   const resize = (): void => {
     if (disposed) return;
-
+    // Anchor the conversation to its lower edge: keyboard movement carries the
+    // messages with the composer, preserving how far back the reader has scrolled.
+    const bottomGap = Math.max(0, scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop);
+    const mobile = window.innerWidth <= 760;
+    if (mobile) {
+      // Magnification shrinks the visual viewport too; keep native pinch zoom.
+      if (!visualViewport || Math.abs(visualViewport.scale - 1) < 0.01) {
+        body.style.height = `${visualViewport?.height ?? window.innerHeight}px`;
+        body.style.top = `${visualViewport?.offsetTop ?? 0}px`;
+      }
+    } else {
+      body.style.height = initialBodyHeight;
+      body.style.top = initialBodyTop;
+    }
     input.rows = 1;
-    const viewportHeight = visualViewport?.height ?? window.innerHeight;
+    const viewportHeight = mobile ? body.clientHeight : window.innerHeight;
     const maxHeight = Math.max(
       window.innerWidth <= 760 ? 28 : MIN_HEIGHT_PX,
       Math.min(
@@ -41,6 +59,15 @@ export function setupComposer(
     const contentHeight = input.scrollHeight;
     input.style.height = `${Math.min(contentHeight, maxHeight)}px`;
     input.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
+    scroll.scrollTop = Math.max(0, scroll.scrollHeight - scroll.clientHeight - bottomGap);
+  };
+
+  const viewportChanged = (): void => {
+    if (viewportFrame !== undefined || disposed) return;
+    viewportFrame = requestAnimationFrame(() => {
+      viewportFrame = undefined;
+      resize();
+    });
   };
 
   const resetBackspace = (): void => {
@@ -189,8 +216,10 @@ export function setupComposer(
   document.addEventListener("selectionchange", onSelectionChange);
   document.addEventListener("visibilitychange", resetBackspace);
   window.addEventListener("blur", resetBackspace);
-  window.addEventListener("resize", resize);
-  visualViewport?.addEventListener("resize", resize);
+  window.addEventListener("resize", viewportChanged);
+  window.addEventListener("pageshow", viewportChanged);
+  visualViewport?.addEventListener("resize", viewportChanged);
+  visualViewport?.addEventListener("scroll", viewportChanged);
 
   let observedWidth: number | null = null;
   let resizeObserver: ResizeObserver | null = null;
@@ -225,8 +254,13 @@ export function setupComposer(
       document.removeEventListener("selectionchange", onSelectionChange);
       document.removeEventListener("visibilitychange", resetBackspace);
       window.removeEventListener("blur", resetBackspace);
-      window.removeEventListener("resize", resize);
-      visualViewport?.removeEventListener("resize", resize);
+      window.removeEventListener("resize", viewportChanged);
+      window.removeEventListener("pageshow", viewportChanged);
+      visualViewport?.removeEventListener("resize", viewportChanged);
+      visualViewport?.removeEventListener("scroll", viewportChanged);
+      if (viewportFrame !== undefined) cancelAnimationFrame(viewportFrame);
+      body.style.height = initialBodyHeight;
+      body.style.top = initialBodyTop;
       input.rows = initialRows;
       input.style.height = initialHeight;
       input.style.overflowY = initialOverflowY;

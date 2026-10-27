@@ -138,6 +138,160 @@ async function assertInputGrows(page: BrowserPage, viewport: string): Promise<vo
   await page.type("#message", "");
 }
 
+async function checkMobileKeyboard(page: BrowserPage): Promise<void> {
+  await page.type("#message", "正在输入中文，保留光标");
+  const before = record(
+    await page.evaluate(`(()=>{
+    const viewport=window.visualViewport;
+    const original={height:viewport.height,offsetTop:viewport.offsetTop,scale:viewport.scale};
+    const own=new Map(["height","offsetTop","scale"].map(key=>[key,Object.getOwnPropertyDescriptor(viewport,key)]));
+    const metrics={...original};
+    for(const key of own.keys()) Object.defineProperty(viewport,key,{configurable:true,get:()=>metrics[key]});
+    window.__keyboardViewport=(height,offsetTop=0,scale=1)=>{
+      Object.assign(metrics,{height,offsetTop,scale});
+      viewport.dispatchEvent(new Event("resize"));
+      viewport.dispatchEvent(new Event("scroll"));
+    };
+    window.__restoreKeyboardViewport=()=>{
+      for(const [key,descriptor] of own) {
+        if(descriptor) Object.defineProperty(viewport,key,descriptor);
+        else delete viewport[key];
+      }
+      viewport.dispatchEvent(new Event("resize"));
+    };
+    const scroll=document.querySelector("#scroll"),input=document.querySelector("#message");
+    input.focus({preventScroll:true});input.setSelectionRange(4,4);
+    input.dispatchEvent(new CompositionEvent("compositionstart",{bubbles:true,data:"中文"}));
+    scroll.scrollTop=scroll.scrollHeight;
+    return {height:original.height,top:document.querySelector(".assistant:last-child").getBoundingClientRect().top,text:input.value,caret:input.selectionStart};
+  })()`),
+  );
+  const settle = async () =>
+    page.evaluate(
+      "new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))",
+    );
+  try {
+    await page.evaluate(`window.__keyboardViewport(${Number(before.height) - 360},24)`);
+    await settle();
+    const opened = record(
+      await page.evaluate(`(()=>{
+      const scroll=document.querySelector("#scroll"),input=document.querySelector("#message");
+      return {bottom:document.querySelector("footer").getBoundingClientRect().bottom,
+        top:document.querySelector(".assistant:last-child").getBoundingClientRect().top,
+        gap:scroll.scrollHeight-scroll.clientHeight-scroll.scrollTop,text:input.value,caret:input.selectionStart};
+    })()`),
+    );
+    assert.ok(
+      Number(opened.bottom) <= Number(before.height) - 360 + 24 + 1,
+      "composer stays above the keyboard",
+    );
+    assert.ok(
+      Math.abs(Number(opened.top) - Number(before.top) + 336) < 3,
+      "messages move up with the keyboard, without shrinking their text",
+    );
+    assert.ok(Number(opened.gap) < 3, "latest response stays beside the composer");
+    assert.equal(opened.text, before.text);
+    assert.equal(opened.caret, before.caret);
+    await page.evaluate(
+      'document.querySelector("#message").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",isComposing:true,bubbles:true}))',
+    );
+    assert.equal(
+      await page.evaluate('document.querySelector("#message").value'),
+      before.text,
+      "IME Enter does not submit the draft",
+    );
+    const bodyHeight = await page.evaluate("document.body.getBoundingClientRect().height");
+    await page.evaluate(`window.__keyboardViewport(220,50,2)`);
+    await settle();
+    assert.equal(
+      await page.evaluate("document.body.getBoundingClientRect().height"),
+      bodyHeight,
+      "pinch zoom does not masquerade as a keyboard resize",
+    );
+    await page.evaluate(`window.__keyboardViewport(${Number(before.height)},0)`);
+    await settle();
+    assert.ok(
+      Math.abs(
+        Number(
+          await page.evaluate(
+            'document.querySelector(".assistant:last-child").getBoundingClientRect().top',
+          ),
+        ) - Number(before.top),
+      ) < 3,
+      "closing the keyboard brings the conversation back down",
+    );
+    const reading = record(
+      await page.evaluate(
+        `(()=>{const s=document.querySelector("#scroll");s.scrollTop=Math.max(0,s.scrollHeight-s.clientHeight-250);return {top:s.scrollTop,gap:s.scrollHeight-s.clientHeight-s.scrollTop};})()`,
+      ),
+    );
+    await page.evaluate(`window.__keyboardViewport(${Number(before.height) - 360},0)`);
+    await settle();
+    const shifted = record(
+      await page.evaluate(
+        `(()=>{const s=document.querySelector("#scroll");return {top:s.scrollTop,gap:s.scrollHeight-s.clientHeight-s.scrollTop};})()`,
+      ),
+    );
+    assert.ok(
+      Math.abs(Number(shifted.top) - Number(reading.top) - 360) < 3,
+      "older messages move up with the keyboard too",
+    );
+    assert.ok(
+      Math.abs(Number(shifted.gap) - Number(reading.gap)) < 3,
+      "reading older messages never jumps to the latest response",
+    );
+  } finally {
+    await page.evaluate(
+      'window.__restoreKeyboardViewport();document.querySelector("#message").dispatchEvent(new CompositionEvent("compositionend",{bubbles:true,data:"中文"}))',
+    );
+    await settle();
+    await page.type("#message", "");
+    await page.evaluate(
+      'document.querySelector("#scroll").scrollTop=document.querySelector("#scroll").scrollHeight',
+    );
+  }
+  const latestTop = Number(
+    await page.evaluate(
+      'document.querySelector(".assistant:last-child").getBoundingClientRect().top',
+    ),
+  );
+  try {
+    await page.call("Emulation.setDeviceMetricsOverride", {
+      width: 390,
+      height: 484,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await settle();
+    assert.ok(
+      Number(
+        await page.evaluate('document.querySelector("footer").getBoundingClientRect().bottom'),
+      ) <= 485,
+      "layout viewport resize also lifts the composer",
+    );
+    assert.ok(
+      Math.abs(
+        Number(
+          await page.evaluate(
+            'document.querySelector(".assistant:last-child").getBoundingClientRect().top',
+          ),
+        ) -
+          latestTop +
+          360,
+      ) < 3,
+      "native viewport resize carries the messages upward",
+    );
+  } finally {
+    await page.call("Emulation.setDeviceMetricsOverride", {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await settle();
+  }
+}
+
 async function stagePngImages(page: BrowserPage, count: number, name: string): Promise<void> {
   await page.evaluate(`(()=>{
     const canvas=document.createElement("canvas");
@@ -893,6 +1047,10 @@ for (const mode of modes) {
     );
     assert.equal(await second.evaluate("document.documentElement.scrollWidth<=innerWidth"), true);
     await second.type("#message", "");
+    await checkMobileKeyboard(second);
+    console.log(
+      `PASS ${mode} mobile keyboard lifts the composer and messages, restores on close, and preserves reading position and IME text`,
+    );
     const shots = process.env.DWELL_WEB_SCREENSHOT_DIR;
     if (shots) {
       await mkdir(shots, { recursive: true });

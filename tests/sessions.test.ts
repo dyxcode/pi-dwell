@@ -24,12 +24,18 @@ async function until<T>(read: () => T, matches: (value: T) => boolean): Promise<
   }
 }
 
-async function setup(t: TestContext) {
+async function setup(t: TestContext, captureSystemPrompt = false) {
   const environment = await createPiEnvironment();
   const dataDir = join(environment.root, "dwell");
   const options = {
     dataDir,
-    env: { ...environment.env, DWELL_TEST_START_LOG: join(environment.root, "starts.log") },
+    env: {
+      ...environment.env,
+      DWELL_TEST_START_LOG: join(environment.root, "starts.log"),
+      ...(captureSystemPrompt
+        ? { DWELL_TEST_SYSTEM_PROMPT: join(environment.root, "prompt.txt") }
+        : {}),
+    },
     extensions: [environment.extensionPath],
   };
   const service = await SessionService.create(options);
@@ -65,6 +71,47 @@ test("sessions start without Pi configuration and create/reopen empty identities
   assert.equal(reopened.piSessionId, first.piSessionId);
   assert.deepEqual(await restored.getContext(first.id), { messages: [] });
   await restored.closeSession(first.id);
+  await restored.shutdown();
+});
+
+test("host restart reloads changed native instructions while preserving session history", async (t) => {
+  const { service, environment, options, configure, request } = await setup(t, true);
+  const report = join(environment.root, "prompt.txt");
+  const instructions = join(environment.cwd, "AGENTS.md");
+  await writeFile(instructions, "DWELL_CONTEXT_BEFORE_RESTART");
+  await configure();
+  const first = await service.createSession(request);
+  const { turn } = await service.submitTurn(first.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await until(
+    () => service.getTurn(first.id, turn.runId),
+    (current) => current.status === "completed",
+  );
+  assert.match(await readFile(report, "utf8"), /DWELL_CONTEXT_BEFORE_RESTART/);
+  const before = await service.getContext(first.id);
+  assert.ok(before.messages.length > 0);
+  await service.shutdown();
+  await writeFile(instructions, "DWELL_CONTEXT_AFTER_RESTART");
+
+  const restored = await SessionService.create(options);
+  t.after(() => restored.shutdown());
+  const reopened = await restored.openSession(first.id);
+  assert.equal(reopened.piSessionId, first.piSessionId);
+  assert.deepEqual(await restored.getContext(first.id), before);
+  const { turn: next } = await restored.submitTurn(first.id, {
+    requestId: randomUUID(),
+    message: "hello again",
+  });
+  await until(
+    () => restored.getTurn(first.id, next.runId),
+    (current) => current.status === "completed",
+  );
+  const prompt = await readFile(report, "utf8");
+  assert.match(prompt, /DWELL_CONTEXT_AFTER_RESTART/);
+  assert.ok(!prompt.includes("DWELL_CONTEXT_BEFORE_RESTART"));
+  assert.ok((await restored.getContext(first.id)).messages.length > before.messages.length);
   await restored.shutdown();
 });
 

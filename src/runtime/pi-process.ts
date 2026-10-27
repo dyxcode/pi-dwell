@@ -302,7 +302,6 @@ export class PiProcess {
       "--no-skills",
       "--no-prompt-templates",
       "--no-themes",
-      "--no-context-files",
       "--no-mcp",
     ];
     if (resumeFile) args.push("--session", resumeFile);

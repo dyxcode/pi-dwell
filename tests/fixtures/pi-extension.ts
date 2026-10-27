@@ -1,4 +1,4 @@
-import { access, appendFile } from "node:fs/promises";
+import { access, appendFile, writeFile } from "node:fs/promises";
 import {
   type Api,
   type AssistantMessage,
@@ -294,6 +294,10 @@ function scriptedStream(
 }
 
 export default function registerDwellFixture(pi: ExtensionAPI): void {
+  pi.on("before_agent_start", async (event) => {
+    const report = process.env.DWELL_TEST_SYSTEM_PROMPT;
+    if (report) await writeFile(report, event.systemPrompt, { mode: 0o600 });
+  });
   pi.on("input", async (event) =>
     event.text === "handled" ? { action: "handled" } : { action: "continue" },
   );

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { access, readFile, unlink, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { type TestContext, test } from "node:test";
 import { join } from "node:path";
@@ -36,10 +36,17 @@ async function waitForFile(path: string, timeoutMs = 5000): Promise<void> {
 async function runtime(
   t: TestContext,
   resumeFile?: string,
-  configureEnvironment?: (environment: Awaited<ReturnType<typeof createPiEnvironment>>) => void,
+  configureEnvironment?: (
+    environment: Awaited<ReturnType<typeof createPiEnvironment>>,
+  ) => void | Promise<void>,
 ) {
   const environment = await createPiEnvironment();
-  configureEnvironment?.(environment);
+  try {
+    await configureEnvironment?.(environment);
+  } catch (error) {
+    await environment.cleanup();
+    throw error;
+  }
   const options = {
     executable: process.env.DWELL_TEST_PI_EXECUTABLE ?? process.execPath,
     ...(process.env.DWELL_TEST_PI_EXECUTABLE
@@ -68,6 +75,105 @@ async function runtime(
   });
   return { pi, environment, options };
 }
+
+test("native context loading includes global and ancestors across a Git root once, in order", async (t) => {
+  const markers = [
+    "DWELL_GLOBAL_CONTEXT",
+    "DWELL_ANCESTOR_CONTEXT",
+    "DWELL_HOME_CONTEXT",
+    "DWELL_PROJECTS_CONTEXT",
+    "DWELL_REPO_OVERRIDE_CONTEXT",
+    "DWELL_SUBDIR_CLAUDE_CONTEXT",
+  ];
+  const excluded = ["DWELL_REPO_BASE_CONTEXT", "DWELL_SIBLING_CONTEXT", "DWELL_CHILD_CONTEXT"];
+  const { pi, environment } = await runtime(t, undefined, async (env) => {
+    const home = env.env.HOME;
+    assert.ok(home);
+    const projects = join(home, "Projects");
+    const repo = join(projects, "example");
+    env.cwd = join(repo, "src");
+    const sibling = join(projects, "sibling");
+    const child = join(env.cwd, "child");
+    await Promise.all(
+      [join(repo, ".git"), sibling, child].map((path) => mkdir(path, { recursive: true })),
+    );
+    await writeFile(join(repo, ".git", "HEAD"), "ref: refs/heads/main\n");
+    const paths = [
+      join(env.agentDir, "AGENTS.md"),
+      join(env.root, "AGENTS.md"),
+      join(home, "AGENTS.md"),
+      join(projects, "AGENTS.md"),
+      join(repo, "AGENTS.override.md"),
+      join(env.cwd, "CLAUDE.md"),
+      join(repo, "AGENTS.md"),
+      join(sibling, "AGENTS.md"),
+      join(child, "AGENTS.md"),
+    ];
+    const contents = [...markers, ...excluded];
+    await Promise.all(
+      paths.map((path, index) => {
+        const content = contents[index];
+        assert.ok(content);
+        return writeFile(path, content);
+      }),
+    );
+    env.env.DWELL_TEST_SYSTEM_PROMPT = join(env.root, "prompt.txt");
+  });
+  assert.equal((await pi.run("hello")).outcome, "completed");
+  const prompt = await readFile(join(environment.root, "prompt.txt"), "utf8");
+  let previous = -1;
+  for (const marker of markers) {
+    const position = prompt.indexOf(marker);
+    assert.ok(position > previous, `${marker} must follow its parent context`);
+    assert.equal(prompt.split(marker).length - 1, 1, `${marker} must appear once`);
+    previous = position;
+  }
+  for (const marker of excluded) assert.ok(!prompt.includes(marker), `${marker} must be excluded`);
+});
+
+test("native context loading deduplicates the agent directory when it is also an ancestor", async (t) => {
+  const { pi, environment } = await runtime(t, undefined, async (env) => {
+    // Pi deduplicates by path; use the same canonical path as the runtime cwd.
+    env.agentDir = await realpath(env.agentDir);
+    env.env.PI_CODING_AGENT_DIR = env.agentDir;
+    env.cwd = join(env.agentDir, "project");
+    await mkdir(env.cwd);
+    await writeFile(join(env.agentDir, "AGENTS.override.md"), "DWELL_GLOBAL_OVERRIDE_CONTEXT");
+    await writeFile(join(env.agentDir, "AGENTS.md"), "DWELL_GLOBAL_SHADOWED_CONTEXT");
+    env.env.DWELL_TEST_SYSTEM_PROMPT = join(env.root, "prompt.txt");
+  });
+  assert.equal((await pi.run("hello")).outcome, "completed");
+  const prompt = await readFile(join(environment.root, "prompt.txt"), "utf8");
+  assert.equal(prompt.split("DWELL_GLOBAL_OVERRIDE_CONTEXT").length - 1, 1);
+  assert.ok(!prompt.includes("DWELL_GLOBAL_SHADOWED_CONTEXT"));
+});
+
+test("sessions without context files retain Pi's default prompt and complete turns", async (t) => {
+  const { pi, environment } = await runtime(t, undefined, (env) => {
+    env.env.DWELL_TEST_SYSTEM_PROMPT = join(env.root, "prompt.txt");
+  });
+  assert.equal((await pi.run("hello")).outcome, "completed");
+  const prompt = await readFile(join(environment.root, "prompt.txt"), "utf8");
+  assert.match(prompt, /You are an expert coding assistant operating inside pi/);
+});
+
+test("native context remains additive to global SYSTEM and APPEND_SYSTEM customization", async (t) => {
+  const { pi, environment } = await runtime(t, undefined, async (env) => {
+    await writeFile(join(env.agentDir, "SYSTEM.md"), "DWELL_CUSTOM_SYSTEM");
+    await writeFile(join(env.agentDir, "APPEND_SYSTEM.md"), "DWELL_APPEND_SYSTEM");
+    await writeFile(join(env.cwd, "AGENTS.md"), "DWELL_CUSTOM_PROJECT_CONTEXT");
+    env.env.DWELL_TEST_SYSTEM_PROMPT = join(env.root, "prompt.txt");
+  });
+  assert.equal((await pi.run("hello")).outcome, "completed");
+  const prompt = await readFile(join(environment.root, "prompt.txt"), "utf8");
+  for (const marker of [
+    "DWELL_CUSTOM_SYSTEM",
+    "DWELL_APPEND_SYSTEM",
+    "DWELL_CUSTOM_PROJECT_CONTEXT",
+  ])
+    assert.equal(prompt.split(marker).length - 1, 1);
+  assert.ok(!prompt.includes("You are an expert coding assistant operating inside pi"));
+});
 
 test("native defaults and model changes work without changing global Pi settings", async (t) => {
   const { pi, environment, options } = await runtime(t);

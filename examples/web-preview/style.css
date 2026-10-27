@@ -1,0 +1,44 @@
+@import url('/base.css');
+#message{display:block;min-width:0;width:100%;white-space:pre-wrap;overflow-wrap:anywhere;outline:none;background:none;border:0}
+#message[data-empty="true"]::before{content:attr(data-placeholder);color:#a09686;pointer-events:none;float:left;height:0;font-size:14px;font-weight:400;line-height:24px}
+/* Two optional-extension presentations; preview controls are demo-only. */
+.preview-mode-label{display:block;font:9px/1.5 var(--mono);color:var(--muted);letter-spacing:1px;margin-bottom:6px}
+#preview-mode{width:100%;padding:8px 5px;margin-bottom:10px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;color:var(--dark);font:11px var(--mono)}
+#memory-preview{margin-top:30px;padding:0 9px}
+.memory-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.memory-heading h2{margin:0;font:600 17px/1.5 var(--mono);letter-spacing:-.5px}
+.memory-heading span{font:8px var(--mono);color:var(--muted);letter-spacing:1px}
+.memory-caption{font:11px/1.6 var(--sans);color:var(--muted);margin:5px 0 14px}
+.memory-note{border-top:1px solid var(--line)}
+.memory-note summary{cursor:pointer;font:11px/1.5 var(--mono);color:var(--dark);padding:14px 0;list-style:none}
+.memory-note summary::before{content:'›';display:inline-block;width:14px;color:var(--muted)}
+.memory-note[open] summary::before{content:'⌄'}
+.memory-note p{font:12px/1.7 var(--sans);margin:0 0 14px 14px;color:var(--ink)}
+.with-distill .session-item .name-row{min-height:46px;align-items:center}
+.with-distill .sidebar-state{display:block;margin:0;font:11px/1.6 var(--mono)}
+.with-distill .name-index{font-size:11px;color:var(--dark)}
+#memory-preview[hidden],#selected-directory[hidden]{display:none}
+#memory-preview .memory-note{margin:0;padding:0;border:0;border-top:1px solid var(--line);background:none;box-shadow:none}
+#memory-preview .memory-note summary{margin:0;padding:12px 0;min-height:44px;display:block}
+#memory-preview .memory-note summary::before{transform:none}
+.session-menu button:focus-visible{outline:1px solid var(--teal);outline-offset:0}
+
+/* Distill keeps memory in the rail and all session controls in the header. */
+.with-distill main>header{display:flex;position:relative;overflow:visible;gap:8px;height:52px;min-height:52px;padding:0 16px;border-bottom:1px solid var(--line)}
+.with-distill #status-list{flex:1;min-width:0;overflow-x:auto}
+#top-session-controls{flex:0 0 36px;align-self:center;height:40px;border:0;background:none;box-shadow:none}
+#top-session-more{width:36px;min-height:40px;font-size:22px}
+#top-session-menu{width:158px;padding:4px 12px;top:calc(100% + 5px);z-index:5}
+.with-distill #memory-preview{margin-top:4px;padding:0 2px}
+#memory-search{width:100%;min-width:0;min-height:38px;margin:16px 0 10px;padding:8px;border:1px solid var(--line);border-radius:0;background:var(--surface);font:12px var(--sans);color:var(--ink)}
+#memory-preview .memory-note summary{font-family:var(--sans);font-size:12px}
+#conversation-heading[hidden],#session-list[hidden],#top-session-controls[hidden]{display:none}
+@media(min-width:761px){.with-distill #open-nav{display:none}.with-distill #new-mobile{display:block;width:36px;min-height:36px;height:36px;font-size:24px}}
+@media(max-width:760px){.with-distill main>header{height:48px;min-height:48px;padding:0 10px;gap:7px}.with-distill #memory-preview{margin-top:6px}}
+.with-distill #rail #new-session{display:none}
+
+
+.with-distill .status-tab{width:44px;flex-basis:44px}
+.with-distill .status-tab .tab-select{padding:0;justify-content:center}
+.with-distill .status-tab .tab-close{flex:1;width:100%}
+#composer[hidden],#closed-session[hidden],#choose-model[hidden]{display:none}

@@ -22,29 +22,62 @@ export function setupComposer(
   const body = document.body;
   const initialBodyHeight = body.style.height;
   const initialBodyTop = body.style.top;
+  let previousScrollClientHeight = scroll.clientHeight;
+  let previousBottomGap = Math.max(0, scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop);
   let viewportFrame: number | undefined;
   let disposed = false;
+  let usingVisualViewportFallback = false;
   let hold: BackspaceHold | null = null;
   let composing = false;
   let editing = false;
   let sawInput = false;
   let notifyingSyntheticInput = false;
 
+  const restoreBodyViewport = (): void => {
+    body.style.height = initialBodyHeight;
+    body.style.top = initialBodyTop;
+  };
+
+  const rememberScrollPosition = (): void => {
+    // A native viewport resize changes clientHeight before its queued resize callback.
+    // Keep the last position until that callback has carried it into the new layout.
+    if (scroll.clientHeight !== previousScrollClientHeight) return;
+    previousBottomGap = Math.max(0, scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop);
+  };
+
   const resize = (): void => {
     if (disposed) return;
     // Anchor the conversation to its lower edge: keyboard movement carries the
     // messages with the composer, preserving how far back the reader has scrolled.
-    const bottomGap = Math.max(0, scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop);
+    const bottomGap =
+      scroll.clientHeight === previousScrollClientHeight
+        ? Math.max(0, scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop)
+        : previousBottomGap;
     const mobile = window.innerWidth <= 760;
-    if (mobile) {
-      // Magnification shrinks the visual viewport too; keep native pinch zoom.
-      if (!visualViewport || Math.abs(visualViewport.scale - 1) < 0.01) {
-        body.style.height = `${visualViewport?.height ?? window.innerHeight}px`;
-        body.style.top = `${visualViewport?.offsetTop ?? 0}px`;
+    // interactive-widget=resizes-content lets 100dvh follow the keyboard natively.
+    // Use visualViewport only when it proves that content is still occluded, as on
+    // browsers that resize the visual viewport without resizing the layout viewport.
+    if (mobile && visualViewport && Math.abs(visualViewport.scale - 1) >= 0.01) {
+      // Pinch zoom changes the visual viewport, not the conversation's layout.
+    } else if (
+      mobile &&
+      visualViewport &&
+      (document.activeElement === input || usingVisualViewportFallback)
+    ) {
+      restoreBodyViewport();
+      const bodyBounds = body.getBoundingClientRect();
+      const visualTop = visualViewport.offsetTop;
+      const visualBottom = visualTop + visualViewport.height;
+      if (bodyBounds.top < visualTop - 1 || bodyBounds.bottom > visualBottom + 1) {
+        body.style.height = `${visualViewport.height}px`;
+        body.style.top = `${visualTop}px`;
+        usingVisualViewportFallback = true;
+      } else {
+        usingVisualViewportFallback = false;
       }
     } else {
-      body.style.height = initialBodyHeight;
-      body.style.top = initialBodyTop;
+      restoreBodyViewport();
+      usingVisualViewportFallback = false;
     }
     input.rows = 1;
     const viewportHeight = mobile ? body.clientHeight : window.innerHeight;
@@ -60,6 +93,8 @@ export function setupComposer(
     input.style.height = `${Math.min(contentHeight, maxHeight)}px`;
     input.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
     scroll.scrollTop = Math.max(0, scroll.scrollHeight - scroll.clientHeight - bottomGap);
+    previousScrollClientHeight = scroll.clientHeight;
+    previousBottomGap = Math.max(0, scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop);
   };
 
   const viewportChanged = (): void => {
@@ -206,6 +241,7 @@ export function setupComposer(
   };
 
   input.addEventListener("input", onInput);
+  scroll.addEventListener("scroll", rememberScrollPosition, { passive: true });
   input.addEventListener("keydown", onKeyDown);
   input.addEventListener("compositionstart", onCompositionStart);
   input.addEventListener("compositionend", onCompositionEnd);
@@ -244,6 +280,7 @@ export function setupComposer(
       resetBackspace();
       resizeObserver?.disconnect();
       input.removeEventListener("input", onInput);
+      scroll.removeEventListener("scroll", rememberScrollPosition);
       input.removeEventListener("keydown", onKeyDown);
       input.removeEventListener("compositionstart", onCompositionStart);
       input.removeEventListener("compositionend", onCompositionEnd);

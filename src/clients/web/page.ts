@@ -65,7 +65,7 @@ export const HOST_PAGE = `<!doctype html>
 <div id="conversation">
 </div>
 </div>
-<footer>
+<footer id="composer-footer">
 <div id="composer-context" class="composer-context" hidden>
 <span id="composer-directory" aria-label="Current directory"></span>
 <button id="choose-model" type="button" aria-label="Choose model" aria-haspopup="dialog" disabled><span id="model-label"></span><span id="thinking-label"></span><span aria-hidden="true">⌄</span></button>
@@ -81,6 +81,13 @@ export const HOST_PAGE = `<!doctype html>
 </footer>
 </main>
 </div>
+<dialog id="close-session-dialog" aria-labelledby="close-session-title" aria-describedby="close-session-copy">
+<div id="close-session-number"></div>
+<h2 id="close-session-title">Close session?</h2>
+<p id="close-session-copy" hidden></p>
+<p id="close-session-error" class="feedback" role="status" hidden></p>
+<div class="close-actions"><button id="cancel-session-close" type="button">Keep open</button><button id="confirm-session-close" type="button">Close</button></div>
+</dialog>
 <dialog id="new-dialog" aria-labelledby="new-title">
 <div class="handle">
 </div>
@@ -753,4 +760,55 @@ footer{padding:4px 22px 8px}
 .thinking-content{padding:4px 0 8px}
 .tool-caption{padding:0 14px 4px 34px;font:10px/1.6 var(--mono);color:var(--muted)}
 .tool-run.error{border-left:2px solid var(--danger,#a65b51)}
+
+/* Open sessions share one status strip on mobile and desktop. */
+:root{--close-wash:#f0ded5;--close-line:#bb8270;--close-ink:#904d3c;--close-fill:#a85e4a}
+main>header{display:flex;height:52px;min-height:52px;padding:0 16px;gap:8px;border-bottom:1px solid var(--line)}
+#status-list{flex:1;display:flex;gap:8px;min-width:0;padding:4px 2px;overflow-x:auto;scrollbar-width:none}
+.status-tab{display:flex;flex:0 0 80px;width:80px;height:40px;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
+.status-tab.active{border-color:var(--teal);background:var(--pale);color:var(--dark);box-shadow:2px 2px #c8d7c9}
+.tab-select{display:flex;flex:1;min-width:0;align-items:center;justify-content:space-around;padding:0 4px;font:12px var(--mono);color:inherit}
+.tab-close{display:flex;flex:0 0 36px;align-items:center;justify-content:center;padding:0;color:var(--dark)}
+.tab-symbol{width:20px;height:20px;display:block;flex-shrink:0}
+.tab-symbol svg{display:block;width:100%;height:100%}
+.tab-symbol.ready{color:var(--teal)}
+.tab-symbol.working,.tab-symbol.opening{color:var(--teal);animation:tab-turn 1.5s linear infinite}
+.tab-symbol.attention{color:#986a2f}
+.tab-symbol.stopped{color:var(--muted)}
+@keyframes tab-turn{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.tab-symbol.working,.tab-symbol.opening{animation:none}}
+.status-tab.close-armed{background:var(--close-wash);border-color:var(--close-line);color:var(--close-ink);box-shadow:2px 2px #dec0b4}
+.close-armed .tab-select,.close-armed .tab-close{color:var(--close-ink)}
+.close-armed .tab-select:hover,.close-armed .tab-close:hover{background:#e9cec1}
+.close-armed button:focus-visible,#confirm-session-close:focus-visible{outline-color:var(--close-ink);outline-offset:1px}
+#new-mobile{display:grid;place-items:center;flex:0 0 38px;width:38px;min-height:38px;height:38px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:24px var(--mono)}
+#rail #new-session{display:none}
+.name-row{min-height:44px;align-items:center}
+.name-index,.sidebar-slot{flex:0 0 20px;font:10px var(--mono);color:var(--muted)}
+.name-row.active .name-index,.name-row.active .sidebar-slot{color:var(--dark)}
+#close-session-dialog{position:fixed;inset:0;margin:auto;width:min(360px,calc(100vw - 32px));max-width:none;height:fit-content;max-height:calc(100dvh - 32px);padding:24px;border:1px solid var(--line);border-radius:0;background:var(--surface);box-shadow:4px 4px #dfc4b8;color:var(--ink)}
+#close-session-dialog::backdrop{background:rgba(37,35,41,.23);backdrop-filter:blur(2px)}
+#close-session-number{font:11px/1.6 var(--mono);color:var(--muted);overflow-wrap:anywhere;margin-bottom:12px}
+#close-session-title{font:600 18px/1.4 var(--sans);letter-spacing:0;margin:0 0 12px}
+#close-session-copy{font:15px/1.65 var(--sans);color:#655b51;margin:0 0 20px;overflow-wrap:anywhere}
+.close-actions{display:flex;align-items:center;justify-content:flex-end;gap:18px;margin-top:20px}
+.close-actions button{min-height:42px;padding:0 12px;font:12px var(--mono)}
+#cancel-session-close{color:var(--muted);padding-left:0;padding-right:0}
+#confirm-session-close{background:var(--close-fill);color:var(--surface);border:1px solid var(--close-fill);box-shadow:2px 2px #e0c5b9}
+#confirm-session-close:not(:disabled):hover{background:var(--close-ink);border-color:var(--close-ink)}
+#confirm-session-close:disabled{opacity:.55;cursor:wait}
+#conversation .user .message-body,#conversation .assistant .message-body{font-size:15px}
+#composer #message,#composer.expanded #message{font-family:var(--sans);font-size:15px;font-weight:400;line-height:24px}
+#message::placeholder{font-size:14px;font-weight:400;opacity:1;letter-spacing:normal}
+@media(min-width:761px){#open-nav{display:none}}
+@media(max-width:760px){
+ main>header{height:48px;min-height:48px;padding:0 10px;gap:7px}
+ .status-tab{width:76px;flex-basis:76px;height:38px}
+ #status-list{gap:6px}
+ .tab-symbol{width:16px;height:16px}
+ .tab-select{font-size:11px}
+ #new-mobile{font-size:20px;line-height:1}
+ #open-nav .menu{font-size:16px;line-height:1}
+ #close-session-dialog{padding:22px}
+}
 `;

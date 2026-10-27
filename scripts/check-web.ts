@@ -95,10 +95,26 @@ const ALTERNATE_MODEL = "dwell-test-alt";
 async function assertComposerLayout(page: BrowserPage, viewport: string): Promise<void> {
   assert.equal(await page.evaluate("innerWidth > 760"), viewport === "desktop");
   assert.equal(
+    await page.evaluate('getComputedStyle(document.querySelector("#message")).fontSize'),
+    "15px",
+  );
+  assert.equal(
+    await page.evaluate(
+      'getComputedStyle(document.querySelector("#message"),"::placeholder").fontSize',
+    ),
+    "14px",
+  );
+  assert.equal(
+    await page.evaluate('getComputedStyle(document.querySelector(".tab-symbol")).width'),
+    viewport === "desktop" ? "20px" : "16px",
+  );
+
+  assert.equal(
     await page.evaluate(
       'getComputedStyle(document.querySelector("main>header")).display === "none"',
     ),
-    viewport === "desktop",
+    false,
+    "session status controls are visible on desktop and mobile",
   );
   assert.equal(
     await page.evaluate(`(()=>{
@@ -250,38 +266,59 @@ async function checkMobileKeyboard(page: BrowserPage): Promise<void> {
       'document.querySelector("#scroll").scrollTop=document.querySelector("#scroll").scrollHeight',
     );
   }
-  const latestTop = Number(
-    await page.evaluate(
-      'document.querySelector(".assistant:last-child").getBoundingClientRect().top',
-    ),
+  const nativeBefore = record(
+    await page.evaluate(`(()=>{
+    const scroll=document.querySelector('#scroll');
+    scroll.scrollTop=Math.max(0,scroll.scrollHeight-scroll.clientHeight-250);
+    scroll.dispatchEvent(new Event('scroll'));
+    return {gap:scroll.scrollHeight-scroll.clientHeight-scroll.scrollTop,top:scroll.scrollTop};
+  })()`),
   );
   try {
-    await page.call("Emulation.setDeviceMetricsOverride", {
-      width: 390,
-      height: 484,
-      deviceScaleFactor: 1,
-      mobile: true,
-    });
-    await settle();
-    assert.ok(
-      Number(
-        await page.evaluate('document.querySelector("footer").getBoundingClientRect().bottom'),
-      ) <= 485,
-      "layout viewport resize also lifts the composer",
-    );
-    assert.ok(
-      Math.abs(
-        Number(
-          await page.evaluate(
-            'document.querySelector(".assistant:last-child").getBoundingClientRect().top',
-          ),
-        ) -
-          latestTop +
-          360,
-      ) < 3,
-      "native viewport resize carries the messages upward",
-    );
+    for (const height of [664, 484, 664, 844]) {
+      await page.evaluate(`(()=>{
+        const original=window.requestAnimationFrame;
+        const pending=[];
+        window.requestAnimationFrame=callback=>{pending.push(callback);return 10000+pending.length};
+        window.__releaseViewportFrames=()=>{window.requestAnimationFrame=original;for(const callback of pending)callback(performance.now());};
+      })()`);
+      await page.call("Emulation.setDeviceMetricsOverride", {
+        width: 390,
+        height,
+        deviceScaleFactor: 1,
+        mobile: true,
+      });
+      assert.ok(
+        Math.abs(
+          Number(
+            await page.evaluate('document.querySelector("footer").getBoundingClientRect().bottom'),
+          ) - height,
+        ) < 2,
+        "native layout lifts and lowers the composer before JavaScript animation callbacks",
+      );
+      assert.equal(
+        await page.evaluate("document.body.style.height"),
+        "",
+        "native keyboard resize never pins a stale pixel height",
+      );
+      await page.evaluate("window.__releaseViewportFrames()");
+      await settle();
+      const position = record(
+        await page.evaluate(
+          `(()=>{const s=document.querySelector('#scroll');return {gap:s.scrollHeight-s.clientHeight-s.scrollTop,top:s.scrollTop};})()`,
+        ),
+      );
+      assert.ok(
+        Math.abs(Number(position.gap) - Number(nativeBefore.gap)) < 3,
+        "native animation preserves reading distance from latest",
+      );
+      assert.ok(
+        Math.abs(Number(position.top) - Number(nativeBefore.top) - (844 - height)) < 3,
+        "messages follow each native keyboard step",
+      );
+    }
   } finally {
+    await page.evaluate("window.__releaseViewportFrames?.()");
     await page.call("Emulation.setDeviceMetricsOverride", {
       width: 390,
       height: 844,
@@ -603,7 +640,7 @@ for (const mode of modes) {
       );
       console.log("PASS HTTPS Secure cookie and missing browser binding rejection");
     }
-    await first.click("#new-session");
+    await first.click("#new-mobile");
     await first.until('document.querySelector("#new-dialog").open');
     assert.equal(
       await first.evaluate(
@@ -626,6 +663,16 @@ for (const mode of modes) {
     await first.click("#create-button");
     await first.until(
       `!document.querySelector("#new-dialog").open && document.querySelector("#session-list .active")?.textContent.includes(${JSON.stringify(longPathParts.at(-1))})`,
+    );
+    assert.equal(
+      await first.evaluate('document.querySelectorAll("#session-list .sidebar-state").length'),
+      0,
+      "sidebar names do not duplicate the top status controls",
+    );
+    assert.equal(
+      await first.evaluate('document.querySelectorAll("#status-list .status-tab").length'),
+      2,
+      "only open sessions appear as status tabs",
     );
     const listed: unknown = await request("/sessions");
     assert.ok(Array.isArray(listed));
@@ -781,7 +828,7 @@ for (const mode of modes) {
       "model changes are disabled while a Pi turn is active",
     );
     await second.click("#send");
-    await second.until('document.querySelector("#session-list").textContent.includes("Stopped")');
+    await second.until(`document.querySelector('#status-list [aria-label*="Stopped"]') !== null`);
     console.log(`PASS ${mode} two browsers, detach without cancellation, and explicit stop`);
     await first.call("Page.navigate", { url: browserOrigin });
     await first.until(
@@ -1051,6 +1098,137 @@ for (const mode of modes) {
     console.log(
       `PASS ${mode} mobile keyboard lifts the composer and messages, restores on close, and preserves reading position and IME text`,
     );
+    // Close/reopen through the real host, retaining native history and local drafts.
+    const currentId = String(session.id);
+    await second.type("#message", "Keep this draft while closing");
+    await stagePngImages(second, 1, "close-draft");
+    await second.until('document.querySelectorAll(".image-attachment").length === 1');
+    const originalSlots = await second.evaluate(
+      'Array.from(document.querySelectorAll(".status-tab"),e=>e.textContent)',
+    );
+    await second.click(".status-tab.active .tab-select");
+    await second.until(
+      'document.querySelector(".status-tab.active.close-armed .tab-close") !== null',
+    );
+    await second.click(".tab-close");
+    await second.until('document.querySelector("#close-session-dialog").open');
+    assert.equal(
+      await second.evaluate('document.querySelector("#close-session-dialog").open'),
+      true,
+    );
+    assert.equal(await second.evaluate("document.activeElement.id"), "cancel-session-close");
+    await second.click("#cancel-session-close");
+    await second.until(
+      '!document.querySelector("#close-session-dialog").open && !document.querySelector(".tab-close")',
+    );
+    assert.equal(
+      await second.evaluate('document.querySelector("#message").value'),
+      "Keep this draft while closing",
+    );
+    assert.equal(await second.evaluate('document.querySelectorAll(".image-attachment").length'), 1);
+    assert.deepEqual(
+      await second.evaluate(
+        'Array.from(document.querySelectorAll(".status-tab"),e=>e.textContent)',
+      ),
+      originalSlots,
+    );
+    await second.click(".status-tab.active .tab-select");
+    await second.click(".tab-close");
+    await second.until('document.querySelector("#close-session-dialog").open');
+    await second.click("#confirm-session-close");
+    await second.until(
+      '!document.querySelector("#close-session-dialog").open && document.querySelectorAll(".status-tab").length === 1',
+    );
+    assert.equal(record(await request(`/sessions/${currentId}`)).runtimeState, "closed");
+    assert.equal(
+      await second.evaluate('document.querySelectorAll("#session-list .name-row").length'),
+      2,
+    );
+    await first.evaluate(
+      "window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))",
+    );
+    await delay(250);
+    assert.equal(
+      record(await request(`/sessions/${currentId}`)).runtimeState,
+      "closed",
+      "another browser does not reopen a closed runtime",
+    );
+    await second.click(".status-tab.active .tab-select");
+    await second.click(".tab-close");
+    await second.until('document.querySelector("#close-session-dialog").open');
+    await second.click("#confirm-session-close");
+    await second.until(
+      '!document.querySelector("#close-session-dialog").open && document.querySelectorAll(".status-tab").length === 0',
+    );
+    await second.call("Page.reload");
+    await second.until(
+      '!document.querySelector("#app").hidden && document.querySelectorAll("#session-list .name-row").length === 2',
+    );
+    assert.equal(
+      await second.evaluate('document.querySelectorAll(".status-tab").length'),
+      0,
+      "reload does not open a historical session",
+    );
+    await second.click("#open-nav");
+    await second.evaluate(
+      `Array.from(document.querySelectorAll('#session-list .name-row')).find(e=>e.textContent.includes(${JSON.stringify(longPathParts.at(-1))})).click()`,
+    );
+    await second.until(
+      'document.querySelector(".sent-image img")?.naturalWidth===64 && document.querySelectorAll(".status-tab").length === 1',
+    );
+    assert.equal(record(await request(`/sessions/${currentId}`)).runtimeState, "ready");
+    // A confirmation for an old turn must never stop a newer turn.
+    const previousTurn = record(
+      await request(`/sessions/${currentId}/turns`, { requestId: randomUUID(), message: "slow" }),
+    );
+    await second.until(
+      'document.querySelector("#send").getAttribute("aria-label")==="Stop response"',
+    );
+    await second.click(".status-tab.active .tab-select");
+    await second.click(".tab-close");
+    await second.until('document.querySelector("#close-session-dialog").open');
+    assert.equal(
+      await second.evaluate('document.querySelector("#close-session-title").textContent'),
+      "Stop and close?",
+    );
+    await request(`/sessions/${currentId}/turns/${String(previousTurn.runId)}/abort`, {});
+    for (let attempt = 0; attempt < 100; attempt++) {
+      if (!record(await request(`/sessions/${currentId}`)).activeTurnId) break;
+      await delay(50);
+    }
+    const newerTurn = record(
+      await request(`/sessions/${currentId}/turns`, { requestId: randomUUID(), message: "slow" }),
+    );
+    await second.click("#confirm-session-close");
+    await second.until('document.querySelector("#close-session-error").textContent.length > 0');
+    assert.equal(record(await request(`/sessions/${currentId}`)).activeTurnId, newerTurn.runId);
+    await second.click("#cancel-session-close");
+    await second.until(
+      '!document.querySelector("#close-session-dialog").open && !document.querySelector(".tab-close")',
+    );
+    await second.click(".status-tab.active .tab-select");
+    await second.click(".tab-close");
+    await second.until('document.querySelector("#close-session-dialog").open');
+    await second.click("#confirm-session-close");
+    await second.until(
+      '!document.querySelector("#close-session-dialog").open && document.querySelectorAll(".status-tab").length === 0',
+    );
+    assert.equal(record(await request(`/sessions/${currentId}`)).runtimeState, "closed");
+    assert.equal(
+      record(await request(`/sessions/${currentId}/turns/${String(newerTurn.runId)}`))
+        .cancellationRequested,
+      true,
+    );
+    await second.click("#open-nav");
+    await second.evaluate(
+      `Array.from(document.querySelectorAll('#session-list .name-row')).find(e=>e.textContent.includes(${JSON.stringify(longPathParts.at(-1))})).click()`,
+    );
+    await second.until(
+      'document.querySelector(".sent-image img")?.naturalWidth===64 && document.querySelectorAll(".status-tab").length === 1',
+    );
+    console.log(
+      `PASS ${mode} close confirmation, abort ownership, closed history, all-closed refresh and explicit reopen`,
+    );
     const shots = process.env.DWELL_WEB_SCREENSHOT_DIR;
     if (shots) {
       await mkdir(shots, { recursive: true });
@@ -1171,10 +1349,17 @@ for (const mode of modes) {
       sessions: { env: environment.env, extensions: [environment.extensionPath] },
     });
     await second.until(
-      'document.querySelector("#connection-badge").textContent==="Connected" && document.querySelector("#conversation").textContent.includes("Received: <img")',
+      'document.querySelector("#connection-badge").textContent==="Connected" && document.querySelectorAll(".status-tab").length===0',
+    );
+    assert.equal(record(await request(`/sessions/${currentId}`)).runtimeState, "closed");
+    await second.evaluate(
+      `Array.from(document.querySelectorAll('#session-list .name-row')).find(e=>e.textContent.includes(${JSON.stringify(longPathParts.at(-1))})).click()`,
+    );
+    await second.until(
+      'document.querySelector("#conversation").textContent.includes("Received: <img") && document.querySelectorAll(".status-tab").length===1',
     );
     proxy?.setUpstreamPort(hostPort);
-    console.log(`PASS ${mode} host restart reconnects with saved history`);
+    console.log(`PASS ${mode} host restart preserves closed history for explicit reopen`);
     assert.equal(
       await second.evaluate('document.querySelector("#notice").hidden'),
       true,

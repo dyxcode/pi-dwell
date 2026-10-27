@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Dwell · UI demo</title>
+<link rel="stylesheet" href="./style.css">
+<script src="./client.js" type="module">
+</script>
+</head>
+<body>
+
+<div id="app" class="app-shell">
+<button class="scrim" id="scrim" hidden aria-label="Close navigation">
+</button>
+<aside id="rail" aria-label="Navigation">
+<div class="brand">dwell.<button id="close-nav" class="icon" aria-label="Close navigation">×</button>
+</div>
+<button class="new" id="new-session">New conversation <span>＋</span>
+</button>
+<div class="section-head" id="conversation-heading">
+<span id="sessions-heading">CONVERSATIONS</span>
+<span id="session-count">00</span>
+</div>
+<nav id="session-list" class="session-names" aria-label="Session names">
+</nav>
+<p id="selected-directory" class="selected-directory">
+</p>
+<section id="memory-preview" hidden aria-label="Memory preview">
+<div class="memory-heading"><h2>Memory</h2><span>EXAMPLE</span></div>
+<label class="sr-only" for="memory-search">Search memory</label>
+<input id="memory-search" type="search" placeholder="Search memory…" autocomplete="off">
+<div id="memory-results"></div>
+<p id="memory-search-hint" class="memory-caption">Find what you want to carry forward.</p>
+</section>
+<div class="rail-foot">
+<label class="preview-mode-label" for="preview-mode">DEMO VIEW</label>
+<select id="preview-mode" aria-label="Demo view"><option value="standalone">Standalone</option><option value="distill">With Distill</option></select>
+<button id="connection-badge" class="text-button" type="button">Connecting…</button>
+</div>
+</aside>
+<main id="chat-main">
+<header>
+<button id="open-nav" aria-label="Open navigation" aria-expanded="false">
+<span class="menu">☰</span>
+</button>
+<nav id="status-list" aria-label="Session status">
+</nav>
+<button id="new-mobile" class="icon" type="button" aria-label="New conversation">＋</button>
+</header>
+<div class="notice-area">
+<p id="notice" class="feedback" role="status" hidden>
+</p>
+<button id="dismiss-notice" type="button" aria-label="Dismiss notice">×</button>
+</div>
+<div id="scroll">
+<div class="history-controls">
+<button id="load-older" class="text-button" hidden>Load earlier messages ↑</button>
+</div>
+<div id="conversation">
+</div>
+</div>
+<footer>
+<div class="composer-context"><span id="composer-directory" aria-label="Current directory"></span><button id="choose-model" type="button" aria-label="Choose model" aria-haspopup="dialog"><span id="model-label">GPT-5.4</span><span id="thinking-label">· Medium</span><span aria-hidden="true">⌄</span></button></div><form id="composer">
+<input id="image-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+<div class="text-editor"><div id="message" contenteditable="true" role="textbox" aria-label="Message Pi" aria-multiline="true" data-placeholder="Message Pi…" spellcheck="true"></div></div>
+<div class="composer-actions">
+<button id="attach-image" type="button" aria-label="Add images" title="Add images">+ Image</button>
+<div id="image-attachments" aria-label="Attached images" hidden></div>
+<button id="send" type="submit" aria-label="Send message" disabled>Send ↑</button>
+</div>
+</form>
+<div id="closed-session" hidden><span>Session closed</span><button id="reopen-session" type="button">Open session ↗</button></div>
+<p id="attachment-notice" role="status" hidden></p>
+</footer>
+</main>
+</div>
+<dialog id="close-session-dialog" aria-labelledby="close-session-title" aria-describedby="close-session-copy">
+<div id="close-session-number" class="close-eyebrow">SESSION 01</div>
+<h2 id="close-session-title">Close this session?</h2>
+<p id="close-session-copy">The conversation stays in your sidebar.</p>
+<div class="close-actions"><button id="cancel-session-close" type="button">Keep open</button><button id="confirm-session-close" type="button">Close session</button></div>
+</dialog>
+<dialog id="new-dialog" aria-labelledby="new-title">
+<div class="handle">
+</div>
+<div class="panel-heading">
+<div>
+<div class="eyebrow">NEW CONVERSATION</div>
+<h2 id="new-title">Start where you are.</h2>
+</div>
+<button id="close-new" class="icon" aria-label="Close panel">×</button>
+</div>
+<form id="new-form" class="form">
+<label for="directory">HOST DIRECTORY</label>
+<div class="directory-input">
+<input id="directory" required autocomplete="off">
+<button id="browse" type="button" class="text-button">Browse</button>
+</div>
+<div id="directories" class="directories">
+</div>
+<p id="create-error" class="feedback" role="status">
+</p>
+<button id="create-button" class="action" type="submit">Start conversation ↗</button>
+</form>
+</dialog>
+<dialog id="host-dialog" aria-labelledby="host-title">
+<div class="panel-heading">
+<h2 id="host-title">Your host.</h2>
+<button id="close-host" class="icon" aria-label="Close host details">×</button>
+</div>
+<p id="host-info">
+</p>
+<button id="logout-button" class="action">Forget this browser</button>
+<p class="footnote">Disconnecting leaves your work running on the host.</p>
+</dialog>
+<dialog id="model-dialog" aria-labelledby="model-title">
+<div class="handle"></div>
+<div class="panel-heading">
+<div><div class="eyebrow" id="model-step">MODEL</div><button id="back-models" class="back-models" type="button" aria-label="Back to models" hidden>← Models</button><h2 id="model-title">Choose a model.</h2></div>
+<button id="close-model" class="icon" aria-label="Close model picker">×</button>
+</div>
+<label class="sr-only" for="model-search">Search models</label>
+<input id="model-search" type="search" placeholder="Search models…" autocomplete="off">
+<div id="model-options"></div>
+<p class="footnote">Applies to your next message.</p>
+</dialog><dialog id="image-dialog" aria-labelledby="image-title"><div class="panel-heading"><h2 id="image-title">Image preview</h2><button id="close-image" type="button" class="icon" aria-label="Close image preview">×</button></div><img id="preview-image" alt=""></dialog></body>
+</html>

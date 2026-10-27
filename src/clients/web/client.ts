@@ -51,6 +51,13 @@ const send = el("send", HTMLButtonElement),
 const dialog = el("new-dialog", HTMLDialogElement);
 const directory = el("directory", HTMLInputElement);
 const createButton = el("create-button", HTMLButtonElement);
+const closeDialog = el("close-session-dialog", HTMLDialogElement);
+const closeDirectory = el("close-session-number", HTMLElement);
+const closeTitle = el("close-session-title", HTMLElement);
+const closeCopy = el("close-session-copy", HTMLElement);
+const closeError = el("close-session-error", HTMLElement);
+const cancelClose = el("cancel-session-close", HTMLButtonElement);
+const confirmClose = el("confirm-session-close", HTMLButtonElement);
 const modelDialog = el("model-dialog", HTMLDialogElement);
 const modelSearch = el("model-search", HTMLInputElement);
 const chooseModel = el("choose-model", HTMLButtonElement);
@@ -101,6 +108,18 @@ let pendingCreate: {
   requestId: string;
   directory: string;
 } | null = null;
+const tabSlots = new Map<string, number>();
+const openingSessions = new Set<string>();
+let closeArmedSession: string | null = null;
+let preparingCloseSession: string | null = null;
+let closeTarget: { id: string; activeRunId: string | null; attempted: boolean } | null = null;
+let closingSession: string | null = null;
+let closePreparationGeneration = 0;
+let closeAttemptGeneration = 0;
+let sessionRefreshGeneration = 0;
+let sessionStateGeneration = 0;
+let selectionGeneration = 0;
+let openIntentGeneration = 0;
 let authAttempt = 0,
   browseAttempt = 0,
   modelAttempt = 0;
@@ -316,6 +335,9 @@ function probeCurrentModel(sessionId: string | null = selected): void {
 function label(s: SessionInfo): string {
   return names.get(s.id) || s.directory.split(/[\\/]/).filter(Boolean).pop() || s.directory;
 }
+function runtimeOpen(s: SessionInfo): boolean {
+  return s.runtimeState !== "closed";
+}
 function status(s: SessionInfo): string {
   const turn =
     s.id === selected ? (state.activeTurn ?? state.latestTurn ?? turns.get(s.id)) : turns.get(s.id);
@@ -328,14 +350,78 @@ function status(s: SessionInfo): string {
   if (turn?.status === "completed") return "Completed";
   return "Idle";
 }
-function glyph(value: string): string {
-  return value === "Working" || value === "Stopping"
-    ? "◒"
-    : value === "Completed"
-      ? "✓"
-      : value === "Failed" || value === "Interrupted"
-        ? "!"
-        : "○";
+type TabStatus = "ready" | "working" | "attention" | "stopped" | "opening";
+function tabStatus(s: SessionInfo): TabStatus {
+  const value = status(s);
+  if (value === "Working" || value === "Stopping") return "working";
+  if (value === "Failed" || value === "Interrupted") return "attention";
+  if (value === "Stopped") return "stopped";
+  if (value === "Opening") return "opening";
+  return "ready";
+}
+function tabStatusLabel(value: TabStatus): string {
+  return value === "working"
+    ? "Working"
+    : value === "attention"
+      ? "Needs attention"
+      : value === "stopped"
+        ? "Stopped"
+        : value === "opening"
+          ? "Opening"
+          : "Ready";
+}
+const SVG_NS = "http://www.w3.org/2000/svg";
+const statusPaths: Record<
+  "ready" | "working" | "attention" | "stopped" | "opening" | "close",
+  string
+> = {
+  ready: "M5 12l4 4L19 6",
+  working: "M12 4a8 8 0 1 0 8 8",
+  attention: "M12 7v6m0 4h.01M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18",
+  stopped: "M8 8l8 8M16 8l-8 8M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18",
+  opening: "M12 4a8 8 0 1 0 8 8",
+  close: "M6 6l12 12M18 6L6 18",
+};
+function tabSymbol(value: keyof typeof statusPaths): HTMLElement {
+  const wrapper = node("span", "", `tab-symbol ${value}`);
+  wrapper.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", statusPaths[value]);
+  svg.append(path);
+  wrapper.append(svg);
+  return wrapper;
+}
+function synchronizeTabSlots(): void {
+  const open = new Set(sessions.filter(runtimeOpen).map((s) => s.id));
+  for (const id of tabSlots.keys()) if (!open.has(id)) tabSlots.delete(id);
+  const used = new Set(tabSlots.values());
+  for (const s of sessions) {
+    if (!open.has(s.id) || tabSlots.has(s.id)) continue;
+    let slot = 1;
+    while (used.has(slot)) slot++;
+    tabSlots.set(s.id, slot);
+    used.add(slot);
+  }
+}
+function openTabIds(): string[] {
+  return sessions.filter(runtimeOpen).map((s) => s.id);
+}
+function closeBlockedReason(): string | null {
+  if (!authenticated) return "Reconnect to close a session.";
+  if (sending) return "Finish the current request before closing.";
+  if (pendingSend) return "Resolve the pending message before closing.";
+  if (changingModel !== null) return "Wait for the model change.";
+  if (attachments.busy) return "Wait for the image upload.";
+  if (pendingCreate) return "Wait for the new session.";
+  if (openingSessions.size > 0) return "Wait for the session to open.";
+  return null;
 }
 function showError(error: unknown, source: "action" | "stream" = "action"): void {
   if (error instanceof ApiError && error.status === 401) {
@@ -364,42 +450,80 @@ function nav(open: boolean): void {
 function navigation(): void {
   const list = el("session-list", HTMLElement),
     tabs = el("status-list", HTMLElement);
+  synchronizeTabSlots();
   list.replaceChildren();
   tabs.replaceChildren();
-  sessions.forEach((s, index) => {
-    const value = status(s),
-      number = String(index + 1).padStart(2, "0");
+  const slotNumber = (id: string): string => String(tabSlots.get(id) ?? 0).padStart(2, "0");
+  sessions.forEach((s) => {
     const row = node("button", "", `name-row${s.id === selected ? " active" : ""}`);
     row.type = "button";
-    row.setAttribute("aria-current", String(s.id === selected));
-    row.append(node("span", number, "name-index"));
-    const content = node("span", "", "name-content");
-    content.append(
+    row.dataset.sessionId = s.id;
+    row.setAttribute("aria-current", String(s.id === selected && runtimeOpen(s)));
+    row.disabled = !authenticated || attachments.busy || openingSessions.has(s.id);
+    row.append(
+      node("span", runtimeOpen(s) ? slotNumber(s.id) : "", "sidebar-slot"),
       node("span", label(s), "session-title"),
-      node("span", `${glyph(value)} ${value}`, "sidebar-state"),
     );
-    row.append(content);
     row.onclick = () => {
-      void select(s.id);
-      nav(false);
+      void openFromSidebar(s.id);
     };
     list.append(row);
-    const tab = node("button", "", `status-chip${s.id === selected ? " active" : ""}`);
-    tab.type = "button";
-    tab.setAttribute("aria-label", `Session ${number}, ${value}`);
-    tab.setAttribute("aria-current", String(s.id === selected));
-    tab.append(
-      node("span", glyph(value), "chip-icon"),
-      node("span", number, "chip-index"),
-      node("span", value, "chip-state"),
-    );
-    tab.onclick = () => {
-      void select(s.id);
-    };
-    tabs.append(tab);
   });
+  for (const s of sessions) {
+    if (!runtimeOpen(s)) continue;
+    const number = slotNumber(s.id),
+      selectedTab = s.id === selected,
+      armed = selectedTab && closeArmedSession === s.id,
+      symbol = tabStatus(s),
+      description = tabStatusLabel(symbol);
+    const tab = node(
+      "div",
+      "",
+      `status-tab${selectedTab ? " active" : ""}${armed ? " close-armed" : ""}`,
+    );
+    tab.dataset.sessionId = s.id;
+    const selectButton = node("button", "", "tab-select");
+    selectButton.type = "button";
+    selectButton.setAttribute(
+      "aria-label",
+      `Session ${number}, ${description}${selectedTab ? ", selected. Activate to show close." : ""}`,
+    );
+    selectButton.title = `Session ${number} · ${description}\n${s.directory}`;
+    selectButton.setAttribute("aria-current", String(selectedTab));
+    selectButton.disabled = attachments.busy || closeDialog.open;
+    selectButton.append(node("span", number));
+    if (!armed) selectButton.append(tabSymbol(symbol));
+    selectButton.onclick = () => {
+      if (selectedTab) closeArmedSession = armed ? null : s.id;
+      else {
+        closeArmedSession = null;
+        void select(s.id);
+      }
+      navigation();
+      tabs.querySelector<HTMLButtonElement>(`[data-session-id="${s.id}"] .tab-select`)?.focus();
+    };
+    tab.append(selectButton);
+    if (armed) {
+      const closeButton = node("button", "", "tab-close");
+      closeButton.type = "button";
+      closeButton.setAttribute("aria-label", `Close session ${number}`);
+      closeButton.title = `Close session ${number}`;
+      closeButton.disabled =
+        closeBlockedReason() !== null ||
+        closeDialog.open ||
+        closeTarget !== null ||
+        preparingCloseSession !== null;
+      closeButton.append(tabSymbol("close"));
+      closeButton.onclick = () => {
+        void prepareClose(s.id);
+      };
+      tab.append(closeButton);
+    }
+    tabs.append(tab);
+  }
   el("session-count", HTMLElement).textContent = String(sessions.length).padStart(2, "0");
   const s = activeSession();
+  el("composer-footer", HTMLElement).hidden = !s;
   el("composer-context", HTMLElement).hidden = !s;
   const contextDirectory = el("composer-directory", HTMLElement);
   contextDirectory.textContent = s?.directory ?? "";
@@ -487,6 +611,312 @@ function navigation(): void {
         ? "Retry the same message"
         : "Send message",
   );
+}
+function updatedSession(session: SessionInfo): string[] {
+  const previousTabs = openTabIds();
+  const existing = sessions.some((value) => value.id === session.id);
+  sessions = existing
+    ? sessions.map((value) => (value.id === session.id ? session : value))
+    : [...sessions, session];
+  sessionStateGeneration++;
+  synchronizeTabSlots();
+  return previousTabs;
+}
+function neighborAfterClose(id: string, previousTabs: readonly string[]): string | null {
+  const currentOpen = new Set(openTabIds());
+  const index = previousTabs.indexOf(id);
+  if (index >= 0) {
+    for (let i = index + 1; i < previousTabs.length; i++) {
+      const candidate = previousTabs[i];
+      if (candidate && currentOpen.has(candidate)) return candidate;
+    }
+    for (let i = index - 1; i >= 0; i--) {
+      const candidate = previousTabs[i];
+      if (candidate && currentOpen.has(candidate)) return candidate;
+    }
+  }
+  return openTabIds()[0] ?? null;
+}
+function reconcileClosedRuntime(id: string, previousTabs: readonly string[]): void {
+  const current = sessions.find((session) => session.id === id);
+  if (!current || runtimeOpen(current) || closingSession === id) return;
+  if (closeTarget?.id === id && closeDialog.open) {
+    closeDialog.close();
+    showError(new Error("This session was closed from another browser."));
+  }
+  if (selected === id) void select(neighborAfterClose(id, previousTabs));
+}
+function userMessageSnippet(values: readonly HistoryEntry[]): string {
+  const latest = [...values].reverse().find((entry) => entry.role === "user");
+  if (!latest) return "";
+  const compact = latest.blocks
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!compact) return "";
+  const characters = Array.from(compact);
+  return characters.length > 100 ? `${characters.slice(0, 99).join("")}…` : compact;
+}
+function showCloseError(error: unknown): void {
+  closeError.textContent = message(error);
+  closeError.hidden = false;
+}
+async function prepareClose(id: string): Promise<void> {
+  if (closeDialog.open || closeTarget || closingSession || preparingCloseSession !== null) return;
+  const blocked = closeBlockedReason();
+  if (blocked) {
+    showError(new Error(blocked));
+    return;
+  }
+  if (selected !== id || !sessions.some((session) => session.id === id && runtimeOpen(session)))
+    return;
+  const authentication = authAttempt,
+    selectedAtStart = selectionGeneration,
+    stateAtStart = sessionStateGeneration,
+    preparation = ++closePreparationGeneration;
+  const tab = sessions.find((session) => session.id === id);
+  if (!tab) return;
+  preparingCloseSession = id;
+  closeArmedSession = null;
+  navigation();
+  try {
+    const [sessionValue, historyValue] = await Promise.all([
+      api(`/api/v1/sessions/${id}`),
+      api(`/api/v1/sessions/${id}/history`).catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 401) throw error;
+        return null;
+      }),
+    ]);
+    if (
+      authentication !== authAttempt ||
+      !authenticated ||
+      selected !== id ||
+      selectedAtStart !== selectionGeneration ||
+      closeDialog.open ||
+      closeTarget !== null
+    )
+      return;
+    if (!isSessionInfo(sessionValue) || sessionValue.id !== id)
+      throw new Error("Invalid session response while preparing to close.");
+    const latestSession =
+      stateAtStart === sessionStateGeneration ? sessionValue : await sessionSnapshot(id);
+    if (
+      authentication !== authAttempt ||
+      !authenticated ||
+      selected !== id ||
+      selectedAtStart !== selectionGeneration
+    )
+      return;
+    if (!isSessionInfo(latestSession) || latestSession.id !== id)
+      throw new Error("Invalid session response while preparing to close.");
+    const previousTabs = updatedSession(latestSession);
+    navigation();
+    if (!runtimeOpen(latestSession)) {
+      reconcileClosedRuntime(id, previousTabs);
+      showError(new Error("This session was closed elsewhere."));
+      return;
+    }
+    const snippet =
+      isHistoryPage(historyValue) && historyValue.sessionId === id
+        ? userMessageSnippet(historyValue.entries)
+        : "";
+    closeTarget = { id, activeRunId: latestSession.activeTurnId, attempted: false };
+    closeDirectory.textContent = `${String(tabSlots.get(id) ?? 0).padStart(2, "0")} · ${latestSession.directory}`;
+    closeTitle.textContent = latestSession.activeTurnId ? "Stop and close?" : "Close session?";
+    closeCopy.textContent = snippet ? `“${snippet}”` : "";
+    closeCopy.hidden = !snippet;
+    closeError.textContent = "";
+    closeError.hidden = true;
+    confirmClose.textContent = latestSession.activeTurnId ? "Stop and close" : "Close";
+    confirmClose.disabled = false;
+    cancelClose.disabled = false;
+    closeDialog.showModal();
+    cancelClose.focus();
+  } catch (error) {
+    if (authentication === authAttempt) showError(error);
+  } finally {
+    if (preparation === closePreparationGeneration && preparingCloseSession === id)
+      preparingCloseSession = null;
+    navigation();
+  }
+}
+async function sessionSnapshot(id: string): Promise<SessionInfo> {
+  const value = await api(`/api/v1/sessions/${id}`);
+  if (!isSessionInfo(value) || value.id !== id)
+    throw new Error("Invalid session response while closing.");
+  return value;
+}
+async function turnSnapshot(id: string, runId: string): Promise<TurnInfo> {
+  const value = await api(`/api/v1/sessions/${id}/turns/${runId}`);
+  if (!isTurnInfo(value) || value.sessionId !== id || value.runId !== runId)
+    throw new Error("Invalid turn response while closing.");
+  return value;
+}
+function turnIsActive(turn: TurnInfo): boolean {
+  return turn.status === "accepted" || turn.status === "dispatching" || turn.status === "running";
+}
+async function waitForTurnAndRuntime(
+  id: string,
+  runId: string,
+  authentication: number,
+): Promise<SessionInfo | null> {
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    const turn = await turnSnapshot(id, runId);
+    if (authentication !== authAttempt || !authenticated) return null;
+    const session = await sessionSnapshot(id);
+    if (authentication !== authAttempt || !authenticated) return null;
+    const previousTabs = updatedSession(session);
+    navigation();
+    if (session.activeTurnId !== null && session.activeTurnId !== runId)
+      throw new Error("A new response started. Review and close again.");
+    if (!turnIsActive(turn) && session.activeTurnId === null) return session;
+    if (Date.now() >= deadline)
+      throw new Error("The response is still active. Review and close again.");
+    if (session.runtimeState === "closed") {
+      reconcileClosedRuntime(id, previousTabs);
+      return session;
+    }
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 250));
+  }
+}
+async function finishClose(id: string, previousTabs: readonly string[]): Promise<void> {
+  closeArmedSession = null;
+  if (closeDialog.open) closeDialog.close();
+  if (selected === id) await select(neighborAfterClose(id, previousTabs));
+  else navigation();
+}
+async function confirmSessionClose(): Promise<void> {
+  const target = closeTarget;
+  if (!target || target.attempted || closingSession !== null) return;
+  const blocked = closeBlockedReason();
+  if (blocked) {
+    showCloseError(new Error(blocked));
+    return;
+  }
+  target.attempted = true;
+  closingSession = target.id;
+  const operation = ++closeAttemptGeneration;
+  const authentication = authAttempt;
+  const previousTabs = openTabIds();
+  confirmClose.disabled = true;
+  cancelClose.disabled = true;
+  closeError.hidden = true;
+  closeError.textContent = "";
+  navigation();
+  try {
+    let session = await sessionSnapshot(target.id);
+    if (authentication !== authAttempt || !authenticated) return;
+    updatedSession(session);
+    navigation();
+    if (target.activeRunId !== null) {
+      const turn = await turnSnapshot(target.id, target.activeRunId);
+      if (authentication !== authAttempt || !authenticated) return;
+      session = await sessionSnapshot(target.id);
+      if (authentication !== authAttempt || !authenticated) return;
+      updatedSession(session);
+      navigation();
+      if (session.activeTurnId !== null && session.activeTurnId !== target.activeRunId)
+        throw new Error("A new response started. Review and close again.");
+      if (turnIsActive(turn) && !turn.cancellationRequested) {
+        const value = await api(
+          `/api/v1/sessions/${target.id}/turns/${target.activeRunId}/abort`,
+          {},
+        );
+        if (
+          !isTurnInfo(value) ||
+          value.sessionId !== target.id ||
+          value.runId !== target.activeRunId
+        )
+          throw new Error("Invalid cancellation response while closing.");
+        if (authentication !== authAttempt || !authenticated) return;
+      }
+      const settled = await waitForTurnAndRuntime(target.id, target.activeRunId, authentication);
+      if (!settled || authentication !== authAttempt || !authenticated) return;
+      session = settled;
+      if (session.activeTurnId !== null)
+        throw new Error("A new response started. Review and close again.");
+    } else {
+      if (session.activeTurnId !== null)
+        throw new Error("A response started. Review and close again.");
+      session = await sessionSnapshot(target.id);
+      if (authentication !== authAttempt || !authenticated) return;
+      updatedSession(session);
+      navigation();
+      if (session.activeTurnId !== null)
+        throw new Error("A response started. Review and close again.");
+    }
+    if (authentication !== authAttempt || !authenticated) return;
+    if (session.runtimeState === "closed") {
+      await finishClose(target.id, previousTabs);
+      return;
+    }
+    const value = await api(`/api/v1/sessions/${target.id}/close`, {});
+    if (authentication !== authAttempt || !authenticated) return;
+    if (!isSessionInfo(value) || value.id !== target.id || value.runtimeState !== "closed")
+      throw new Error("Invalid close-session response.");
+    updatedSession(value);
+    await finishClose(target.id, previousTabs);
+  } catch (error) {
+    if (authentication !== authAttempt) return;
+    if (error instanceof ApiError && error.status === 401) {
+      showError(error);
+      return;
+    }
+    showCloseError(error);
+    try {
+      await refresh();
+      const latest = sessions.find((session) => session.id === target.id);
+      if (latest && !runtimeOpen(latest)) await finishClose(target.id, previousTabs);
+    } catch {
+      /* The visible error remains; polling will refresh authoritative state. */
+    }
+  } finally {
+    if (operation === closeAttemptGeneration && closingSession === target.id) closingSession = null;
+    if (closeDialog.open) {
+      confirmClose.disabled = true;
+      cancelClose.disabled = false;
+    }
+    navigation();
+  }
+}
+async function openFromSidebar(id: string): Promise<void> {
+  if (!authenticated) return;
+  if (attachments.busy) {
+    showError(new Error("Wait for image uploads to finish."));
+    return;
+  }
+  const session = sessions.find((value) => value.id === id);
+  if (!session) return;
+  const intent = ++openIntentGeneration,
+    selectedAtStart = selectionGeneration;
+  closeArmedSession = null;
+  nav(false);
+  if (runtimeOpen(session) && session.runtimeState !== "failed") {
+    await select(id);
+    return;
+  }
+  if (openingSessions.has(id)) return;
+  const authentication = authAttempt;
+  openingSessions.add(id);
+  navigation();
+  try {
+    const value = await api(`/api/v1/sessions/${id}/open`, {});
+    if (!isSessionInfo(value) || value.id !== id)
+      throw new Error("Invalid session response while opening.");
+    if (authentication !== authAttempt || !authenticated) return;
+    updatedSession(value);
+    navigation();
+    if (intent === openIntentGeneration && selectedAtStart === selectionGeneration)
+      await select(id);
+  } catch (error) {
+    if (authentication === authAttempt) showError(error);
+  } finally {
+    openingSessions.delete(id);
+    navigation();
+  }
 }
 function renderConversation(): void {
   const atBottom = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 90;
@@ -712,7 +1142,11 @@ async function stream(id: string, epoch: number): Promise<void> {
             const previousKey = previous
               ? modelCapabilityKey(previous.provider, previous.model)
               : null;
+            const previousTabs = openTabIds();
             sessions = sessions.map((s) => (s.id === id && state.session ? state.session : s));
+            sessionStateGeneration++;
+            synchronizeTabSlots();
+            if (!runtimeOpen(state.session)) reconcileClosedRuntime(id, previousTabs);
             const current = activeSession();
             if (
               id === selected &&
@@ -770,8 +1204,11 @@ async function stream(id: string, epoch: number): Promise<void> {
     }, 2000);
   }
 }
-async function select(id: string): Promise<void> {
+async function select(id: string | null): Promise<void> {
   if (selected === id) return;
+  if (id !== null && !sessions.some((session) => session.id === id && runtimeOpen(session))) return;
+  selectionGeneration++;
+  closeArmedSession = null;
   modelDialog.close();
   modelAttempt++;
   if (selected) drafts.set(selected, input.value);
@@ -783,39 +1220,61 @@ async function select(id: string): Promise<void> {
   contextSources = [];
   contextSourcesTruncated = false;
   liveOrder = [];
-  savePreference("selected", id);
-  state = emptyConversationState(id);
+  if (id !== null) savePreference("selected", id);
+  state = emptyConversationState(id ?? undefined);
   entries = [];
   nextCursor = null;
   historyError = "";
-  input.value = drafts.get(id) ?? "";
+  input.value = id === null ? "" : (drafts.get(id) ?? "");
   composer.resize();
   navigation();
   renderConversation();
   scroll.scrollTop = 0;
-  probeCurrentModel(id);
-  void stream(id, generation);
-  await loadHistory();
+  if (id) {
+    probeCurrentModel(id);
+    void stream(id, generation);
+    await loadHistory();
+  }
 }
 function connection(text: string): void {
   el("connection-badge", HTMLElement).textContent = text;
 }
 async function refresh(): Promise<void> {
-  const attempt = authAttempt;
+  const attempt = authAttempt,
+    refreshGeneration = ++sessionRefreshGeneration,
+    stateGeneration = sessionStateGeneration,
+    previousTabs = openTabIds();
   const previous = activeSession();
   const previousKey = previous ? modelCapabilityKey(previous.provider, previous.model) : null;
   const result = await api("/api/v1/sessions");
   if (!Array.isArray(result) || !result.every(isSessionInfo))
     throw new Error("Invalid session list.");
-  if (attempt !== authAttempt || !authenticated) return;
+  if (
+    attempt !== authAttempt ||
+    !authenticated ||
+    refreshGeneration !== sessionRefreshGeneration ||
+    stateGeneration !== sessionStateGeneration
+  )
+    return;
   sessions = result;
+  sessionStateGeneration++;
+  synchronizeTabSlots();
+  if (selected && !sessions.some((session) => session.id === selected && runtimeOpen(session))) {
+    const closedId = selected;
+    if (closeTarget?.id === closedId && closingSession !== closedId && closeDialog.open) {
+      closeDialog.close();
+      showError(new Error("This session was closed from another browser."));
+    }
+    await select(neighborAfterClose(closedId, previousTabs));
+  }
+  const openSessions = sessions.filter(runtimeOpen);
+  if (!selected && openSessions.length) {
+    const preferred = openSessions.find((session) => session.id === localPreferences.selected);
+    await select((preferred ?? openSessions[0])?.id ?? null);
+  }
   const current = activeSession();
   if (current && modelCapabilityKey(current.provider, current.model) !== previousKey)
     probeCurrentModel(selected);
-  if (!selected && sessions.length)
-    await select(
-      sessions.find((s) => s.id === localPreferences.selected)?.id ?? sessions[0]?.id ?? "",
-    );
   navigation();
   const unseen = sessions.filter(
     (s) =>
@@ -829,13 +1288,20 @@ async function refresh(): Promise<void> {
       try {
         const value = await api(`/api/v1/sessions/${s.id}/turns/${s.latestTurnId}`);
         if (!isTurnInfo(value)) throw new Error("Invalid turn metadata.");
-        if (attempt === authAttempt && authenticated) turns.set(s.id, value);
+        if (
+          attempt === authAttempt &&
+          authenticated &&
+          refreshGeneration === sessionRefreshGeneration &&
+          sessions.find((session) => session.id === s.id)?.latestTurnId === value.runId
+        )
+          turns.set(s.id, value);
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) showError(error);
       }
     }),
   );
-  if (attempt === authAttempt && authenticated) navigation();
+  if (attempt === authAttempt && authenticated && refreshGeneration === sessionRefreshGeneration)
+    navigation();
 }
 async function poll(): Promise<void> {
   if (!authenticated || polling || suspended) return;
@@ -872,6 +1338,10 @@ function disconnect(reason: string): void {
   generation++;
   dialog.close();
   modelDialog.close();
+  closeDialog.close();
+  closeArmedSession = null;
+  preparingCloseSession = null;
+  closeTarget = null;
   modelAttempt++;
   el("host-dialog", HTMLDialogElement).close();
   stopStream();
@@ -1280,6 +1750,36 @@ el("new-session", HTMLButtonElement).onclick = () => {
   void newSession();
 };
 el("close-new", HTMLButtonElement).onclick = () => dialog.close();
+cancelClose.onclick = dismissCloseDialog;
+confirmClose.onclick = () => {
+  void confirmSessionClose();
+};
+closeDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  if (closingSession === null) dismissCloseDialog();
+});
+function resetCloseDialog(): void {
+  closeArmedSession = null;
+  closeTarget = null;
+  confirmClose.disabled = false;
+  cancelClose.disabled = false;
+  closeError.textContent = "";
+  closeError.hidden = true;
+  navigation();
+  const active = el("status-list", HTMLElement).querySelector<HTMLButtonElement>(
+    ".status-tab.active .tab-select",
+  );
+  (active ?? el("new-mobile", HTMLButtonElement)).focus();
+}
+function dismissCloseDialog(): void {
+  closeDialog.close();
+  resetCloseDialog();
+}
+closeDialog.addEventListener("close", () => {
+  // Native close events are queued: do not erase a later reveal or dialog.
+  if (!closeDialog.open && closeTarget !== null) resetCloseDialog();
+});
+
 directory.oninput = () => {
   browseAttempt++;
   el("directories", HTMLElement).replaceChildren();
@@ -1374,7 +1874,22 @@ input.onkeydown = (event) => {
   }
 };
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && rail.classList.contains("open")) nav(false);
+  if (event.key !== "Escape" || closeDialog.open) return;
+  if (closeArmedSession !== null) {
+    closeArmedSession = null;
+    navigation();
+  }
+  if (rail.classList.contains("open")) nav(false);
+});
+document.addEventListener("click", (event) => {
+  if (
+    closeArmedSession !== null &&
+    !event.composedPath().includes(el("status-list", HTMLElement)) &&
+    !event.composedPath().includes(closeDialog)
+  ) {
+    closeArmedSession = null;
+    navigation();
+  }
 });
 const viewport = matchMedia("(max-width:760px)");
 function responsive(): void {

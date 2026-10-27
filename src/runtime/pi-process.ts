@@ -4,6 +4,7 @@ import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { validateDataDirectory } from "../local/paths.ts";
+import type { PiSessionModelOption } from "../shared/discovery.ts";
 import { type ImageContent, isImageContentArray } from "../shared/images.ts";
 import {
   type RuntimeConfiguration,
@@ -11,6 +12,7 @@ import {
   type SessionModelRequest,
 } from "../shared/sessions.ts";
 import { isThinkingLevel, type ThinkingLevel } from "../shared/thinking.ts";
+import { parsePiSessionModels } from "./pi-models.ts";
 import { isRecord, PiRpc, type RpcRecord } from "./pi-rpc.ts";
 
 const exec = promisify(execFile);
@@ -442,6 +444,12 @@ export class PiProcess {
         this.#rpc.fail(error);
       throw error;
     }
+  }
+
+  async getAvailableModels(): Promise<PiSessionModelOption[]> {
+    if (this.#state !== "ready" && this.#state !== "running")
+      throw new Error("Pi is not available for model discovery.");
+    return parsePiSessionModels(await this.#rpc.request("get_available_models"));
   }
 
   async getAvailableThinkingLevels(): Promise<ThinkingLevel[]> {

@@ -19,7 +19,11 @@ import {
   listHostDirectories,
   SessionDiscoveryError,
 } from "../server/session-discovery.ts";
-import type { HostDirectoryListing, PiModelOption } from "../shared/discovery.ts";
+import type {
+  HostDirectoryListing,
+  PiModelOption,
+  PiSessionModelOption,
+} from "../shared/discovery.ts";
 import type { StreamFrame } from "../shared/events.ts";
 import type { HistoryPage } from "../shared/history.ts";
 import type { ImageContent } from "../shared/images.ts";
@@ -218,6 +222,7 @@ export class SessionService {
   readonly #shutdownController = new AbortController();
   #modelDiscovery: Promise<PiModelOption[]> | undefined;
   readonly #modelCapabilityDiscoveries = new Map<string, Promise<ModelCapabilitiesResponse>>();
+  readonly #sessionModelReads = new Map<PiProcess, Promise<PiSessionModelOption[]>>();
   readonly #checkpoint: SessionServiceOptions["turnCheckpoint"];
   #queue: Promise<void> = Promise.resolve();
   #stopping = false;
@@ -330,6 +335,69 @@ export class SessionService {
     } catch (error) {
       return Promise.reject(error);
     }
+  }
+
+  listSessionModels(id: string): Promise<PiSessionModelOption[]> {
+    try {
+      this.#admit();
+      this.#stored(id);
+      this.#checkStorage(id);
+      const runtime = this.#runtimes.get(id);
+      if (!runtime || (runtime.state !== "ready" && runtime.state !== "running"))
+        throw new SessionError(409, "session_not_open", "Open the session to choose a model.");
+      const pending = this.#sessionModelReads.get(runtime);
+      if (pending) return pending;
+      const read = runtime
+        .getAvailableModels()
+        .then((models) => {
+          if (
+            this.#runtimes.get(id) !== runtime ||
+            (runtime.state !== "ready" && runtime.state !== "running")
+          )
+            throw new SessionError(
+              409,
+              "session_changed",
+              "The session changed. Reload its models.",
+            );
+          return models;
+        })
+        .catch((error: unknown) => {
+          if (error instanceof SessionError) throw error;
+          throw new SessionError(
+            502,
+            "model_discovery_failed",
+            "Pi could not list this session's models.",
+          );
+        });
+      this.#sessionModelReads.set(runtime, read);
+      void read.then(
+        () => this.#sessionModelReads.delete(runtime),
+        () => this.#sessionModelReads.delete(runtime),
+      );
+      return read;
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
+  async getSessionModelCapabilities(
+    id: string,
+    request: ModelCapabilitiesRequest,
+  ): Promise<ModelCapabilitiesResponse> {
+    if (!isModelCapabilitiesRequest(request))
+      throw new SessionError(400, "invalid_input", "Provide a valid Pi provider and model.");
+    const models = await this.listSessionModels(id);
+    const model = models.find(
+      (value) => value.provider === request.provider && value.id === request.model,
+    );
+    if (!model)
+      throw new SessionError(404, "model_not_found", "This model is not available in the session.");
+    return {
+      provider: model.provider,
+      model: model.id,
+      supportsImages: model.supportsImages,
+      thinkingLevels: [...model.thinkingLevels],
+    };
   }
 
   getModelCapabilities(request: ModelCapabilitiesRequest): Promise<ModelCapabilitiesResponse> {
@@ -1367,6 +1435,7 @@ export class SessionService {
         ...this.#nativeRefreshes,
         ...(this.#modelDiscovery ? [this.#modelDiscovery] : []),
         ...this.#modelCapabilityDiscoveries.values(),
+        ...this.#sessionModelReads.values(),
       ]);
       this.#catalog.close();
       if (failed) throw new Error("Session shutdown could not save all runtime metadata.");

@@ -1417,22 +1417,6 @@ for (const mode of modes) {
                 contextWindow: 8192,
                 maxTokens: 1024,
               },
-              {
-                id: "dwell-test-reasoning",
-                name: "Dwell Thinking Fixture",
-                input: ["text", "image"],
-                reasoning: true,
-                thinkingLevelMap: {
-                  off: null,
-                  minimal: null,
-                  low: "low",
-                  medium: "medium",
-                  high: "high",
-                  xhigh: "xhigh",
-                },
-                contextWindow: 8192,
-                maxTokens: 1024,
-              },
               { id: "dwell-test", name: "Dwell test model", contextWindow: 8192, maxTokens: 1024 },
               {
                 id: ALTERNATE_MODEL,
@@ -1554,7 +1538,7 @@ for (const mode of modes) {
       window.__releaseDwellCapability=()=>{release();window.fetch=original;};
       window.fetch=async(input,init)=>{
         const target=typeof input==="string"?input:input.url;
-        if(new URL(target,location.href).pathname==="/api/v1/model-capabilities"){
+        if(new URL(target,location.href).pathname.endsWith("/model-capabilities")){
           window.__dwellCapabilityPending=true;
           await gate;
         }
@@ -1817,7 +1801,7 @@ for (const mode of modes) {
       window.fetch=async(input,init)=>{
         const target=typeof input==="string"?input:input.url;
         const url=new URL(target,location.href);
-        if(url.pathname==="/api/v1/models"){
+        if(url.pathname==="/api/v1/sessions/${String(session.id)}/models"){
           window.__dwellModelDiscoveryMethod=init?.method??"GET";
           window.__dwellModelDiscoveryOrigin=url.origin;
         }
@@ -1919,6 +1903,9 @@ for (const mode of modes) {
       'document.querySelector("#connection-badge").textContent==="Connected" && document.querySelector("#conversation").textContent.includes("dwell-slow-start") && document.querySelector("#send").getAttribute("aria-label")==="Stop response"',
     );
     await assertNoPartialOrRecoveryRow(second, `${mode} same-run reconnect`);
+    await second.until(
+      'document.querySelector("#attach-image").getAttribute("aria-label")==="Images are not supported by this model"',
+    );
     assert.equal(
       await second.evaluate(
         'document.querySelector("#conversation").textContent.split("dwell-slow-start").length-1',
@@ -2254,6 +2241,33 @@ for (const mode of modes) {
       `PASS ${mode} DOM reconciliation preserves focus, handlers, selection, and disclosures`,
     );
     const beforeModel = record(await request(`/sessions/${String(session.id)}`)).model;
+    await second.evaluate(`(()=>{
+      const original=window.fetch.bind(window);
+      let release;
+      const gate=new Promise(resolve=>{release=resolve;});
+      window.__registryPending=false;
+      window.__releaseRegistry=()=>{release();window.fetch=original;};
+      window.fetch=async(input,init)=>{
+        const response=await original(input,init);
+        const target=typeof input==='string'?input:input.url;
+        if(new URL(target,location.href).pathname.endsWith('/models')){
+          window.__registryPending=true;
+          await gate;
+        }
+        return response;
+      };
+    })()`);
+    await second.click("#choose-model");
+    await second.until("window.__registryPending");
+    await second.evaluate('window.dispatchEvent(new Event("online"))');
+    assert.equal(
+      await second.evaluate('document.querySelector("#model-dialog").open'),
+      false,
+      "resume invalidates the pending model picker",
+    );
+    await second.evaluate("window.__releaseRegistry()");
+    await second.until('document.querySelector("#connection-badge").textContent==="Connected"');
+    assert.equal(record(await request(`/sessions/${String(session.id)}`)).model, beforeModel);
     await second.type("#message", "Keep this image-review draft");
     await second.click("#choose-model");
     await second.until('document.querySelectorAll("#model-options .model-option").length>=4');
@@ -2658,7 +2672,7 @@ for (const mode of modes) {
       document.querySelector("#image-files").click=()=>window.__dwellPickerClicked=true;
       window.fetch=async(input,init)=>{
         const target=typeof input==="string"?input:input.url;
-        if(new URL(target,location.href).pathname==="/api/v1/model-capabilities"&&window.__dwellFailCapabilityOnce){
+        if(new URL(target,location.href).pathname.endsWith("/model-capabilities")&&window.__dwellFailCapabilityOnce){
           window.__dwellFailCapabilityOnce=false;
           return new Response(JSON.stringify({error:{code:"fixture_retry",message:"Temporary capability failure."}}),{status:503,headers:{"Content-Type":"application/json"}});
         }

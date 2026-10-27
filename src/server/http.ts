@@ -230,6 +230,9 @@ export async function startHost({
         path,
       );
       const modelMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/model$/.exec(path);
+      const sessionModelsMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/models$/.exec(path);
+      const sessionCapabilitiesMatch =
+        /^\/api\/v1\/sessions\/([a-f0-9-]+)\/model-capabilities$/.exec(path);
       const eventMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/events$/.exec(path);
       const nativeExecutionMatch =
         /^\/api\/v1\/sessions\/([a-f0-9-]+)\/native-executions\/([a-f0-9-]+)\/abort$/.exec(path);
@@ -245,6 +248,8 @@ export async function startHost({
         imageMatch !== null ||
         path === "/api/v1/runtime" ||
         modelMatch !== null ||
+        sessionModelsMatch !== null ||
+        sessionCapabilitiesMatch !== null ||
         sessionMatch !== null ||
         historyMatch !== null ||
         eventMatch !== null ||
@@ -256,6 +261,7 @@ export async function startHost({
           path === "/api/v1/runtime" ||
           path === "/api/v1/model-capabilities" ||
           modelMatch !== null ||
+          sessionCapabilitiesMatch !== null ||
           nativeExecutionMatch !== null ||
           sessionMatch?.[2] === "open" ||
           sessionMatch?.[2] === "close"
@@ -380,6 +386,16 @@ export async function startHost({
               });
             } else send(response, 201, created);
           }
+        } else if (sessionModelsMatch) {
+          const id = sessionModelsMatch[1];
+          if (!id) fail(400, "invalid_input", "Invalid session ID.");
+          send(response, 200, { sessionId: id, models: await sessions.listSessionModels(id) });
+        } else if (sessionCapabilitiesMatch) {
+          const id = sessionCapabilitiesMatch[1];
+          if (!id) fail(400, "invalid_input", "Invalid session ID.");
+          if (!isModelCapabilitiesRequest(body))
+            fail(400, "invalid_input", "Provide provider and model.");
+          send(response, 200, await sessions.getSessionModelCapabilities(id, body));
         } else if (modelMatch) {
           const id = modelMatch[1];
           if (!id) fail(400, "invalid_input", "Invalid session ID.");

@@ -1,3 +1,6 @@
+import { SESSION_ID } from "./sessions.ts";
+import { isThinkingLevel, type ThinkingLevel } from "./thinking.ts";
+
 export interface HostDirectoryEntry {
   name: string;
   path: string;
@@ -18,6 +21,37 @@ export interface PiModelOption {
 
 export interface AvailableModelsResponse {
   models: PiModelOption[];
+}
+
+export interface PiSessionModelOption extends PiModelOption {
+  supportsImages: boolean;
+  thinkingLevels: ThinkingLevel[];
+}
+
+export interface SessionModelsResponse {
+  sessionId: string;
+  models: PiSessionModelOption[];
+}
+
+export function isSessionModelsResponse(value: unknown): value is SessionModelsResponse {
+  return (
+    isObject(value) &&
+    typeof value.sessionId === "string" &&
+    SESSION_ID.test(value.sessionId) &&
+    Array.isArray(value.models) &&
+    value.models.length <= 10_000 &&
+    value.models.every(
+      (item: unknown) =>
+        isModelOption(item) &&
+        isObject(item) &&
+        typeof item.supportsImages === "boolean" &&
+        Array.isArray(item.thinkingLevels) &&
+        item.thinkingLevels.length > 0 &&
+        item.thinkingLevels.length <= 7 &&
+        item.thinkingLevels.every(isThinkingLevel) &&
+        new Set(item.thinkingLevels).size === item.thinkingLevels.length,
+    )
+  );
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

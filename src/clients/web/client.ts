@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import {
-  isAvailableModelsResponse,
+  isSessionModelsResponse,
   isHostDirectoryListing,
   type PiModelOption,
 } from "../../shared/discovery.ts";
@@ -78,6 +78,12 @@ const capabilities = new Map<string, ModelCapabilitiesResponse>();
 const capabilityRequests = new Map<string, Promise<ModelCapabilitiesResponse>>();
 const capabilityErrors = new Set<string>();
 let capabilityGeneration = 0;
+function resetCapabilities(): void {
+  capabilityGeneration++;
+  capabilities.clear();
+  capabilityRequests.clear();
+  capabilityErrors.clear();
+}
 let thinkingChoice: PiModelOption | null = null;
 const levelNames: Record<ThinkingLevel, string> = {
   off: "Off",
@@ -320,11 +326,20 @@ function savePreference(key: string, value: string): void {
 function activeSession(): SessionInfo | undefined {
   return sessions.find((s) => s.id === selected);
 }
-function modelCapabilityKey(provider: string | null, model: string | null): string | null {
-  return provider !== null && model !== null ? JSON.stringify([provider, model]) : null;
+function modelCapabilityKey(
+  provider: string | null,
+  model: string | null,
+  sessionId = selected,
+): string | null {
+  return sessionId !== null && provider !== null && model !== null
+    ? JSON.stringify([sessionId, provider, model])
+    : null;
 }
-function requestModelCapabilities(choice: PiModelOption): Promise<ModelCapabilitiesResponse> {
-  const key = modelCapabilityKey(choice.provider, choice.id);
+function requestModelCapabilities(
+  choice: PiModelOption,
+  sessionId = selected,
+): Promise<ModelCapabilitiesResponse> {
+  const key = modelCapabilityKey(choice.provider, choice.id, sessionId);
   if (key === null) return Promise.reject(new Error("This session has no selected model."));
   const cached = capabilities.get(key);
   if (cached) return Promise.resolve(cached);
@@ -334,7 +349,7 @@ function requestModelCapabilities(choice: PiModelOption): Promise<ModelCapabilit
   const epoch = capabilityGeneration;
   capabilityErrors.delete(key);
   let pending: Promise<ModelCapabilitiesResponse>;
-  pending = api("/api/v1/model-capabilities", {
+  pending = api(`/api/v1/sessions/${sessionId}/model-capabilities`, {
     provider: choice.provider,
     model: choice.id,
   })
@@ -363,23 +378,30 @@ function requestModelCapabilities(choice: PiModelOption): Promise<ModelCapabilit
 function probeCurrentModel(sessionId: string | null = selected): void {
   if (!authenticated || !sessionId) return;
   const session = sessions.find((value) => value.id === sessionId);
-  if (!session || session.provider === null || session.model === null) return;
-  const key = modelCapabilityKey(session.provider, session.model);
+  if (
+    !session ||
+    session.provider === null ||
+    session.model === null ||
+    session.runtimeState !== "ready"
+  )
+    return;
+  const key = modelCapabilityKey(session.provider, session.model, session.id);
   if (key === null) return;
   if (capabilities.has(key) || capabilityRequests.has(key) || capabilityErrors.has(key)) return;
   const authentication = authAttempt;
   const epoch = capabilityGeneration;
-  void requestModelCapabilities({ provider: session.provider, id: session.model }).catch(
-    (error: unknown) => {
-      if (
-        authentication === authAttempt &&
-        epoch === capabilityGeneration &&
-        error instanceof ApiError &&
-        error.status === 401
-      )
-        showError(error);
-    },
-  );
+  void requestModelCapabilities(
+    { provider: session.provider, id: session.model },
+    session.id,
+  ).catch((error: unknown) => {
+    if (
+      authentication === authAttempt &&
+      epoch === capabilityGeneration &&
+      error instanceof ApiError &&
+      error.status === 401
+    )
+      showError(error);
+  });
 }
 function label(s: SessionInfo): string {
   const directory =
@@ -610,6 +632,7 @@ function navigation(): void {
     !s ||
     !authenticated ||
     s.status !== "ready" ||
+    s.runtimeState !== "ready" ||
     busy ||
     sending ||
     changingModel !== null ||
@@ -634,6 +657,7 @@ function navigation(): void {
     !s ||
     !authenticated ||
     s.status !== "ready" ||
+    s.runtimeState !== "ready" ||
     sending ||
     busy ||
     changingModel !== null ||
@@ -1470,6 +1494,7 @@ async function select(id: string | null): Promise<void> {
   stopStream();
   generation++;
   selected = id;
+  resetCapabilities();
   attachments.select(id);
   releaseImages();
   contextSources = [];
@@ -1583,10 +1608,7 @@ async function poll(): Promise<void> {
 }
 function disconnect(reason: string): void {
   attachments.dispose();
-  capabilityGeneration++;
-  capabilities.clear();
-  capabilityRequests.clear();
-  capabilityErrors.clear();
+  resetCapabilities();
   releaseImages();
   imageDialog.close();
   authenticated = false;
@@ -1833,6 +1855,7 @@ async function showModels(): Promise<void> {
   const attempt = ++modelAttempt,
     authentication = authAttempt;
   modelSession = session.id;
+  resetCapabilities();
   availableModels = [];
   thinkingChoice = null;
   modelSearch.hidden = false;
@@ -1844,8 +1867,9 @@ async function showModels(): Promise<void> {
   modelDialog.showModal();
   el("close-model", HTMLButtonElement).focus();
   try {
-    const result = await api("/api/v1/models");
-    if (!isAvailableModelsResponse(result)) throw new Error("Invalid model list.");
+    const result = await api(`/api/v1/sessions/${session.id}/models`);
+    if (!isSessionModelsResponse(result) || result.sessionId !== session.id)
+      throw new Error("Invalid session model list.");
     if (
       attempt !== modelAttempt ||
       authentication !== authAttempt ||
@@ -1854,12 +1878,26 @@ async function showModels(): Promise<void> {
     )
       return;
     availableModels = result.models;
+    for (const option of result.models) {
+      const key = modelCapabilityKey(option.provider, option.id, session.id);
+      if (key)
+        capabilities.set(key, {
+          provider: option.provider,
+          model: option.id,
+          supportsImages: option.supportsImages,
+          thinkingLevels: option.thinkingLevels,
+        });
+    }
+    navigation();
     renderModels();
   } catch (error) {
     if (attempt !== modelAttempt || authentication !== authAttempt || !modelDialog.open) return;
     if (error instanceof ApiError && error.status === 401) showError(error);
     el("model-options", HTMLElement).replaceChildren();
     el("model-error", HTMLElement).textContent = message(error);
+    const key = modelCapabilityKey(session.provider, session.model, session.id);
+    if (key) capabilityErrors.add(key);
+    navigation();
   }
 }
 async function showThinking(choice: PiModelOption): Promise<void> {
@@ -2020,7 +2058,10 @@ chooseModel.onclick = () => {
 el("close-model", HTMLButtonElement).onclick = () => modelDialog.close();
 modelSearch.oninput = renderModels;
 modelDialog.addEventListener("close", () => {
-  if (!modelDialog.open) modelAttempt++;
+  if (!modelDialog.open) {
+    modelAttempt++;
+    probeCurrentModel();
+  }
 });
 el("open-nav", HTMLButtonElement).onclick = () => nav(true);
 el("close-nav", HTMLButtonElement).onclick = () => nav(false);
@@ -2202,11 +2243,17 @@ function resume(): void {
   window.clearTimeout(pollTimer);
   stopStream();
   generation++;
+  resetCapabilities();
+  modelAttempt++;
+  modelDialog.close();
+  availableModels = [];
+  thinkingChoice = null;
   releaseImages();
   streamConnected = false;
   connection("Reconnecting…");
   state = { ...state, cursor: null };
   if (selected) {
+    probeCurrentModel(selected);
     void stream(selected, generation);
     void loadHistory();
   }

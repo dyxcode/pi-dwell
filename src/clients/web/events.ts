@@ -5,7 +5,7 @@ import {
   type StreamFrame,
   type TurnProjection,
 } from "../../shared/events.ts";
-import { type HistoryPage, isHistoryPage } from "../../shared/history.ts";
+import { type HistoryEntry, type HistoryPage, isHistoryPage } from "../../shared/history.ts";
 import type { SessionInfo } from "../../shared/sessions.ts";
 
 export const MAX_SSE_FRAME_BYTES = 256 * 1024;
@@ -17,6 +17,8 @@ export type ResyncReason = "cursor_stale" | "cursor_ahead" | "epoch_changed" | "
 
 export interface ConversationState {
   sessionId: string | null;
+  /** Last accepted frame cursor, retained while `cursor` is cleared for a fresh resync request. */
+  lastCursor: string | null;
   cursor: string | null;
   session: SessionInfo | null;
   activeTurn: TurnProjection | null;
@@ -186,6 +188,7 @@ export class SSEDecoder {
 export function emptyConversationState(sessionId?: string): ConversationState {
   return {
     sessionId: sessionId ?? null,
+    lastCursor: null,
     cursor: null,
     session: null,
     activeTurn: null,
@@ -239,6 +242,23 @@ function copyHistory(value: HistoryPage): HistoryPage {
       blocks: entry.blocks.map((block) => ({ ...block })),
     })),
   };
+}
+
+/** Preserves only the previously loaded branch prefix that connects to a latest page. */
+export function mergeHistoryEntries(
+  previous: readonly HistoryEntry[],
+  incoming: readonly HistoryEntry[],
+): HistoryEntry[] {
+  const first = incoming[0];
+  if (!first) return [];
+
+  const matchingIndex = previous.findIndex((entry) => entry.id === first.id);
+  if (matchingIndex >= 0) return [...previous.slice(0, matchingIndex), ...incoming];
+
+  if (first.parentId === null) return [...incoming];
+  const parentIndex = previous.findIndex((entry) => entry.id === first.parentId);
+  if (parentIndex < 0) return [...incoming];
+  return [...previous.slice(0, parentIndex + 1), ...incoming];
 }
 
 function utf8Bytes(character: string): number {
@@ -296,21 +316,111 @@ function applyCoveredHistory(state: ConversationState): ConversationState {
   };
 }
 
+function preserveCompatiblePrefix(previous: string, incoming: string, truncated: boolean): string {
+  if (!truncated) return incoming;
+  const incomingPrefix = incoming.endsWith("…") ? incoming.slice(0, -1) : incoming;
+  const previousPrefix = previous.endsWith("…") ? previous.slice(0, -1) : previous;
+  if (previous.startsWith(incomingPrefix)) return previous;
+  if (previousPrefix.startsWith(incomingPrefix)) return previous;
+  return incoming;
+}
+
+function mergeSnapshotMessage(previous: LiveMessage, incoming: LiveMessage): LiveMessage {
+  return {
+    ...copyMessage(incoming),
+    text: preserveCompatiblePrefix(previous.text, incoming.text, incoming.truncated),
+    truncated: previous.truncated || incoming.truncated,
+  };
+}
+
+function mergeSnapshotTool(previous: LiveTool, incoming: LiveTool): LiveTool {
+  const truncated = incoming.truncated;
+  return {
+    ...copyTool(incoming),
+    name: preserveCompatiblePrefix(previous.name, incoming.name, truncated),
+    input: preserveCompatiblePrefix(previous.input, incoming.input, truncated),
+    output: preserveCompatiblePrefix(previous.output, incoming.output, truncated),
+    truncated: previous.truncated || incoming.truncated,
+  };
+}
+
+function upsertSnapshotMessage(
+  messages: readonly LiveMessage[],
+  value: LiveMessage,
+): { messages: LiveMessage[]; dropped: boolean } {
+  const index = messages.findIndex((message) => message.id === value.id);
+  if (index < 0) return upsertMessage(messages, value);
+  const previous = messages[index];
+  if (!previous) return upsertMessage(messages, value);
+  const combined = [...messages];
+  combined[index] = mergeSnapshotMessage(previous, value);
+  return {
+    messages: combined.slice(-MAX_LIVE_MESSAGES),
+    dropped: combined.length > MAX_LIVE_MESSAGES,
+  };
+}
+
+function upsertSnapshotTool(
+  tools: readonly LiveTool[],
+  value: LiveTool,
+): { tools: LiveTool[]; dropped: boolean } {
+  const index = tools.findIndex((tool) => tool.id === value.id);
+  if (index < 0) return upsertTool(tools, value);
+  const previous = tools[index];
+  if (!previous) return upsertTool(tools, value);
+  const combined = [...tools];
+  combined[index] = mergeSnapshotTool(previous, value);
+  return { tools: combined.slice(-MAX_LIVE_TOOLS), dropped: combined.length > MAX_LIVE_TOOLS };
+}
+
 function snapshotState(
   state: ConversationState,
   frame: Extract<StreamFrame, { type: "snapshot" }>,
 ): ConversationState {
-  const previousCursor = state.cursor === null ? null : cursorParts(state.cursor);
+  const sameSession = state.sessionId === frame.sessionId;
+  const previousState = sameSession ? state : emptyConversationState(frame.sessionId);
+  const previousCursorValue = previousState.lastCursor ?? previousState.cursor;
+  const previousCursor = previousCursorValue === null ? null : cursorParts(previousCursorValue);
   const incomingCursor = cursorParts(frame.cursor);
-  if (previousCursor && incomingCursor && previousCursor.epoch === incomingCursor.epoch) {
-    if (incomingCursor.sequence <= previousCursor.sequence) return state;
+  if (
+    previousCursor &&
+    incomingCursor &&
+    previousCursor.sessionId === frame.sessionId &&
+    previousCursor.epoch === incomingCursor.epoch
+  ) {
+    if (incomingCursor.sequence < previousCursor.sequence) return state;
+    if (incomingCursor.sequence === previousCursor.sequence) {
+      return state.cursor === null
+        ? { ...state, cursor: frame.cursor, lastCursor: frame.cursor, resyncReason: null }
+        : state;
+    }
   }
   const payload = frame.payload;
-  const history = state.history?.sessionId === frame.sessionId ? state.history : null;
+  const history =
+    previousState.history?.sessionId === frame.sessionId ? previousState.history : null;
   const liveRunId = payload.activeTurn?.runId ?? payload.latestTurn?.runId ?? null;
+  const sameRun = previousState.liveRunId === liveRunId;
   const covered = coveredLiveRun(history, liveRunId, payload.activeTurn, payload.latestTurn);
-  const messages = !covered && payload.live.message ? [copyMessage(payload.live.message)] : [];
-  const tools = covered ? [] : payload.live.tools.map(copyTool);
+  let messages = !covered && sameSession && sameRun ? previousState.messages.map(copyMessage) : [];
+  let messageDropped = false;
+  if (!covered && payload.live.message) {
+    const result =
+      sameSession && sameRun
+        ? upsertSnapshotMessage(messages, payload.live.message)
+        : upsertMessage(messages, payload.live.message);
+    messages = result.messages;
+    messageDropped = result.dropped;
+  }
+  let tools = !covered && sameSession && sameRun ? previousState.tools.map(copyTool) : [];
+  let toolDropped = false;
+  if (!covered) {
+    for (const value of payload.live.tools) {
+      const result =
+        sameSession && sameRun ? upsertSnapshotTool(tools, value) : upsertTool(tools, value);
+      tools = result.tools;
+      toolDropped ||= result.dropped;
+    }
+  }
   const epochChanged =
     previousCursor !== null &&
     incomingCursor !== null &&
@@ -318,6 +428,7 @@ function snapshotState(
 
   return {
     sessionId: frame.sessionId,
+    lastCursor: frame.cursor,
     cursor: frame.cursor,
     session: { ...payload.session },
     activeTurn: copyTurn(payload.activeTurn),
@@ -326,13 +437,23 @@ function snapshotState(
     messages,
     tools,
     liveRunId,
-    liveTruncated: payload.live.truncated,
+    liveTruncated:
+      !covered &&
+      ((sameSession && sameRun && previousState.liveTruncated) ||
+        payload.live.truncated ||
+        messageDropped ||
+        toolDropped ||
+        messages.some((message) => message.truncated) ||
+        tools.some((tool) => tool.truncated)),
     liveIncomplete:
       !covered &&
-      (liveRunId !== null ||
+      ((sameSession && sameRun && previousState.liveIncomplete) ||
+        liveRunId !== null ||
         payload.live.message !== null ||
         payload.live.tools.length > 0 ||
-        epochChanged),
+        epochChanged ||
+        messageDropped ||
+        toolDropped),
     history,
     resyncReason: null,
     error: null,
@@ -423,8 +544,10 @@ export function reduceFrame(state: ConversationState, frame: StreamFrame): Conve
 
   if (frame.type === "resync") {
     return {
-      ...emptyConversationState(frame.sessionId),
-      history: state.history?.sessionId === frame.sessionId ? state.history : null,
+      ...state,
+      sessionId: frame.sessionId,
+      cursor: null,
+      lastCursor: state.lastCursor ?? state.cursor,
       resyncReason: frame.payload.reason,
       liveIncomplete: true,
     };
@@ -432,7 +555,8 @@ export function reduceFrame(state: ConversationState, frame: StreamFrame): Conve
   if (frame.type === "snapshot") return snapshotState(state, frame);
 
   let gap = false;
-  const previous = state.cursor === null ? null : cursorParts(state.cursor);
+  const previousCursorValue = state.lastCursor ?? state.cursor;
+  const previous = previousCursorValue === null ? null : cursorParts(previousCursorValue);
   const incoming = cursorParts(frame.cursor);
   if (!incoming) return state;
   if (previous !== null) {
@@ -447,6 +571,7 @@ export function reduceFrame(state: ConversationState, frame: StreamFrame): Conve
   let next: ConversationState = {
     ...state,
     sessionId: frame.sessionId,
+    lastCursor: frame.cursor,
     cursor: frame.cursor,
     resyncReason: null,
     liveIncomplete: state.liveIncomplete || gap,

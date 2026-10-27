@@ -78,6 +78,12 @@
 #conversation .tool-run .tool-output{padding-bottom:4px}
 @media(max-width:760px){#rail{width:min(360px,85vw)}#conversation .thinking-preview>summary{min-height:36px}}
 
+/* Bash command previews stay compact while the open details preserve the full command. */
+#conversation .tool-run>summary .tool-command-preview{display:block;flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal}
+#conversation .tool-run[open]>summary .tool-command-preview{overflow:visible;text-overflow:clip;white-space:pre-wrap;overflow-wrap:anywhere}
+#conversation .tool-run .tool-command-lines{flex:0 0 auto;white-space:nowrap;font-size:10px;opacity:.72}
+#conversation .tool-run .tool-command-full{margin:0;padding:2px 0 6px;max-height:none;overflow:visible;background:none;border:0;color:#797267;font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+
 /* Shared geometry for text actions, independent of font glyph baselines. */
 .action-icon{display:block;width:12px;height:12px;flex:0 0 12px}
 .icon-label,#composer #send,#composer #attach-image{display:inline-flex;align-items:center;gap:6px;line-height:16px}

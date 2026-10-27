@@ -884,4 +884,14 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #status-list .status-tab .tab-select>span{justify-self:center}
 #status-list .status-tab.close-armed .tab-select{grid-column:1;grid-template-columns:20px;gap:0}
 #status-list .status-tab .tab-close{grid-column:2;display:flex;align-items:center;justify-content:center;width:18px;padding:0}
+
+/* Compact command disclosure keeps all source lines available. */
+#conversation .tool-run>summary .tool-command-preview{display:block;flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal}
+#conversation .tool-run[open]>summary .tool-command-preview{overflow:visible;text-overflow:clip;white-space:pre-wrap;overflow-wrap:anywhere}
+#conversation .tool-run .tool-command-lines{flex:0 0 auto;white-space:nowrap;font-size:10px;opacity:.72}
+#conversation .tool-run .tool-command-full{margin:0;padding:2px 0 6px;max-height:none;overflow:visible;background:none;border:0;color:#797267;font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.history-recovery{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--muted);font:12px/1.5 var(--sans)}
+.history-retry{min-height:28px;padding:0 4px;font:inherit;color:var(--dark)}
+.history-entry-anchor{display:block;height:0}
+.markdown>.history-entry-anchor:first-child+*{margin-top:0}
 `;

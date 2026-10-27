@@ -3,6 +3,7 @@
 import type { ContextSource, HistoryBlock, HistoryEntry } from "../../shared/history.ts";
 import { actionIcon } from "./icons.ts";
 import { renderMarkdown } from "./markdown.ts";
+import { appendToolCommand } from "./tool-command.ts";
 
 export type SavedConversationGroup =
   | { kind: "user"; entry: HistoryEntry }
@@ -210,10 +211,10 @@ function toolRun(
   const summary = node("summary");
   const shell = options.shell === true || call?.name === "bash";
   const command = options.shell ? (call?.text ?? "bash") : bashCommand(call);
-  const label = shell
-    ? `$ ${command ?? "bash"}`
-    : (call?.name ?? owner.toolName ?? (options.orphan ? "Tool result" : "Tool"));
-  summary.append(node("code", label));
+  const label = call?.name ?? owner.toolName ?? (options.orphan ? "Tool result" : "Tool");
+  let fullCommand: HTMLElement | null = null;
+  if (shell) fullCommand = appendToolCommand(summary, command ?? "bash");
+  else summary.append(node("code", label));
   const status = isError
     ? "Error"
     : result
@@ -230,6 +231,7 @@ function toolRun(
   }
   summary.append(indicator);
   details.append(summary);
+  if (fullCommand) details.append(fullCommand);
 
   const body = node("div", "", "tool-run-body");
   if (call && !shell) {
@@ -262,6 +264,7 @@ function appendTruncated(parent: HTMLElement, entry: HistoryEntry): void {
 function renderUser(entry: HistoryEntry, renderImage: SavedImageRenderer): HTMLElement {
   const article = node("article", "", "message user");
   article.dataset.entryId = entry.id;
+  article.dataset.scrollAnchor = "";
   article.setAttribute("aria-label", "User message");
   const body = node("div", "", "message-body");
   appendMarkdownBlocks(body, entry, renderImage);
@@ -281,6 +284,12 @@ function renderAssistant(
   const pairs = pairToolResults(entries);
 
   for (const entry of entries) {
+    if (entry.role === "toolResult" && pairs.matchedResultIds.has(entry.id)) continue;
+    const anchor = node("span", "", "history-entry-anchor");
+    anchor.dataset.entryId = entry.id;
+    anchor.dataset.scrollAnchor = "";
+    anchor.setAttribute("aria-hidden", "true");
+    body.append(anchor);
     if (
       entry.role === "custom" ||
       entry.role === "context" ||
@@ -293,9 +302,6 @@ function renderAssistant(
       continue;
     }
     if (entry.role === "toolResult") {
-      if (pairs.matchedResultIds.has(entry.id)) {
-        continue;
-      }
       body.append(
         toolRun(entry, undefined, undefined, renderImage, `orphan:${entry.id}`, {
           orphan: true,

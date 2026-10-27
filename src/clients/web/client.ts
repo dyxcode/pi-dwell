@@ -9,7 +9,14 @@ import { type ContextSource, type HistoryEntry, isHistoryPage } from "../../shar
 import { isHostStatus } from "../../shared/protocol.ts";
 import { isSessionInfo, type SessionInfo } from "../../shared/sessions.ts";
 import { isTurnInfo, type TurnInfo } from "../../shared/turns.ts";
-import { emptyConversationState, reconcileHistory, reduceFrame, SSEDecoder } from "./events.ts";
+import {
+  emptyConversationState,
+  mergeHistoryEntries,
+  reconcileHistory,
+  reduceFrame,
+  SSEDecoder,
+} from "./events.ts";
+import { appendToolCommand } from "./tool-command.ts";
 import { actionIcon, labelWithIcon } from "./icons.ts";
 import { Attachments } from "./attachments.ts";
 import { renderMarkdown } from "./markdown.ts";
@@ -112,8 +119,20 @@ let controller: AbortController | null = null,
 let reconnectTimer: number | undefined, pollTimer: number | undefined;
 let polling = false,
   suspended = false;
+interface HistoryReadRecovery {
+  failures: number;
+  timer: number | undefined;
+  queued: boolean;
+}
+const historyRecovery: Record<"latest" | "older", HistoryReadRecovery> = {
+  latest: { failures: 0, timer: undefined, queued: false },
+  older: { failures: 0, timer: undefined, queued: false },
+};
+let historyContentFailed = false;
+let historyCoverageReads = 0;
+let historyCoverageRun: string | null = null;
+let resetHistoryPagination = false;
 let historyPending = false,
-  historyAgain = false,
   sending = false;
 let pendingSend: {
   session: string;
@@ -141,9 +160,7 @@ let authAttempt = 0,
   browseAttempt = 0,
   modelAttempt = 0;
 let hostMode = "",
-  historyError = "",
   streamConnected = false;
-let noticeSource: "action" | "stream" | undefined;
 const imageDialog = el("image-dialog", HTMLDialogElement);
 function showImage(url: string, name: string): void {
   el("preview-image", HTMLImageElement).src = url;
@@ -444,18 +461,15 @@ function closeBlockedReason(): string | null {
   if (openingSessions.size > 0) return "Wait for the session to open.";
   return null;
 }
-function showError(error: unknown, source: "action" | "stream" = "action"): void {
+function showError(error: unknown): void {
   if (error instanceof ApiError && error.status === 401) {
     disconnect("This browser needs pairing again. Your host-owned work continues.");
     return;
   }
-  if (source === "stream" && noticeSource === "action") return;
-  noticeSource = source;
   notice.textContent = message(error);
   notice.hidden = false;
 }
 function clearNotice(): void {
-  noticeSource = undefined;
   notice.hidden = true;
   notice.textContent = "";
 }
@@ -948,6 +962,17 @@ async function openFromSidebar(id: string): Promise<void> {
 }
 function renderConversation(): void {
   const atBottom = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 90;
+  const oldTop = scroll.scrollTop;
+  const scrollEdge = scroll.getBoundingClientRect().top;
+  const anchors = Array.from(
+    conversation.querySelectorAll<HTMLElement>("[data-scroll-anchor], [data-key]"),
+  ).filter((element) => !element.parentElement?.closest("details:not([open])"));
+  const anchor =
+    anchors.filter((element) => element.getBoundingClientRect().top <= scrollEdge).at(-1) ??
+    anchors.find((element) => element.getBoundingClientRect().bottom > scrollEdge);
+  const anchorId = anchor?.dataset.entryId;
+  const anchorKey = anchor?.dataset.key;
+  const anchorTop = anchor?.getBoundingClientRect().top;
   const expanded = new Set(
     Array.from(conversation.querySelectorAll<HTMLDetailsElement>("details[open]")).map(
       (d) => d.dataset.key,
@@ -994,8 +1019,8 @@ function renderConversation(): void {
         } else {
           const tool = state.tools.find((value) => value.id === item.id);
           if (!tool) continue;
-          let title = tool.name,
-            input = tool.input;
+          let command: string | null = null;
+          let input = tool.input;
           try {
             const parsed: unknown = JSON.parse(input);
             if (
@@ -1005,7 +1030,7 @@ function renderConversation(): void {
               "command" in parsed &&
               typeof parsed.command === "string"
             ) {
-              title = `$ ${parsed.command}`;
+              command = parsed.command;
               input = "";
             }
           } catch {
@@ -1021,9 +1046,12 @@ function renderConversation(): void {
             status.append(actionIcon("check"));
             status.setAttribute("aria-label", "Completed");
           }
-          summary.append(node("code", title), status);
+          const fullCommand = command === null ? null : appendToolCommand(summary, command);
+          if (command === null) summary.append(node("code", tool.name));
+          summary.append(status);
+          detail.append(summary);
+          if (fullCommand) detail.append(fullCommand);
           detail.append(
-            summary,
             node("pre", [input, tool.output].filter(Boolean).join("\n\n"), "tool-output"),
           );
           detail.open = expanded.has(detail.dataset.key) || tool.status === "failed";
@@ -1031,43 +1059,114 @@ function renderConversation(): void {
         }
       }
       if (body.childNodes.length) conversation.append(article);
-      if (state.liveTruncated || state.liveIncomplete)
-        conversation.append(
-          node(
-            "p",
-            "Live preview is partial. Saved history will refresh when available.",
-            "footnote",
-          ),
-        );
     }
     const turn = state.activeTurn ?? state.latestTurn;
     if (turn?.error)
       conversation.append(node("p", `${turn.status}: ${turn.error.message}`, "feedback"));
-    if (state.error) conversation.append(node("p", state.error.message, "feedback"));
-    if (historyError) conversation.append(node("p", historyError, "feedback"));
-    if (!entries.length && !state.messages.length && !historyError)
+    const retryMore = historyProblem();
+    if (retryMore !== null) {
+      const recovery = node("div", "", "history-recovery");
+      recovery.setAttribute("role", "status");
+      recovery.append(node("span", "Some content couldn’t be loaded."));
+      const retry = node("button", "Retry", "text-button history-retry");
+      retry.type = "button";
+      retry.disabled = historyPending;
+      retry.onclick = () => {
+        resetHistoryRecovery(retryMore);
+        void loadHistory(retryMore);
+        renderConversation();
+      };
+      recovery.append(retry);
+      conversation.append(recovery);
+    }
+    if (
+      !entries.length &&
+      !state.messages.length &&
+      !state.tools.length &&
+      !state.activeTurn &&
+      retryMore === null
+    )
       conversation.append(node("p", "Start a conversation in this directory.", "empty-copy"));
-    if (state.history?.incompleteTail)
-      conversation.append(
-        node("p", "The saved history has an incomplete final record.", "footnote"),
-      );
   }
   older.hidden = !nextCursor;
   if (atBottom) scroll.scrollTop = scroll.scrollHeight;
+  else {
+    const replacement =
+      anchorTop === undefined
+        ? undefined
+        : Array.from(
+            conversation.querySelectorAll<HTMLElement>("[data-scroll-anchor], [data-key]"),
+          ).find((element) =>
+            anchorKey
+              ? element.dataset.key === anchorKey
+              : anchorId && element.dataset.entryId === anchorId,
+          );
+    scroll.scrollTop =
+      replacement && anchorTop !== undefined
+        ? scroll.scrollTop + replacement.getBoundingClientRect().top - anchorTop
+        : oldTop;
+  }
+}
+function historyProblem(): boolean | null {
+  if (historyContentFailed || historyRecovery.latest.failures >= 2) return false;
+  return historyRecovery.older.failures >= 2 ? true : null;
+}
+function resetHistoryRecovery(more?: boolean): void {
+  const modes =
+    more === undefined ? (["latest", "older"] as const) : ([more ? "older" : "latest"] as const);
+  for (const mode of modes) {
+    const recovery = historyRecovery[mode];
+    window.clearTimeout(recovery.timer);
+    recovery.timer = undefined;
+    recovery.failures = 0;
+    recovery.queued = false;
+  }
+  if (more !== true) {
+    historyCoverageReads = 0;
+    historyCoverageRun = null;
+    historyContentFailed = false;
+  }
+}
+function uncoveredHistoryRun(): string | null {
+  const turn = state.latestTurn;
+  if (state.activeTurn || !turn || ["accepted", "dispatching", "running"].includes(turn.status))
+    return null;
+  return state.history?.coveredTurnId === turn.runId ? null : turn.runId;
+}
+function scheduleHistoryRecovery(more = false): void {
+  const recovery = more ? historyRecovery.older : historyRecovery.latest;
+  window.clearTimeout(recovery.timer);
+  const epoch = generation;
+  recovery.timer = window.setTimeout(() => {
+    recovery.timer = undefined;
+    if (epoch === generation && authenticated && !suspended) void loadHistory(more);
+  }, 1000);
 }
 async function loadHistory(more = false): Promise<void> {
-  if (!selected || !authenticated || suspended) return;
+  const recovery = more ? historyRecovery.older : historyRecovery.latest;
+  if (
+    !selected ||
+    !authenticated ||
+    suspended ||
+    recovery.failures >= 2 ||
+    (!more && historyContentFailed)
+  )
+    return;
   if (historyPending) {
-    if (!more) historyAgain = true;
+    recovery.queued = true;
     return;
   }
   const id = selected,
     epoch = generation,
     cursor = more ? nextCursor : null;
   if (more && !cursor) return;
+  window.clearTimeout(recovery.timer);
+  recovery.timer = undefined;
+  recovery.queued = false;
   historyPending = true;
   older.disabled = true;
-  const previousHeight = scroll.scrollHeight;
+  const retryButton = conversation.querySelector<HTMLButtonElement>(".history-retry");
+  if (retryButton) retryButton.disabled = true;
   try {
     const result = await api(
       `/api/v1/sessions/${id}/history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
@@ -1075,34 +1174,70 @@ async function loadHistory(more = false): Promise<void> {
     if (!isHistoryPage(result) || result.sessionId !== id)
       throw new Error("Invalid saved-history response.");
     if (epoch !== generation) return;
-    historyError = "";
-    contextSources = result.contextSources ?? [];
-    contextSourcesTruncated = result.contextSourcesTruncated === true;
+    recovery.failures = 0;
+    if (!more) historyContentFailed = false;
+    if (result.status !== "pending") {
+      contextSources = result.contextSources ?? [];
+      contextSourcesTruncated = result.contextSourcesTruncated === true;
+    }
     if (more) {
       const seen = new Set(entries.map((e) => e.id));
       entries = [...result.entries.filter((e) => !seen.has(e.id)), ...entries];
+      nextCursor = result.nextCursor;
     } else {
-      entries = result.entries;
+      if (result.status !== "pending") {
+        const merged = mergeHistoryEntries(entries, result.entries);
+        if (resetHistoryPagination || merged.length === result.entries.length)
+          nextCursor = result.nextCursor;
+        resetHistoryPagination = false;
+        entries = merged;
+      }
       state = reconcileHistory(state, result);
+      const uncovered =
+        uncoveredHistoryRun() ??
+        (result.incompleteTail && result.activeTurnId === null && state.activeTurn === null
+          ? "saved-tail"
+          : null);
+      if (uncovered !== historyCoverageRun) {
+        historyCoverageRun = uncovered;
+        historyCoverageReads = 0;
+      }
+      if (uncovered) {
+        historyCoverageReads++;
+        if (historyCoverageReads < 3) scheduleHistoryRecovery();
+        else if (
+          state.liveTruncated ||
+          result.incompleteTail ||
+          state.error?.type === "projection.error"
+        ) {
+          historyContentFailed = true;
+        }
+      }
     }
-    nextCursor = result.nextCursor;
     renderConversation();
-    if (more) scroll.scrollTop += scroll.scrollHeight - previousHeight;
   } catch (error) {
     if (epoch !== generation) return;
     if (error instanceof ApiError && error.code.includes("cursor")) {
-      historyAgain = true;
-    } else {
-      historyError = message(error);
+      resetHistoryPagination = true;
+      historyRecovery.latest.queued = true;
+    } else if (error instanceof ApiError && error.status === 401) {
       showError(error);
+    } else {
+      recovery.failures++;
+      if (recovery.failures < 2) scheduleHistoryRecovery(more);
       renderConversation();
     }
   } finally {
     historyPending = false;
     older.disabled = false;
-    if (historyAgain) {
-      historyAgain = false;
+    const retryButton = conversation.querySelector<HTMLButtonElement>(".history-retry");
+    if (retryButton) retryButton.disabled = false;
+    if (historyRecovery.latest.queued) {
+      historyRecovery.latest.queued = false;
       void loadHistory();
+    } else if (historyRecovery.older.queued) {
+      historyRecovery.older.queued = false;
+      void loadHistory(true);
     }
   }
 }
@@ -1131,7 +1266,6 @@ async function stream(id: string, epoch: number): Promise<void> {
       throw new Error("Invalid event stream.");
     streamConnected = true;
     connection("Connected");
-    if (noticeSource === "stream") clearNotice();
     const reader = response.body.getReader(),
       text = new TextDecoder(),
       decoder = new SSEDecoder();
@@ -1144,12 +1278,10 @@ async function stream(id: string, epoch: number): Promise<void> {
           if (frame.sessionId !== id) throw new Error("Event stream changed sessions.");
           const previousRun = state.liveRunId;
           state = reduceFrame(state, frame);
-          if (
-            state.liveRunId !== previousRun ||
-            frame.type === "resync" ||
-            frame.type === "snapshot"
-          )
+          if (state.liveRunId !== previousRun) {
             liveOrder = [];
+            resetHistoryRecovery(false);
+          }
           const liveItem =
             frame.type === "message.started" || frame.type === "message.finished"
               ? { kind: "message" as const, id: frame.payload.id }
@@ -1197,11 +1329,7 @@ async function stream(id: string, epoch: number): Promise<void> {
             }
             pendingSend = null;
           }
-          if (frame.type === "stream.error") {
-            showError(new Error(frame.payload.message), "stream");
-            renderConversation();
-            throw new Error(frame.payload.message);
-          }
+          if (frame.type === "stream.error") throw new Error(frame.payload.message);
           if (
             frame.type === "snapshot" ||
             frame.type === "resync" ||
@@ -1221,7 +1349,6 @@ async function stream(id: string, epoch: number): Promise<void> {
     if (abort.signal.aborted || epoch !== generation) return;
     streamConnected = false;
     connection("Reconnecting…");
-    showError(error, "stream");
     state = { ...state, cursor: null };
     if (error instanceof ApiError && error.status === 401) {
       showError(error);
@@ -1252,7 +1379,8 @@ async function select(id: string | null): Promise<void> {
   state = emptyConversationState(id ?? undefined);
   entries = [];
   nextCursor = null;
-  historyError = "";
+  resetHistoryPagination = false;
+  resetHistoryRecovery();
   input.value = id === null ? "" : (drafts.get(id) ?? "");
   composer.resize();
   navigation();
@@ -1373,6 +1501,7 @@ function disconnect(reason: string): void {
   modelAttempt++;
   el("host-dialog", HTMLDialogElement).close();
   stopStream();
+  resetHistoryRecovery();
   window.clearTimeout(pollTimer);
   app.hidden = true;
   gate.hidden = false;

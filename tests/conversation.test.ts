@@ -6,6 +6,35 @@ import {
   pairToolResults,
   thinkingPresentation,
 } from "../src/clients/web/conversation.ts";
+import { commandPresentation } from "../src/clients/web/tool-command.ts";
+
+test("command presentation previews the first meaningful line and counts physical lines", () => {
+  assert.deepEqual(commandPresentation("npm test"), {
+    preview: "$ npm test",
+    lineCount: 1,
+    multiline: false,
+  });
+  assert.deepEqual(
+    commandPresentation(
+      "\n  npm run build \\\r\n    --verbose \\\r\n    --mode production \\\r\n    --watch\r\n",
+    ),
+    {
+      preview: "$ npm run build \\",
+      lineCount: 5,
+      multiline: true,
+    },
+  );
+  assert.deepEqual(commandPresentation("one\n\n"), {
+    preview: "$ one",
+    lineCount: 2,
+    multiline: true,
+  });
+  assert.deepEqual(commandPresentation("\n  \t\n"), {
+    preview: "$ ",
+    lineCount: 2,
+    multiline: true,
+  });
+});
 
 test("thinking uses a short existing heading without repeating it in the body", () => {
   assert.deepEqual(thinkingPresentation("## Checking the output\n\nDetails."), {

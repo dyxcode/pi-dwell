@@ -201,6 +201,34 @@ function renderMarkdown(parent, source) {
   append(parent, marked.lexer(source, { gfm: true }));
 }
 
+function commandPresentation(command) {
+  const lines = command.split(/\r\n|\r|\n/);
+  if (/(?:\r\n|\r|\n)$/.test(command)) lines.pop();
+  const lineCount = Math.max(1, lines.length);
+  const multiline = lineCount > 1;
+  const preview = multiline ? (lines.find((line) => line.trim()) || "").trim() : command;
+  return { preview: "$ " + preview, lineCount, multiline };
+}
+
+function appendToolCommand(summary, command) {
+  const presentation = commandPresentation(command);
+  const preview = document.createElement("code");
+  preview.className = "tool-command-preview";
+  preview.textContent = presentation.preview;
+  summary.append(preview);
+  if (!presentation.multiline) return null;
+
+  const count = document.createElement("span");
+  count.className = "tool-command-lines";
+  count.textContent = presentation.lineCount + " lines";
+  summary.append(count);
+
+  const full = document.createElement("pre");
+  full.className = "tool-command-full";
+  full.textContent = command;
+  return full;
+}
+
 function message(role, text) {
   const article = document.createElement("article");
   article.className = "message " + role;
@@ -261,18 +289,19 @@ function message(role, text) {
     });
     const summary = document.createElement("summary");
     summary.setAttribute("aria-label", "Bash command and output");
-    const command = document.createElement("code");
-    command.textContent = "$ " + text.command;
+    const fullCommand = appendToolCommand(summary, text.command);
     const status = document.createElement("span");
     status.className = "tool-status";
     if (text.failed) status.textContent = "Failed";
     else status.append(actionIcon("check"));
     status.setAttribute("aria-label", text.failed ? "Failed" : "Completed");
-    summary.append(command, status);
+    summary.append(status);
     const output = document.createElement("pre");
     output.className = "tool-output";
     output.textContent = text.output;
-    run.append(summary, output);
+    run.append(summary);
+    if (fullCommand) run.append(fullCommand);
+    run.append(output);
     body.append(run);
     const reply = document.createElement("div");
     reply.className = "after-tool";
@@ -1000,6 +1029,18 @@ const markdownSample = [
   "[Visit the Pi project](https://github.com/earendil-works/pi) or use an autolink: https://example.com.\n\nFirst line with a hard break.  \nSecond line.",
   "A final paragraph after the blocks.",
 ].join("\n\n");
+
+if (new URLSearchParams(location.search).has("multiline")) {
+  sessions[0].messages = [
+    ["user", "Run the checks in this directory."],
+    ["assistant", {
+      intro: "I’ll run the checks together.",
+      command: ["cd ~/Projects/pi-dwell", "npm run lint", "npm run typecheck", "npm test", "git diff --check"].join("\n"),
+      output: "All checks passed.",
+      text: "The checks passed. The changes are ready to review.",
+    }],
+  ];
+}
 
 if (new URLSearchParams(location.search).has("markdown")) {
   sessions[0].messages = [

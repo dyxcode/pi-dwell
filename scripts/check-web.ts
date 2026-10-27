@@ -388,6 +388,162 @@ async function assertActionIconGeometry(page: BrowserPage, viewport: string): Pr
   }
 }
 
+async function assertNoPartialOrRecoveryRow(page: BrowserPage, context: string): Promise<void> {
+  assert.equal(
+    await page.evaluate(
+      'document.querySelector("#conversation").textContent.includes("Live preview is partial")',
+    ),
+    false,
+    `${context} does not label an ordinary snapshot as partial`,
+  );
+  assert.equal(
+    await page.evaluate('document.querySelector(".history-recovery") === null'),
+    true,
+    `${context} does not show a content-recovery failure row when history is available`,
+  );
+}
+
+async function assertOlderAssistantGroupScrollAnchor(
+  page: BrowserPage,
+  sessionId: string,
+  latestTurnId: string | null,
+  viewport: string,
+): Promise<void> {
+  const olderId = "synthetic-older-assistant";
+  const firstId = "synthetic-first-assistant";
+  const anchorId = "synthetic-anchor-assistant";
+  const anchoredText = Array.from(
+    { length: 16 },
+    (_, index) =>
+      `Assistant section ${index + 1}: ${"This saved assistant entry stays anchored while its older group is loaded. ".repeat(4)}`,
+  ).join("\n\n");
+  const entry = (id: string, parentId: string | null, text: string) => ({
+    id,
+    parentId,
+    timestamp: "2026-10-27T00:00:00.000Z",
+    type: "message",
+    role: "assistant",
+    blocks: [{ type: "text", text, callId: null, name: null }],
+    toolCallId: null,
+    toolName: null,
+    targetId: null,
+    truncated: false,
+  });
+  const pageBase = (entries: ReturnType<typeof entry>[], nextCursor: string | null) => ({
+    sessionId,
+    status: "available",
+    revision: "a".repeat(64),
+    leafId: anchorId,
+    entries,
+    nextCursor,
+    incompleteTail: false,
+    activeTurnId: null,
+    latestTurnId,
+    coveredTurnId: latestTurnId,
+    contextSources: [],
+    contextSourcesTruncated: false,
+  });
+  const firstPage = pageBase(
+    [
+      entry(firstId, olderId, "A prior assistant item in this response group."),
+      entry(anchorId, firstId, anchoredText),
+    ],
+    "older.page",
+  );
+  const olderPage = pageBase(
+    [entry(olderId, null, "Older assistant continuation before the stable anchor.")],
+    null,
+  );
+  const historyPath = `/api/v1/sessions/${sessionId}/history`;
+  const anchorSelector = `#conversation [data-scroll-anchor][data-entry-id=${JSON.stringify(anchorId)}]`;
+
+  await page.evaluate(`(()=>{
+    const original=window.fetch.bind(window);
+    const historyPath=${JSON.stringify(historyPath)};
+    const firstPage=${JSON.stringify(firstPage)};
+    const olderPage=${JSON.stringify(olderPage)};
+    window.__dwellOlderPageTwoCalls=0;
+    window.__restoreDwellHistoryPages=()=>window.fetch=original;
+    window.fetch=async(input,init)=>{
+      const target=typeof input==="string"?input:input.url;
+      const url=new URL(target,location.href);
+      if(url.pathname===historyPath){
+        if(url.searchParams.has("cursor")){
+          window.__dwellOlderPageTwoCalls++;
+          return new Response(JSON.stringify(olderPage),{status:200,headers:{"Content-Type":"application/json"}});
+        }
+        return new Response(JSON.stringify(firstPage),{status:200,headers:{"Content-Type":"application/json"}});
+      }
+      return original(input,init);
+    };
+  })()`);
+  await page.evaluate(
+    "window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))",
+  );
+  await page.evaluate(
+    "window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))",
+  );
+  await page.until(
+    `!document.querySelector("#load-older").hidden && document.querySelector(${JSON.stringify(anchorSelector)}) && document.querySelector("#conversation").textContent.includes("Assistant section 1:")`,
+  );
+
+  const before = record(
+    await page.evaluate(`(()=>{
+      const scroll=document.querySelector("#scroll");
+      const anchor=document.querySelector(${JSON.stringify(anchorSelector)});
+      const group=anchor?.closest(".message.assistant");
+      if(!(scroll instanceof HTMLElement)||!(anchor instanceof HTMLElement)||!(group instanceof HTMLElement)) return {present:false};
+      const relativeTop=()=>anchor.getBoundingClientRect().top-scroll.getBoundingClientRect().top;
+      scroll.scrollTop=Math.max(0,Math.min(scroll.scrollHeight-scroll.clientHeight,scroll.scrollTop+relativeTop()));
+      return {
+        present:true,top:relativeTop(),groupId:group.dataset.entryId,
+        clientHeight:scroll.clientHeight,gap:scroll.scrollHeight-scroll.clientHeight-scroll.scrollTop
+      };
+    })()`),
+  );
+  assert.equal(
+    before.present,
+    true,
+    `${viewport} paginated assistant entry exposes a stable anchor`,
+  );
+  assert.equal(before.groupId, firstId, `${viewport} the loaded page starts this assistant group`);
+  assert.ok(Math.abs(Number(before.top)) <= 2, `${viewport} reading starts at the anchored entry`);
+  assert.ok(Number(before.gap) > 100, `${viewport} the anchored reader is away from the bottom`);
+
+  await page.click("#load-older");
+  await page.until(
+    `window.__dwellOlderPageTwoCalls===1 && document.querySelector(${JSON.stringify(anchorSelector)}) && document.querySelector("#conversation").textContent.includes("Older assistant continuation")`,
+  );
+  const after = record(
+    await page.evaluate(`(()=>{
+      const scroll=document.querySelector("#scroll");
+      const anchor=document.querySelector(${JSON.stringify(anchorSelector)});
+      const group=anchor?.closest(".message.assistant");
+      if(!(scroll instanceof HTMLElement)||!(anchor instanceof HTMLElement)||!(group instanceof HTMLElement)) return {present:false};
+      const rect=anchor.getBoundingClientRect();
+      return {
+        present:true,top:rect.top-scroll.getBoundingClientRect().top,groupId:group.dataset.entryId,
+        documentWidth:document.documentElement.scrollWidth,viewportWidth:innerWidth
+      };
+    })()`),
+  );
+  assert.equal(after.present, true);
+  assert.equal(
+    after.groupId,
+    olderId,
+    `${viewport} older and newer entries now share one assistant group`,
+  );
+  assert.ok(
+    Math.abs(Number(after.top) - Number(before.top)) <= 2,
+    `${viewport} loading the older assistant entry preserves the inner reading anchor: ${JSON.stringify({ before: before.top, after: after.top })}`,
+  );
+  assert.ok(
+    Number(after.documentWidth) <= Number(after.viewportWidth) + 1,
+    `${viewport} older assistant content stays within the viewport width`,
+  );
+  await page.evaluate("window.__restoreDwellHistoryPages()");
+}
+
 async function assertStatusCloseGeometry(page: BrowserPage, viewport: string): Promise<void> {
   await page.until('document.querySelector("#status-list .status-tab.active .tab-symbol")');
   const before = record(
@@ -435,6 +591,9 @@ async function assertStatusCloseGeometry(page: BrowserPage, viewport: string): P
 }
 
 async function assertQuietProcessPresentation(page: BrowserPage, viewport: string): Promise<void> {
+  const multilineCommand =
+    "\n  printf 'first line'\r\n    npm run check\r\n      echo done\r\nexit 0\r\n";
+  const longCommand = `echo ${"x".repeat(320)}`;
   assert.equal(
     await page.evaluate(`(async()=>{
       const {renderSavedConversation}=await import("/conversation.js");
@@ -444,6 +603,8 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
         toolCallId:null,toolName:null,targetId:null,truncated:false,...extra
       });
       const longTitle="L".repeat(73);
+      const multilineCommand=${JSON.stringify(multilineCommand)};
+      const longCommand=${JSON.stringify(longCommand)};
       const entries=[
         entry("quiet-thinking","assistant","message",[
           block("thinking","# Planning the answer\\n\\nFirst reasoning sentence."),
@@ -463,7 +624,19 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
         ]),
         entry("quiet-error-result","toolResult","toolResult",[
           block("text","synthetic error output")
-        ],{toolCallId:"quiet-error",toolName:"echo",error:true})
+        ],{toolCallId:"quiet-error",toolName:"echo",error:true}),
+        entry("quiet-command-call","assistant","message",[
+          block("tool_call",JSON.stringify({command:multilineCommand}),"quiet-command","bash")
+        ]),
+        entry("quiet-command-result","toolResult","toolResult",[
+          block("text","synthetic command output")
+        ],{toolCallId:"quiet-command",toolName:"bash"}),
+        entry("quiet-long-command-call","assistant","message",[
+          block("tool_call",JSON.stringify({command:longCommand}),"quiet-long-command","bash")
+        ]),
+        entry("quiet-long-command-result","toolResult","toolResult",[
+          block("text","synthetic long command output")
+        ],{toolCallId:"quiet-long-command",toolName:"bash"})
       ];
       const fixture=document.createElement("div");
       fixture.id="quiet-process-test-fixture";
@@ -551,6 +724,91 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.equal(presentation.markdownCodeBackground, "rgb(235, 230, 219)");
     assert.equal(presentation.markdownCodeSize, "12px");
     assert.equal(presentation.markdownCodeText, "const answer = 42;");
+
+    const commands = record(
+      await page.evaluate(`(async()=>{
+        const root=document.querySelector("#quiet-process-test-fixture");
+        const multiline=root.querySelector('.tool-run[data-entry-id="quiet-command-call"]');
+        const longline=root.querySelector('.tool-run[data-entry-id="quiet-long-command-call"]');
+        if(!(multiline instanceof HTMLDetailsElement)||!(longline instanceof HTMLDetailsElement)) return {present:false};
+        const multilinePreview=multiline.querySelector(".tool-command-preview");
+        const multilineCount=multiline.querySelector(".tool-command-lines");
+        const full=multiline.querySelector(".tool-command-full");
+        const longPreview=longline.querySelector(".tool-command-preview");
+        if(!(multilinePreview instanceof HTMLElement)||!(multilineCount instanceof HTMLElement)||!(full instanceof HTMLElement)||!(longPreview instanceof HTMLElement)) return {present:false};
+        const readPreview=(element)=>{
+          const style=getComputedStyle(element);
+          return {text:element.textContent,whiteSpace:style.whiteSpace,overflowX:style.overflowX,textOverflow:style.textOverflow,overflowWrap:style.overflowWrap,clientWidth:element.clientWidth,scrollWidth:element.scrollWidth,height:element.getBoundingClientRect().height};
+        };
+        const closed={
+          multilineOpen:multiline.open,count:multilineCount.textContent,preview:readPreview(multilinePreview),
+          fullText:full.textContent,fullVisible:full.checkVisibility({contentVisibilityAuto:true}),
+          fullWhiteSpace:getComputedStyle(full).whiteSpace,fullBackground:getComputedStyle(full).backgroundColor,
+          longOpen:longline.open,longPreview:readPreview(longPreview),
+          toolBackground:getComputedStyle(multiline).backgroundColor,documentWidth:document.documentElement.scrollWidth
+        };
+        multiline.open=true;
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const multilineOpen={fullVisible:full.checkVisibility({contentVisibilityAuto:true}),fullWhiteSpace:getComputedStyle(full).whiteSpace,fullBackground:getComputedStyle(full).backgroundColor};
+        multiline.open=false;
+        longline.open=true;
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const longOpen={preview:readPreview(longPreview),documentWidth:document.documentElement.scrollWidth};
+        longline.open=false;
+        return {present:true,closed,multilineOpen,longOpen,viewportWidth:innerWidth};
+      })()`),
+    );
+    assert.equal(
+      commands.present,
+      true,
+      `${viewport} saved shell commands use the production renderer`,
+    );
+    const closedCommands = record(commands.closed);
+    const multilinePreview = record(closedCommands.preview);
+    const longPreview = record(closedCommands.longPreview);
+    assert.equal(closedCommands.multilineOpen, false);
+    assert.equal(closedCommands.count, "5 lines");
+    assert.equal(multilinePreview.text, "$ printf 'first line'");
+    assert.equal(
+      closedCommands.fullText,
+      multilineCommand,
+      "the full saved command preserves its leading and continuation indentation and line endings",
+    );
+    assert.equal(
+      closedCommands.fullVisible,
+      false,
+      "full commands stay inside their collapsed disclosure",
+    );
+    assert.equal(multilinePreview.whiteSpace, "nowrap");
+    assert.equal(closedCommands.toolBackground, "rgba(0, 0, 0, 0)");
+    const multilineOpen = record(commands.multilineOpen);
+    assert.equal(
+      multilineOpen.fullVisible,
+      true,
+      "opening the saved tool reveals its full command",
+    );
+    assert.equal(multilineOpen.fullWhiteSpace, "pre-wrap");
+    assert.equal(multilineOpen.fullBackground, "rgba(0, 0, 0, 0)");
+    assert.equal(longPreview.text, `$ ${longCommand}`);
+    assert.equal(longPreview.whiteSpace, "nowrap");
+    assert.equal(longPreview.overflowX, "hidden");
+    assert.equal(longPreview.textOverflow, "ellipsis");
+    assert.ok(
+      Number(longPreview.scrollWidth) > Number(longPreview.clientWidth),
+      `${viewport} a long one-line command is clipped while collapsed`,
+    );
+    const longOpen = record(commands.longOpen);
+    const longOpenPreview = record(longOpen.preview);
+    assert.equal(longOpenPreview.whiteSpace, "pre-wrap");
+    assert.equal(longOpenPreview.overflowWrap, "anywhere");
+    assert.ok(
+      Number(longOpenPreview.height) > Number(longPreview.height),
+      `${viewport} a long one-line command wraps when expanded`,
+    );
+    assert.ok(
+      Number(longOpen.documentWidth) <= Number(commands.viewportWidth) + 1,
+      `${viewport} expanded command details do not create horizontal page overflow`,
+    );
 
     const rhythm = record(
       await page.evaluate(`(()=>{
@@ -1385,10 +1643,12 @@ for (const mode of modes) {
     await first.until(
       'document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
     );
+    await assertNoPartialOrRecoveryRow(first, `${mode} ordinary reload`);
     const second = await page();
     await second.until(
       'document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
     );
+    await assertNoPartialOrRecoveryRow(second, `${mode} ordinary browser snapshot`);
     await second.until(
       'document.querySelector("#model-label").textContent.trim()==="dwell-test-image"',
     );
@@ -1494,6 +1754,35 @@ for (const mode of modes) {
     await second.until(
       'document.querySelector("#conversation").textContent.includes("dwell-slow-start")',
     );
+    const slowRunId = String(record(await request(`/sessions/${String(session.id)}`)).activeTurnId);
+    assert.match(slowRunId, /^[0-9a-f-]{36}$/i);
+    await second.call("Page.reload");
+    await second.until(
+      'document.querySelector("#conversation").textContent.includes("dwell-slow-start") && document.querySelector("#send").getAttribute("aria-label")==="Stop response"',
+    );
+    await assertNoPartialOrRecoveryRow(second, `${mode} active-turn snapshot`);
+    await second.evaluate(
+      "window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))",
+    );
+    await second.evaluate(
+      "window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))",
+    );
+    await second.until(
+      'document.querySelector("#connection-badge").textContent==="Connected" && document.querySelector("#conversation").textContent.includes("dwell-slow-start") && document.querySelector("#send").getAttribute("aria-label")==="Stop response"',
+    );
+    await assertNoPartialOrRecoveryRow(second, `${mode} same-run reconnect`);
+    assert.equal(
+      await second.evaluate(
+        'document.querySelector("#conversation").textContent.split("dwell-slow-start").length-1',
+      ),
+      1,
+      "same-run reconnect retains the existing live preview exactly once",
+    );
+    assert.equal(
+      record(await request(`/sessions/${String(session.id)}`)).activeTurnId,
+      slowRunId,
+      "snapshot recovery preserves the existing active run",
+    );
     await first.call("Page.navigate", { url: "about:blank" });
     assert.ok(record(await request(`/sessions/${String(session.id)}`)).activeTurnId);
     await second.until(
@@ -1511,6 +1800,67 @@ for (const mode of modes) {
     await first.until(
       `!document.querySelector("#app").hidden && document.querySelector("#session-list").textContent.includes(${JSON.stringify(longPathParts.at(-1))})`,
     );
+    await first.until(
+      'document.querySelector("#connection-badge").textContent==="Connected" && document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
+    );
+    await delay(100);
+    await first.evaluate(`(()=>{
+      const original=window.fetch.bind(window);
+      window.__dwellHistoryFailures=0;
+      window.__dwellHistoryRequests=0;
+      window.__dwellTurnSubmissions=0;
+      window.__dwellFailHistory=false;
+      window.__restoreDwellFetch=()=>window.fetch=original;
+      window.fetch=async(input,init)=>{
+        const target=typeof input==="string"?input:input.url;
+        const url=new URL(target,location.href);
+        if(url.pathname==="/api/v1/sessions/${String(session.id)}/history"){
+          window.__dwellHistoryRequests++;
+          if(window.__dwellFailHistory){
+            window.__dwellHistoryFailures++;
+            throw new Error("Synthetic history transport failure.");
+          }
+        }
+        if(url.pathname.endsWith("/turns")&&init?.method==="POST")
+          window.__dwellTurnSubmissions++;
+        return original(input,init);
+      };
+      window.__dwellHistoryFailures=0;
+      window.__dwellHistoryRequests=0;
+      window.__dwellFailHistory=true;
+    })()`);
+    await first.evaluate(
+      "window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))",
+    );
+    await first.evaluate(
+      "window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))",
+    );
+    await first.until(
+      'document.querySelector(".history-recovery")?.textContent.includes("Some content couldn’t be loaded.") && document.querySelector(".history-retry")?.textContent.trim()==="Retry"',
+    );
+    await delay(100);
+    assert.equal(await first.evaluate("window.__dwellHistoryFailures"), 2);
+    assert.equal(await first.evaluate("window.__dwellHistoryRequests"), 2);
+    assert.equal(await first.evaluate("window.__dwellTurnSubmissions"), 0);
+    assert.equal(
+      await first.evaluate(
+        'document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
+      ),
+      true,
+      "failed history recovery keeps previously loaded conversation content",
+    );
+    await first.evaluate("window.__restoreDwellFetch()");
+    await first.click(".history-retry");
+    await first.until('document.querySelector(".history-recovery")===null');
+    assert.equal(await first.evaluate("window.__dwellTurnSubmissions"), 0);
+    assert.equal(
+      await first.evaluate(
+        'document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
+      ),
+      true,
+      "Retry refreshes saved content without sending a new turn",
+    );
+    console.log(`PASS ${mode} bounded history recovery and content-only Retry`);
     await first.type("#message", "draft survives page suspension");
     await first.evaluate(
       "window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))",
@@ -1779,10 +2129,89 @@ for (const mode of modes) {
       'document.querySelector("#conversation").textContent.includes("Received 1 image(s): image/png") && document.querySelector("#send").getAttribute("aria-label")==="Send message"',
     );
     await second.until('document.querySelector(".sent-image img")?.naturalWidth===64');
+    const readingAnchor = record(
+      await second.evaluate(`(()=>{
+        const scroll=document.querySelector("#scroll");
+        const anchors=[...document.querySelectorAll("#conversation .message.user[data-entry-id]")];
+        if(!(scroll instanceof HTMLElement)||anchors.length===0) return {present:false};
+        const anchor=anchors[0];
+        const scrollRect=scroll.getBoundingClientRect();
+        const anchorRect=anchor.getBoundingClientRect();
+        const target=scroll.scrollTop+anchorRect.top-scrollRect.top-80;
+        scroll.scrollTop=Math.max(0,Math.min(scroll.scrollHeight-scroll.clientHeight,target));
+        const rect=anchor.getBoundingClientRect();
+        return {
+          present:true,id:anchor.dataset.entryId,
+          top:rect.top-scroll.getBoundingClientRect().top,
+          clientHeight:scroll.clientHeight,
+          gap:scroll.scrollHeight-scroll.clientHeight-scroll.scrollTop,
+          contentHeight:scroll.scrollHeight
+        };
+      })()`),
+    );
+    assert.equal(readingAnchor.present, true);
+    assert.ok(Number(readingAnchor.contentHeight) > Number(readingAnchor.clientHeight) + 100);
+    assert.ok(Number(readingAnchor.top) >= 0 && Number(readingAnchor.top) < 160);
+    assert.ok(Number(readingAnchor.gap) > 90, "the reader is away from the bottom anchor");
+    await second.evaluate(`(()=>{
+      const original=window.fetch.bind(window);
+      window.__dwellHistoryRefreshResponses=0;
+      window.__restoreDwellFetch=()=>window.fetch=original;
+      window.fetch=async(input,init)=>{
+        const target=typeof input==="string"?input:input.url;
+        const url=new URL(target,location.href);
+        const response=await original(input,init);
+        if(url.pathname==="/api/v1/sessions/${String(session.id)}/history")
+          window.__dwellHistoryRefreshResponses++;
+        return response;
+      };
+    })()`);
+    await first.type("#message", "history refresh anchor");
+    await first.click("#send");
+    await second.until(
+      'document.querySelector("#conversation").textContent.includes("Received: history refresh anchor") && [...document.querySelectorAll("#conversation .message.assistant:not(.live)")].some(entry=>entry.textContent.includes("Received: history refresh anchor"))',
+    );
+    assert.ok(
+      Number(await second.evaluate("window.__dwellHistoryRefreshResponses")) > 0,
+      "the reader observed a successful saved-history refresh",
+    );
+    const refreshedAnchor = record(
+      await second.evaluate(`(()=>{
+        const scroll=document.querySelector("#scroll");
+        const anchor=document.querySelector('#conversation [data-entry-id="${String(readingAnchor.id)}"]');
+        if(!(scroll instanceof HTMLElement)||!(anchor instanceof HTMLElement)) return {present:false};
+        const rect=anchor.getBoundingClientRect();
+        return {
+          present:true,top:rect.top-scroll.getBoundingClientRect().top,
+          documentWidth:document.documentElement.scrollWidth,viewportWidth:innerWidth
+        };
+      })()`),
+    );
+    assert.equal(refreshedAnchor.present, true);
+    assert.ok(
+      Math.abs(Number(refreshedAnchor.top) - Number(readingAnchor.top)) <= 2,
+      `history refresh keeps the reading anchor at the same viewport position: ${JSON.stringify({ before: readingAnchor.top, after: refreshedAnchor.top })}`,
+    );
+    assert.ok(
+      Number(refreshedAnchor.documentWidth) <= Number(refreshedAnchor.viewportWidth) + 1,
+      "the refreshed mobile conversation stays within the viewport width",
+    );
+    await second.evaluate("window.__restoreDwellFetch()");
+    const paginationSession = record(await request(`/sessions/${String(session.id)}`));
+    const paginationTurnId =
+      typeof paginationSession.latestTurnId === "string" ? paginationSession.latestTurnId : null;
+    await assertOlderAssistantGroupScrollAnchor(
+      second,
+      String(session.id),
+      paginationTurnId,
+      `${mode} mobile`,
+    );
+    console.log(`PASS ${mode} history refresh preserves a reader's scroll anchor`);
     await second.call("Page.reload");
     await second.until(
       'document.querySelector(".sent-image img")?.naturalWidth===64 && document.querySelector("#thinking-label").textContent.includes("High")',
     );
+    await assertNoPartialOrRecoveryRow(second, `${mode} image-history reload`);
     await assertSidebarLabel(
       second,
       String(session.id),

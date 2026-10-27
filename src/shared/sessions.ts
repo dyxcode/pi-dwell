@@ -1,3 +1,5 @@
+import { isThinkingLevel, type ThinkingLevel } from "./thinking.ts";
+
 export const SESSION_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
 export interface RuntimeConfiguration {
@@ -15,6 +17,7 @@ export interface SessionCreateRequest {
 export interface SessionModelRequest {
   provider: string;
   model: string;
+  thinkingLevel?: ThinkingLevel;
 }
 
 export interface SessionInfo {
@@ -22,6 +25,7 @@ export interface SessionInfo {
   directory: string;
   provider: string | null;
   model: string | null;
+  thinkingLevel: ThinkingLevel | null;
   piSessionId: string;
   createdAt: number;
   updatedAt: number;
@@ -62,6 +66,8 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
       (typeof value.provider === "string" && value.provider.length > 0)) &&
     "model" in value &&
     (value.model === null || (typeof value.model === "string" && value.model.length > 0)) &&
+    "thinkingLevel" in value &&
+    (value.thinkingLevel === null || isThinkingLevel(value.thinkingLevel)) &&
     ((value.provider === null && value.model === null) ||
       (typeof value.provider === "string" && typeof value.model === "string")) &&
     "createdAt" in value &&
@@ -95,9 +101,12 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
 export function isSessionModelRequest(value: unknown): value is SessionModelRequest {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   return (
-    Object.keys(value).length === 2 &&
+    (Object.keys(value).length === 2 || Object.keys(value).length === 3) &&
     Object.hasOwn(value, "provider") &&
     Object.hasOwn(value, "model") &&
+    Object.keys(value).every(
+      (key) => key === "provider" || key === "model" || key === "thinkingLevel",
+    ) &&
     "provider" in value &&
     typeof value.provider === "string" &&
     value.provider.length > 0 &&
@@ -105,6 +114,8 @@ export function isSessionModelRequest(value: unknown): value is SessionModelRequ
     "model" in value &&
     typeof value.model === "string" &&
     value.model.length > 0 &&
-    value.model.length <= 300
+    value.model.length <= 300 &&
+    (!Object.hasOwn(value, "thinkingLevel") ||
+      ("thinkingLevel" in value && isThinkingLevel(value.thinkingLevel)))
   );
 }

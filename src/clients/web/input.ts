@@ -31,8 +31,11 @@ export function setupComposer(
     input.rows = 1;
     const viewportHeight = visualViewport?.height ?? window.innerHeight;
     const maxHeight = Math.max(
-      MIN_HEIGHT_PX,
-      Math.min(MAX_HEIGHT_PX, viewportHeight * VIEWPORT_HEIGHT_RATIO),
+      window.innerWidth <= 760 ? 28 : MIN_HEIGHT_PX,
+      Math.min(
+        window.innerWidth <= 760 ? 120 : MAX_HEIGHT_PX,
+        viewportHeight * VIEWPORT_HEIGHT_RATIO,
+      ),
     );
     input.style.height = "0px";
     const contentHeight = input.scrollHeight;

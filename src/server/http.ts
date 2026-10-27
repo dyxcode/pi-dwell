@@ -7,6 +7,7 @@ import { dataDirectory, type HostMode } from "../local/paths.ts";
 import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
 import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
 import { isRuntimeConfiguration, isSessionModelRequest } from "../shared/sessions.ts";
+import { isModelCapabilitiesRequest } from "../shared/thinking.ts";
 import { isTurnCreateRequest } from "../shared/turns.ts";
 import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
 import { browserCookie, readBrowserOrigin, requestAccess } from "./access.ts";
@@ -43,7 +44,7 @@ function browserRequest(request: IncomingMessage, origin: string): void {
     fail(403, "forbidden_origin", "Open Dwell at the address used to connect this browser.");
   }
 }
-async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJson(request: IncomingMessage, limit = 8192): Promise<Record<string, unknown>> {
   if (
     !/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(request.headers["content-type"] ?? "")
   ) {
@@ -51,16 +52,15 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
   }
   if (request.headers["content-encoding"] !== undefined)
     fail(415, "unsupported_encoding", "Compressed request bodies are not supported.");
-  const limit = 8192;
   if (Number(request.headers["content-length"] ?? 0) > limit)
-    fail(413, "body_too_large", "Request body exceeds 8 KiB.");
+    fail(413, "body_too_large", `Request body exceeds ${limit / 1024} KiB.`);
   const text = await new Promise<string>((resolve, reject) => {
     const chunks: Buffer[] = [];
     let length = 0;
     request.on("data", (chunk: Buffer) => {
       length += chunk.length;
       if (length > limit) {
-        reject(new AccessError(413, "body_too_large", "Request body exceeds 8 KiB."));
+        reject(new AccessError(413, "body_too_large", `Request body exceeds ${limit / 1024} KiB.`));
         return;
       }
       chunks.push(chunk);
@@ -170,7 +170,7 @@ export async function startHost({
     response.setHeader("Referrer-Policy", "no-referrer");
     response.setHeader(
       "Content-Security-Policy",
-      "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+      "default-src 'none'; script-src 'self'; style-src 'self'; img-src blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
     );
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     try {
@@ -203,6 +203,8 @@ export async function startHost({
       const queryStart = requestTarget.indexOf("?");
       const path = queryStart < 0 ? requestTarget : requestTarget.slice(0, queryStart);
       const historyMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/history$/.exec(path);
+      const imageMatch =
+        /^\/api\/v1\/sessions\/([a-f0-9-]+)\/history\/([^/]+)\/images\/(\d+)$/.exec(path);
       let historyCursor: string | undefined;
       let directoryPath: string | undefined;
       if (queryStart >= 0) {
@@ -237,6 +239,8 @@ export async function startHost({
         path === "/api/v1/sessions" ||
         path === "/api/v1/directories" ||
         path === "/api/v1/models" ||
+        path === "/api/v1/model-capabilities" ||
+        imageMatch !== null ||
         path === "/api/v1/runtime" ||
         modelMatch !== null ||
         sessionMatch !== null ||
@@ -247,12 +251,13 @@ export async function startHost({
       if (sessionRoute) {
         if (
           path === "/api/v1/runtime" ||
+          path === "/api/v1/model-capabilities" ||
           modelMatch !== null ||
           sessionMatch?.[2] === "open" ||
           sessionMatch?.[2] === "close"
         ) {
           method = "POST";
-        } else if (eventMatch || historyMatch) {
+        } else if (eventMatch || historyMatch || imageMatch) {
           method = "GET";
         } else if (turnMatch) {
           method = turnMatch[2] === undefined || turnMatch[3] === "abort" ? "POST" : "GET";
@@ -292,7 +297,13 @@ export async function startHost({
             "Pi executable configuration requires the local CLI credential.",
           );
         if (method === "POST" && !cli) browserRequest(request, access.origin);
-        const body = method === "POST" ? await readJson(request) : {};
+        const body =
+          method === "POST"
+            ? await readJson(
+                request,
+                turnMatch && turnMatch[2] === undefined ? 8 * 1024 * 1024 : 8192,
+              )
+            : {};
         if (stopping) fail(503, "unavailable", "Dwell is stopping.");
         // Body/header deadlines remain bounded; admitted RPC work has its own deadlines.
         request.socket.setTimeout(0);
@@ -307,6 +318,28 @@ export async function startHost({
           send(response, 200, await sessions.listDirectories(directoryPath));
         } else if (path === "/api/v1/models") {
           send(response, 200, { models: await sessions.listAvailableModels() });
+        } else if (path === "/api/v1/model-capabilities") {
+          if (!isModelCapabilitiesRequest(body))
+            fail(400, "invalid_input", "Provide provider and model.");
+          send(response, 200, await sessions.getModelCapabilities(body));
+        } else if (imageMatch) {
+          const id = imageMatch[1],
+            encodedEntry = imageMatch[2],
+            index = Number(imageMatch[3]);
+          if (!id || !encodedEntry || !Number.isSafeInteger(index))
+            fail(400, "invalid_input", "Invalid image reference.");
+          let entry: string;
+          try {
+            entry = decodeURIComponent(encodedEntry);
+          } catch {
+            fail(400, "invalid_input", "Invalid entry ID.");
+          }
+          const image = await sessions.getHistoryImage(id, entry, index);
+          if (!image) fail(404, "not_found", "This saved image is unavailable.");
+          response.setHeader("Content-Type", image.mimeType);
+          response.setHeader("Content-Length", image.data.length);
+          response.setHeader("Content-Disposition", "inline");
+          response.end(image.data);
         } else if (path === "/api/v1/sessions") {
           if (method === "GET") send(response, 200, sessions.listSessions());
           else {
@@ -367,8 +400,14 @@ export async function startHost({
           const runId = turnMatch[2];
           const action = turnMatch[3];
           if (runId === undefined) {
+            if (typeof body.message === "string" && Buffer.byteLength(body.message, "utf8") > 8192)
+              fail(413, "body_too_large", "Message text exceeds 8 KiB.");
             if (!isTurnCreateRequest(body))
-              fail(400, "invalid_input", "Provide a request UUID and nonempty plain-text message.");
+              fail(
+                400,
+                "invalid_input",
+                "Provide a request UUID and message text or supported images.",
+              );
             const admitted = await sessions.submitTurn(id, body);
             send(response, admitted.created ? 202 : 200, admitted.turn);
           } else if (action === "result") {

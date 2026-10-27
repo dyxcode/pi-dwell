@@ -14,8 +14,13 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
-import { SUPPORTED_PI_VERSION, verifyPiConfiguration } from "../runtime/pi-process.ts";
+import { PiProcess, SUPPORTED_PI_VERSION, verifyPiConfiguration } from "../runtime/pi-process.ts";
 import type { HostDirectoryListing, PiModelOption } from "../shared/discovery.ts";
+import {
+  isModelCapabilitiesRequest,
+  type ModelCapabilitiesRequest,
+  type ModelCapabilitiesResponse,
+} from "../shared/thinking.ts";
 import type { RuntimeConfiguration as PiConfiguration } from "../shared/sessions.ts";
 
 const MAX_DIRECTORY_ENTRIES = 500;
@@ -415,7 +420,7 @@ function parseModelList(output: string): PiModelOption[] {
         "Pi returned duplicate models. Check the local model configuration.",
       );
     seen.add(key);
-    models.push({ provider, id });
+    models.push({ provider, id, supportsImages: columns[5] === "yes" });
     if (models.length > MAX_MODEL_COUNT)
       throw new SessionDiscoveryError(
         413,
@@ -493,4 +498,102 @@ export async function discoverPiModels(
       "Pi model discovery returned no result.",
     );
   return models;
+}
+
+export async function discoverPiModelCapabilities(
+  configuration: PiConfiguration,
+  env: NodeJS.ProcessEnv,
+  request: ModelCapabilitiesRequest,
+): Promise<ModelCapabilitiesResponse> {
+  if (!isModelCapabilitiesRequest(request))
+    throw new SessionDiscoveryError(400, "invalid_model", "Provide a valid Pi provider and model.");
+
+  const workspace = await createDiscoveryWorkspace();
+  let runtime: PiProcess | undefined;
+  let capabilities: ModelCapabilitiesResponse | undefined;
+  let failure: SessionDiscoveryError | undefined;
+  let stopFailed = false;
+  try {
+    const home = hostHomeDirectory(env);
+    const sourceAgentDirectory = canonicalPathForPiAgentDirectory(env, home);
+    const verificationEnv = isolatedEnvironment(env, workspace);
+    const verified = await verifyPiConfiguration(
+      configuration,
+      workspace.cwd,
+      verificationEnv,
+      MODEL_DISCOVERY_TIMEOUT_MS,
+    );
+    await copyPiConfiguration(sourceAgentDirectory, workspace.agentDirectory);
+    runtime = await PiProcess.start({
+      ...verified,
+      cwd: workspace.cwd,
+      env: discoveryEnvironment(env, workspace),
+      sessionDirectory: workspace.sessionDirectory,
+      provider: request.provider,
+      model: request.model,
+    });
+    const state = await runtime.getState();
+    if (
+      !state.model ||
+      state.model.provider !== request.provider ||
+      state.model.id !== request.model
+    )
+      throw new Error("Pi did not select the requested model for capability discovery.");
+    const [thinkingLevels, supportsImages] = await Promise.all([
+      runtime.getAvailableThinkingLevels(),
+      runtime.supportsImages(),
+    ]);
+    capabilities = {
+      provider: request.provider,
+      model: request.model,
+      thinkingLevels,
+      supportsImages,
+    };
+  } catch (error) {
+    if (error instanceof SessionDiscoveryError) {
+      failure = error;
+    } else if (error instanceof Error && error.message.startsWith("Unsupported Pi version ")) {
+      failure = new SessionDiscoveryError(
+        503,
+        "unsupported_pi_version",
+        `The configured Pi version is unsupported. Model capabilities require Pi ${SUPPORTED_PI_VERSION}.`,
+      );
+    } else {
+      failure = new SessionDiscoveryError(
+        503,
+        "model_capabilities_failed",
+        "Pi could not read capabilities for the selected model. Check its executable and local model configuration.",
+      );
+    }
+  }
+  if (runtime) {
+    try {
+      await runtime.stop();
+    } catch {
+      stopFailed = true;
+    }
+  }
+  try {
+    await rm(workspace.root, { recursive: true, force: true });
+  } catch {
+    throw new SessionDiscoveryError(
+      503,
+      "discovery_cleanup_failed",
+      "Dwell could not remove private temporary model capability state.",
+    );
+  }
+  if (stopFailed)
+    throw new SessionDiscoveryError(
+      503,
+      "discovery_cleanup_failed",
+      "Dwell could not stop the temporary Pi model capability process.",
+    );
+  if (failure) throw failure;
+  if (!capabilities)
+    throw new SessionDiscoveryError(
+      503,
+      "model_capabilities_failed",
+      "Pi model capability discovery returned no result.",
+    );
+  return capabilities;
 }

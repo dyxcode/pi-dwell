@@ -33,6 +33,7 @@ function session(id = SESSION_ID, overrides: Partial<SessionInfo> = {}): Session
     directory: "/tmp/project",
     provider: "test-provider",
     model: "test-model",
+    thinkingLevel: "off",
     piSessionId: OTHER_SESSION_ID,
     createdAt: 1,
     updatedAt: 1,

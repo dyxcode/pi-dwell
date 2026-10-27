@@ -1,10 +1,18 @@
 import { SESSION_ID } from "./sessions.ts";
 
 export interface HistoryBlock {
-  type: "text" | "thinking" | "tool_call" | "unsupported";
+  type: "text" | "thinking" | "tool_call" | "image" | "unsupported";
   text: string;
   callId: string | null;
   name: string | null;
+  imageIndex?: number;
+  mimeType?: string;
+}
+
+export interface ContextSource {
+  path: string;
+  content: string;
+  truncated: boolean;
 }
 
 /** Display projection of a saved native entry; never a model-context reconstruction. */
@@ -13,12 +21,21 @@ export interface HistoryEntry {
   parentId: string | null;
   timestamp: string;
   type: string;
-  role: "user" | "assistant" | "toolResult" | "custom" | null;
+  role:
+    | "user"
+    | "assistant"
+    | "toolResult"
+    | "bashExecution"
+    | "custom"
+    | "context"
+    | "diagnostic"
+    | null;
   blocks: HistoryBlock[];
   toolCallId: string | null;
   toolName: string | null;
   targetId: string | null;
   truncated: boolean;
+  error?: boolean;
 }
 
 export interface HistoryPage {
@@ -34,7 +51,13 @@ export interface HistoryPage {
   latestTurnId: string | null;
   /** Latest terminal Dwell turn whose recorded entries all exist on this saved branch. */
   coveredTurnId: string | null;
+  /** Instructions proven to have been part of Pi's saved system context. */
+  contextSources?: ContextSource[];
+  /** True when the saved instruction preview was cut to fit its display limits. */
+  contextSourcesTruncated?: boolean;
 }
+
+const IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -54,64 +77,100 @@ function exact(value: Record<string, unknown>, keys: string[]): boolean {
   );
 }
 function block(value: unknown): value is HistoryBlock {
+  const base = ["type", "text", "callId", "name"];
+  const image = [...base, "imageIndex", "mimeType"];
+  const isImage = record(value) && value.type === "image";
   return (
     record(value) &&
-    exact(value, ["type", "text", "callId", "name"]) &&
+    exact(value, isImage ? image : base) &&
     typeof value.type === "string" &&
-    ["text", "thinking", "tool_call", "unsupported"].includes(value.type) &&
+    ["text", "thinking", "tool_call", "image", "unsupported"].includes(value.type) &&
     typeof value.text === "string" &&
     value.text.length <= 64 * 1024 &&
     optionalText(value.callId) &&
-    optionalText(value.name)
+    optionalText(value.name) &&
+    (!isImage ||
+      (typeof value.imageIndex === "number" &&
+        Number.isSafeInteger(value.imageIndex) &&
+        value.imageIndex >= 0 &&
+        typeof value.mimeType === "string" &&
+        IMAGE_MIME_TYPES.has(value.mimeType)))
+  );
+}
+function contextSource(value: unknown): value is ContextSource {
+  return (
+    record(value) &&
+    exact(value, ["path", "content", "truncated"]) &&
+    text(value.path, 4096) &&
+    typeof value.content === "string" &&
+    new TextEncoder().encode(value.content).byteLength <= 32 * 1024 &&
+    typeof value.truncated === "boolean"
   );
 }
 function entry(value: unknown): value is HistoryEntry {
+  const fields = [
+    "id",
+    "parentId",
+    "timestamp",
+    "type",
+    "role",
+    "blocks",
+    "toolCallId",
+    "toolName",
+    "targetId",
+    "truncated",
+  ];
   return (
     record(value) &&
-    exact(value, [
-      "id",
-      "parentId",
-      "timestamp",
-      "type",
-      "role",
-      "blocks",
-      "toolCallId",
-      "toolName",
-      "targetId",
-      "truncated",
-    ]) &&
+    (exact(value, fields) || exact(value, [...fields, "error"])) &&
     text(value.id) &&
     optionalText(value.parentId) &&
     text(value.timestamp, 100) &&
     text(value.type) &&
     (value.role === null ||
       (typeof value.role === "string" &&
-        ["user", "assistant", "toolResult", "custom"].includes(value.role))) &&
+        [
+          "user",
+          "assistant",
+          "toolResult",
+          "bashExecution",
+          "custom",
+          "context",
+          "diagnostic",
+        ].includes(value.role))) &&
     Array.isArray(value.blocks) &&
     value.blocks.length <= 64 &&
     Array.from(value.blocks).every(block) &&
     optionalText(value.toolCallId) &&
     optionalText(value.toolName) &&
     optionalText(value.targetId) &&
-    typeof value.truncated === "boolean"
+    typeof value.truncated === "boolean" &&
+    (value.error === undefined || typeof value.error === "boolean")
   );
 }
 
 export function isHistoryPage(value: unknown): value is HistoryPage {
+  const fields = [
+    "sessionId",
+    "status",
+    "revision",
+    "leafId",
+    "entries",
+    "nextCursor",
+    "incompleteTail",
+    "activeTurnId",
+    "latestTurnId",
+    "coveredTurnId",
+  ];
+  const optionalFields = [
+    fields,
+    [...fields, "contextSources"],
+    [...fields, "contextSourcesTruncated"],
+    [...fields, "contextSources", "contextSourcesTruncated"],
+  ];
   if (
     !record(value) ||
-    !exact(value, [
-      "sessionId",
-      "status",
-      "revision",
-      "leafId",
-      "entries",
-      "nextCursor",
-      "incompleteTail",
-      "activeTurnId",
-      "latestTurnId",
-      "coveredTurnId",
-    ]) ||
+    !optionalFields.some((candidate) => exact(value, candidate)) ||
     typeof value.sessionId !== "string" ||
     !SESSION_ID.test(value.sessionId) ||
     typeof value.status !== "string" ||
@@ -125,6 +184,12 @@ export function isHistoryPage(value: unknown): value is HistoryPage {
     !Array.isArray(value.entries) ||
     value.entries.length > 100 ||
     !Array.from(value.entries).every(entry) ||
+    (value.contextSources !== undefined &&
+      (!Array.isArray(value.contextSources) ||
+        value.contextSources.length > 32 ||
+        !Array.from(value.contextSources).every(contextSource))) ||
+    (value.contextSourcesTruncated !== undefined &&
+      (value.contextSources === undefined || typeof value.contextSourcesTruncated !== "boolean")) ||
     typeof value.incompleteTail !== "boolean" ||
     !optionalUuid(value.activeTurnId) ||
     !optionalUuid(value.latestTurnId) ||

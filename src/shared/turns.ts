@@ -1,3 +1,5 @@
+import { type ImageContent, isImageContentArray } from "./images.ts";
+
 export type TurnStatus =
   | "accepted"
   | "dispatching"
@@ -15,6 +17,7 @@ export interface TurnError {
 export interface TurnCreateRequest {
   requestId: string;
   message: string;
+  images?: ImageContent[];
 }
 
 export interface TurnInfo {
@@ -84,7 +87,6 @@ export function isTurnCreateRequest(value: unknown): value is TurnCreateRequest 
     typeof value !== "object" ||
     value === null ||
     Array.isArray(value) ||
-    !hasExactKeys(value, ["requestId", "message"]) ||
     !("requestId" in value) ||
     !isUuid(value.requestId) ||
     !("message" in value) ||
@@ -92,8 +94,18 @@ export function isTurnCreateRequest(value: unknown): value is TurnCreateRequest 
   ) {
     return false;
   }
+  const hasImages = Object.hasOwn(value, "images");
+  if (
+    !hasExactKeys(
+      value,
+      hasImages ? ["requestId", "message", "images"] : ["requestId", "message"],
+    ) ||
+    (hasImages && !("images" in value && isImageContentArray(value.images)))
+  )
+    return false;
   return (
-    value.message.trim().length > 0 &&
+    (value.message.trim().length > 0 ||
+      (hasImages && "images" in value && Array.isArray(value.images) && value.images.length > 0)) &&
     new TextEncoder().encode(value.message).byteLength <= 8192 &&
     !value.message.trimStart().startsWith("/")
   );

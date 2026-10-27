@@ -23,6 +23,7 @@ function session(id = SESSION_ID, updatedAt = 10): SessionInfo {
     directory: "/tmp/project",
     provider: "synthetic",
     model: "offline-test",
+    thinkingLevel: "off",
     piSessionId: "55555555-5555-4555-8555-555555555555",
     createdAt: 1,
     updatedAt,

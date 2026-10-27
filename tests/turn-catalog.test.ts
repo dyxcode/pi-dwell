@@ -41,6 +41,7 @@ function session(id: string, updatedAt = 1000): StoredSession {
     directory: "/tmp/project",
     provider: "test-provider",
     model: "test-model",
+    thinkingLevel: "off",
     piSessionId: id,
     piSessionFile: null,
     historyExpected: false,

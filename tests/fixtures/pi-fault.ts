@@ -12,6 +12,7 @@ const state = {
   isCompacting: false,
   messageCount: 0,
   pendingMessageCount: 0,
+  thinkingLevel: "off",
   model: { provider: "dwell-test", id: "dwell-test" },
 };
 const output = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -67,6 +68,11 @@ process.stdin.on("data", (chunk: Buffer) => {
           leafId: null,
         },
       });
+    } else if (value.type === "get_available_thinking_levels") {
+      output({ ...response, data: { levels: ["off", "low", "high"] } });
+    } else if (value.type === "set_thinking_level") {
+      if ("level" in value && typeof value.level === "string") state.thinkingLevel = value.level;
+      output(response);
     } else if (value.type === "prompt") {
       if (mode === "crash") {
         process.exit(23);

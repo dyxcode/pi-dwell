@@ -6,6 +6,11 @@ import { stripTypeScriptTypes } from "node:module";
 const modules = {
   "/client.js": new URL("./client.ts", import.meta.url),
   "/events.js": new URL("./events.ts", import.meta.url),
+  "/conversation.js": new URL("./conversation.ts", import.meta.url),
+  "/markdown.js": new URL("./markdown.ts", import.meta.url),
+  "/attachments.js": new URL("./attachments.ts", import.meta.url),
+  "/shared/images.js": new URL("../../shared/images.ts", import.meta.url),
+  "/shared/thinking.js": new URL("../../shared/thinking.ts", import.meta.url),
   "/input.js": new URL("./input.ts", import.meta.url),
   "/transport.js": new URL("./transport.ts", import.meta.url),
   "/shared/sessions.js": new URL("../../shared/sessions.ts", import.meta.url),
@@ -18,10 +23,13 @@ const modules = {
 export const BROWSER_ASSETS = new Map<string, string>(
   Object.entries(modules).map(([path, url]) => [
     path,
-    stripTypeScriptTypes(readFileSync(url, "utf8"), { mode: "strip" }).replace(
-      /(from\s+["'][^"']+)\.ts(["'])/g,
-      "$1.js$2",
-    ),
+    stripTypeScriptTypes(readFileSync(url, "utf8"), { mode: "strip" })
+      .replace(/(from\s+["'][^"']+)\.ts(["'])/g, "$1.js$2")
+      .replace(/from "marked"/g, 'from "/vendor/marked.js"'),
   ]),
+);
+BROWSER_ASSETS.set(
+  "/vendor/marked.js",
+  readFileSync(new URL(import.meta.resolve("marked")), "utf8"),
 );
 export const BROWSER_SCRIPT = BROWSER_ASSETS.get("/client.js") ?? "";

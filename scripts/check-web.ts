@@ -76,7 +76,9 @@ class BrowserPage {
       if (await this.evaluate(expression)) return;
       await delay(100);
     }
-    throw new Error(`Browser condition timed out: ${expression}`);
+    throw new Error(
+      `Browser condition timed out: ${expression}; ${JSON.stringify(await this.evaluate('({notice:document.querySelector("#notice")?.textContent,chat:document.querySelector("#conversation")?.textContent,send:document.querySelector("#send")?.outerHTML})'))}; errors=${JSON.stringify(this.errors)}`,
+    );
   }
   async click(selector: string): Promise<void> {
     await this.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
@@ -91,6 +93,13 @@ type BrowserMode = "http" | "https";
 const ALTERNATE_MODEL = "dwell-test-alt";
 
 async function assertComposerLayout(page: BrowserPage, viewport: string): Promise<void> {
+  assert.equal(await page.evaluate("innerWidth > 760"), viewport === "desktop");
+  assert.equal(
+    await page.evaluate(
+      'getComputedStyle(document.querySelector("main>header")).display === "none"',
+    ),
+    viewport === "desktop",
+  );
   assert.equal(
     await page.evaluate(`(()=>{
       const context=document.querySelector("#composer-context");
@@ -129,6 +138,25 @@ async function assertInputGrows(page: BrowserPage, viewport: string): Promise<vo
   await page.type("#message", "");
 }
 
+async function stagePngImages(page: BrowserPage, count: number, name: string): Promise<void> {
+  await page.evaluate(`(()=>{
+    const canvas=document.createElement("canvas");
+    canvas.width=64;
+    canvas.height=48;
+    const context=canvas.getContext("2d");
+    context.fillStyle="#3e8983";
+    context.fillRect(0,0,64,48);
+    const encoded=canvas.toDataURL("image/png").split(",")[1];
+    const bytes=Uint8Array.from(atob(encoded),character=>character.charCodeAt(0));
+    const transfer=new DataTransfer();
+    for(let index=0;index<${count};index++)
+      transfer.items.add(new File([bytes],${JSON.stringify(name)}+"-"+(index+1)+".png",{type:"image/png"}));
+    const input=document.querySelector("#image-files");
+    input.files=transfer.files;
+    input.dispatchEvent(new Event("change",{bubbles:true}));
+  })()`);
+}
+
 const args = process.argv.slice(2);
 const browserExecutables = args.filter((argument) => !argument.startsWith("--"));
 assert.ok(browserExecutables.length <= 1, "Provide at most one Chrome executable path.");
@@ -156,6 +184,11 @@ for (const mode of modes) {
   try {
     await mkdir(longDirectory, { recursive: true, mode: 0o700 });
     longDirectory = await realpath(longDirectory);
+    await writeFile(
+      join(longDirectory, "AGENTS.md"),
+      "# Project guidance\n\nKeep changes focused.\n",
+      { mode: 0o600 },
+    );
     const dataDir = join(environment.root, `host-${mode}`);
     if (mode === "https") {
       proxy = await createHttpsProxy(join(environment.root, "https-proxy"));
@@ -175,6 +208,30 @@ for (const mode of modes) {
             apiKey: "synthetic-key",
             api: "openai-completions",
             models: [
+              {
+                id: "dwell-test-image",
+                name: "Dwell Image Fixture",
+                input: ["text", "image"],
+                reasoning: false,
+                contextWindow: 8192,
+                maxTokens: 1024,
+              },
+              {
+                id: "dwell-test-reasoning",
+                name: "Dwell Thinking Fixture",
+                input: ["text", "image"],
+                reasoning: true,
+                thinkingLevelMap: {
+                  off: null,
+                  minimal: null,
+                  low: "low",
+                  medium: "medium",
+                  high: "high",
+                  xhigh: "xhigh",
+                },
+                contextWindow: 8192,
+                maxTokens: 1024,
+              },
               { id: "dwell-test", name: "Dwell test model", contextWindow: 8192, maxTokens: 1024 },
               {
                 id: ALTERNATE_MODEL,
@@ -223,6 +280,10 @@ for (const mode of modes) {
       }),
     );
     assert.equal(typeof session.id, "string");
+    const settingsPath = join(environment.agentDir, "settings.json");
+    const settings = record(JSON.parse(await readFile(settingsPath, "utf8")));
+    settings.defaultModel = "dwell-test-image";
+    await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, { mode: 0o600 });
     const profile = join(environment.root, `browser-${mode}`);
     chrome = spawn(
       executable,
@@ -254,7 +315,7 @@ for (const mode of modes) {
       await delay(100);
     }
     assert.match(port, /^\d+$/);
-    async function page(): Promise<BrowserPage> {
+    async function page(beforeNavigate?: string): Promise<BrowserPage> {
       const target = record(
         await (
           await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: "PUT" })
@@ -264,10 +325,41 @@ for (const mode of modes) {
       const result = new BrowserPage(String(target.webSocketDebuggerUrl));
       pages.push(result);
       await result.open();
+      await result.call("Emulation.setDeviceMetricsOverride", {
+        width: 1280,
+        height: 900,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      const injected = beforeNavigate
+        ? record(
+            await result.call("Page.addScriptToEvaluateOnNewDocument", {
+              source: beforeNavigate,
+            }),
+          )
+        : undefined;
       await result.call("Page.navigate", { url: browserOrigin });
+      if (typeof injected?.identifier === "string")
+        await result.call("Page.removeScriptToEvaluateOnNewDocument", {
+          identifier: injected.identifier,
+        });
       return result;
     }
-    const first = await page();
+    const first = await page(`(()=>{
+      const original=window.fetch.bind(window);
+      let release=()=>{};
+      const gate=new Promise(resolve=>{release=resolve;});
+      window.__dwellCapabilityPending=false;
+      window.__releaseDwellCapability=()=>{release();window.fetch=original;};
+      window.fetch=async(input,init)=>{
+        const target=typeof input==="string"?input:input.url;
+        if(new URL(target,location.href).pathname==="/api/v1/model-capabilities"){
+          window.__dwellCapabilityPending=true;
+          await gate;
+        }
+        return original(input,init);
+      };
+    })()`);
     await first.until(
       'document.querySelector("#gate-message")?.textContent === "Pair this browser to connect." && !document.querySelector("#pair-button").disabled',
     );
@@ -298,6 +390,19 @@ for (const mode of modes) {
     await first.click("#pair-button");
     await first.until(
       '!document.querySelector("#app").hidden && !document.querySelector("#message").disabled',
+    );
+    await first.until(
+      'window.__dwellCapabilityPending && document.querySelector("#attach-image").disabled && document.querySelector("#attach-image").title.includes("Checking")',
+    );
+    await first.evaluate("window.__releaseDwellCapability()");
+    await first.until(
+      'document.querySelector("#model-label").textContent.trim()==="dwell-test" && document.querySelector("#attach-image").disabled && document.querySelector("#attach-image").title.includes("Choose a model")',
+    );
+    assert.equal(
+      record(await request("/model-capabilities", { provider: "dwell-test", model: "dwell-test" }))
+        .supportsImages,
+      false,
+      "the existing default text model is reported as image-incompatible",
     );
     console.log(`PASS ${mode} real browser pairing and session selection`);
     if (proxy) {
@@ -379,10 +484,23 @@ for (const mode of modes) {
     assert.deepEqual(Object.keys(createBody).sort(), ["directory", "requestId"]);
     assert.equal(created.directory, longDirectory);
     assert.equal(created.provider, "dwell-test");
-    assert.equal(created.model, "dwell-test");
+    assert.equal(created.model, "dwell-test-image");
     assert.equal(
       await first.evaluate('document.querySelector("#composer-directory").textContent.trim()'),
       longDirectory,
+    );
+    await first.until(
+      'document.querySelector("#model-label").textContent.trim()==="dwell-test-image" && !document.querySelector("#attach-image").disabled && document.querySelector("#attach-image").title==="Add images"',
+    );
+    assert.equal(
+      record(
+        await request("/model-capabilities", {
+          provider: "dwell-test",
+          model: "dwell-test-image",
+        }),
+      ).supportsImages,
+      true,
+      "a new session uses the configured image-capable Pi default",
     );
     await assertComposerLayout(first, "desktop");
     await assertInputGrows(first, "desktop");
@@ -405,7 +523,9 @@ for (const mode of modes) {
     await second.until(
       'document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
     );
-    await second.until('document.querySelector("#model-label").textContent.trim()==="dwell-test"');
+    await second.until(
+      'document.querySelector("#model-label").textContent.trim()==="dwell-test-image"',
+    );
     assert.equal(
       await second.evaluate('document.querySelector("#composer-directory").textContent.trim()'),
       longDirectory,
@@ -573,6 +693,318 @@ for (const mode of modes) {
         mode +
         " safe text rendering, mobile drawer, top-right new action, and adaptive composer",
     );
+
+    await second.until(
+      'document.querySelector("#send").getAttribute("aria-label")==="Send message"',
+    );
+    await second.type("#message", "markdown");
+    await second.click("#send");
+    await second.until(
+      'document.querySelector("#conversation .assistant table") !== null && document.querySelector("#send").getAttribute("aria-label")==="Send message"',
+    );
+    assert.equal(
+      await second.evaluate(
+        '!!document.querySelector(".assistant h1") && !!document.querySelector(".assistant ul ul") && !!document.querySelector(".assistant ol") && !!document.querySelector(".assistant blockquote") && !!document.querySelector(".assistant .task-item input:checked") && !!document.querySelector(".assistant hr") && !!document.querySelector(".assistant del")',
+      ),
+      true,
+    );
+    assert.equal(
+      await second.evaluate('document.querySelector(".assistant pre code").textContent'),
+      "project/\n  src/\n    client.ts",
+    );
+    assert.equal(
+      await second.evaluate(
+        'document.querySelector(".assistant table th:nth-child(2)")?.style.textAlign',
+      ),
+      "right",
+      "Markdown tables retain right-aligned columns",
+    );
+    assert.equal(
+      await second.evaluate(
+        'document.querySelectorAll("#conversation img, #conversation script").length',
+      ),
+      0,
+    );
+    await second.until('document.querySelector(".session-details") !== null');
+    assert.equal(await second.evaluate('document.querySelector(".session-details").open'), false);
+    assert.equal(
+      await second.evaluate(
+        'document.querySelector("#conversation").textContent.includes("Unsupported saved message role")',
+      ),
+      false,
+    );
+    await second.click(".session-details>summary");
+    await second.click(".context-source>summary");
+    assert.equal(
+      await second.evaluate(
+        'document.querySelector(".context-content").textContent.includes("Keep changes focused.")',
+      ),
+      true,
+    );
+    await second.click(".session-details>summary");
+    await second.type("#message", "tool");
+    await second.click("#send");
+    await second.until(
+      'document.querySelector("#conversation").textContent.includes("Echo complete:") && document.querySelector("#send").getAttribute("aria-label")==="Send message"',
+    );
+    assert.equal(
+      await second.evaluate(
+        '[...document.querySelectorAll(".assistant")].some(e=>e.querySelector(".tool-run") && e.textContent.includes("Echo complete:"))',
+      ),
+      true,
+    );
+    assert.equal(
+      await second.evaluate('document.querySelectorAll("#conversation .byline").length'),
+      0,
+    );
+    const beforeModel = record(await request(`/sessions/${String(session.id)}`)).model;
+    await second.type("#message", "Keep this image-review draft");
+    await second.click("#choose-model");
+    await second.until('document.querySelectorAll("#model-options .model-option").length>=4');
+    await second.type("#model-search", "dwell-test-reasoning");
+    await second.click("#model-options .model-option");
+    await second.until('document.querySelectorAll(".thinking-choice").length===4');
+    assert.deepEqual(
+      await second.evaluate(
+        '[...document.querySelectorAll(".thinking-choice")].map(e=>e.dataset.level)',
+      ),
+      ["low", "medium", "high", "xhigh"],
+    );
+    await second.click("#close-model");
+    assert.equal(record(await request(`/sessions/${String(session.id)}`)).model, beforeModel);
+    await second.click("#choose-model");
+    await second.until('document.querySelectorAll("#model-options .model-option").length>=4');
+    await second.type("#model-search", "dwell-test-reasoning");
+    await second.click("#model-options .model-option");
+    await second.until('document.querySelectorAll(".thinking-choice").length===4');
+    await second.click("#back-models");
+    assert.equal(await second.evaluate('document.querySelector("#model-search").hidden'), false);
+    await second.click("#model-options .model-option");
+    await second.until('document.querySelectorAll(".thinking-choice").length===4');
+    await second.click('[data-level="high"]');
+    await second.until(
+      '!document.querySelector("#model-dialog").open && document.querySelector("#thinking-label").textContent.includes("High")',
+    );
+    assert.equal(record(await request(`/sessions/${String(session.id)}`)).thinkingLevel, "high");
+    assert.equal(
+      await second.evaluate('document.querySelector("#message").value'),
+      "Keep this image-review draft",
+    );
+    await stagePngImages(second, 1, "remove-after-model-switch");
+    await second.until('document.querySelectorAll(".image-attachment").length===1');
+    await second.click("#choose-model");
+    await second.until('document.querySelectorAll("#model-options .model-option").length>=4');
+    await second.evaluate(`([...document.querySelectorAll("#model-options .model-option")]
+      .find(button=>button.querySelector("strong")?.textContent==="dwell-test")?.click())`);
+    await second.until(
+      'document.querySelector("#model-label").textContent.trim()==="dwell-test" && document.querySelector("#attach-image").disabled',
+    );
+    assert.equal(
+      await second.evaluate('document.querySelector(".image-chip-remove").disabled'),
+      false,
+      "an existing draft image remains removable after switching to a text-only model",
+    );
+    await second.evaluate(`(()=>{
+      const original=window.fetch.bind(window);
+      window.__dwellTurnSubmissions=0;
+      window.fetch=async(input,init)=>{
+        const target=typeof input==="string"?input:input.url;
+        if(new URL(target,location.href).pathname.endsWith("/turns")&&init?.method==="POST")
+          window.__dwellTurnSubmissions++;
+        return original(input,init);
+      };
+      window.__restoreDwellFetch=()=>window.fetch=original;
+    })()`);
+    await second.click("#send");
+    await second.until(
+      'document.querySelector("#notice").textContent.includes("Choose an image-capable model")',
+    );
+    assert.equal(await second.evaluate("window.__dwellTurnSubmissions"), 0);
+    assert.equal(await second.evaluate('document.querySelectorAll(".image-attachment").length'), 1);
+    await second.evaluate("window.__restoreDwellFetch()");
+    await second.click(".image-chip-remove");
+    await second.until('document.querySelectorAll(".image-attachment").length===0');
+    await second.click("#choose-model");
+    await second.until('document.querySelectorAll("#model-options .model-option").length>=4');
+    await second.type("#model-search", "dwell-test-reasoning");
+    await second.click("#model-options .model-option");
+    await second.until('document.querySelectorAll(".thinking-choice").length===4');
+    await second.click('[data-level="high"]');
+    await second.until(
+      'document.querySelector("#model-label").textContent.trim()==="dwell-test-reasoning" && document.querySelector("#thinking-label").textContent.includes("High")',
+    );
+    assert.equal(
+      await second.evaluate('document.querySelector("#message").value'),
+      "Keep this image-review draft",
+    );
+    await second.type("#message", "Review the attached image");
+    await second.evaluate(
+      `(()=>{const c=document.createElement('canvas');c.width=64;c.height=48;const x=c.getContext('2d');x.fillStyle='#3e8983';x.fillRect(0,0,64,48);window.__testImage=c.toDataURL('image/png');const data=new DataTransfer();data.items.add(new File([Uint8Array.from(atob(window.__testImage.split(',')[1]),c=>c.charCodeAt(0))],'layout-reference.png',{type:'image/png'}));const input=document.querySelector('#image-files');input.files=data.files;input.dispatchEvent(new Event('change',{bubbles:true}))})()`,
+    );
+    await second.until(
+      'document.querySelectorAll(".image-attachment").length===1 && !document.querySelector("#send").disabled',
+    );
+    assert.equal(
+      await second.evaluate('document.querySelector(".image-chip-preview").textContent'),
+      "layout-reference.png",
+    );
+    assert.equal(
+      await second.evaluate('document.querySelectorAll("#image-attachments img").length'),
+      0,
+    );
+    await second.click(".image-chip-preview");
+    await second.until('document.querySelector("#preview-image").naturalWidth===64');
+    await second.click("#close-image");
+    await second.evaluate(
+      `(()=>{const data=new DataTransfer();data.items.add(new File([Uint8Array.from(atob(window.__testImage.split(',')[1]),c=>c.charCodeAt(0))],'image.png',{type:'image/png'}));document.querySelector('#message').dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}))})()`,
+    );
+    await second.until(
+      'document.querySelectorAll(".image-attachment").length===2 && !document.querySelector("#send").disabled',
+    );
+    assert.equal(
+      await second.evaluate('document.querySelectorAll(".image-chip-preview")[1].textContent'),
+      "Pasted image",
+    );
+    assert.equal(
+      await second.evaluate('document.querySelector("#message").value'),
+      "Review the attached image",
+    );
+    await second.click(".image-attachment:last-child .image-chip-remove");
+    await second.click("#send");
+    await second.until(
+      'document.querySelector("#conversation").textContent.includes("Received 1 image(s): image/png") && document.querySelector("#send").getAttribute("aria-label")==="Send message"',
+    );
+    await second.until('document.querySelector(".sent-image img")?.naturalWidth===64');
+    await second.call("Page.reload");
+    await second.until(
+      'document.querySelector(".sent-image img")?.naturalWidth===64 && document.querySelector("#thinking-label").textContent.includes("High")',
+    );
+    assert.equal(await second.evaluate('document.querySelectorAll(".image-attachment").length'), 0);
+    assert.equal(
+      await second.evaluate(
+        'document.querySelector(".composer-actions").getBoundingClientRect().height===document.querySelector(".composer-context").getBoundingClientRect().height',
+      ),
+      true,
+    );
+    await second.type("#message", "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight");
+    assert.equal(
+      await second.evaluate('document.querySelector("#message").clientHeight<=130'),
+      true,
+    );
+    assert.equal(await second.evaluate("document.documentElement.scrollWidth<=innerWidth"), true);
+    await second.type("#message", "");
+    const shots = process.env.DWELL_WEB_SCREENSHOT_DIR;
+    if (shots) {
+      await mkdir(shots, { recursive: true });
+      const result = record(await second.call("Page.captureScreenshot", { format: "png" }));
+      await writeFile(
+        join(shots, `${mode}-mobile.png`),
+        Buffer.from(String(result.data), "base64"),
+      );
+    }
+    await second.call("Emulation.setDeviceMetricsOverride", {
+      width: 1280,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await assertComposerLayout(second, "desktop");
+    await second.until(
+      'document.querySelector("#attach-image").title==="Add images" && !document.querySelector("#attach-image").disabled',
+    );
+    await second.evaluate(`(()=>{
+      const prototype=HTMLImageElement.prototype;
+      const original=prototype.decode;
+      let release=()=>{};
+      const gate=new Promise(resolve=>{release=resolve;});
+      window.__dwellImageDecodeStarted=false;
+      window.__dwellImageDecodeFinished=false;
+      window.__releaseDwellImageDecode=()=>{
+        prototype.decode=original;
+        release();
+      };
+      prototype.decode=function(){
+        window.__dwellImageDecodeStarted=true;
+        return gate.then(()=>original.call(this)).finally(()=>window.__dwellImageDecodeFinished=true);
+      };
+    })()`);
+    await stagePngImages(second, 1, "disconnect-pending");
+    await second.until("window.__dwellImageDecodeStarted===true");
+    await second.evaluate(
+      'window.dispatchEvent(new StorageEvent("storage",{key:"dwell.browser-binding.v1"}))',
+    );
+    await second.until('!document.querySelector("#gate").hidden');
+    await second.evaluate(`(()=>{
+      const original=window.fetch.bind(window);
+      window.__dwellFailCapabilityOnce=true;
+      window.__dwellPickerClicked=false;
+      document.querySelector("#image-files").click=()=>window.__dwellPickerClicked=true;
+      window.fetch=async(input,init)=>{
+        const target=typeof input==="string"?input:input.url;
+        if(new URL(target,location.href).pathname==="/api/v1/model-capabilities"&&window.__dwellFailCapabilityOnce){
+          window.__dwellFailCapabilityOnce=false;
+          return new Response(JSON.stringify({error:{code:"fixture_retry",message:"Temporary capability failure."}}),{status:503,headers:{"Content-Type":"application/json"}});
+        }
+        return original(input,init);
+      };
+    })()`);
+    await second.click("#retry-button");
+    await second.until(
+      'document.querySelector("#gate").hidden && !document.querySelector("#app").hidden && document.querySelector("#attach-image").getAttribute("aria-label")==="Retry image support check" && !document.querySelector("#attach-image").disabled',
+    );
+    assert.equal(
+      await second.evaluate('document.querySelectorAll(".image-attachment").length'),
+      0,
+      "disconnect discards the attachment that was still decoding",
+    );
+    await second.click("#attach-image");
+    await second.until("window.__dwellPickerClicked===true");
+    await second.evaluate("window.__releaseDwellImageDecode()");
+    await second.until("window.__dwellImageDecodeFinished===true");
+    assert.equal(
+      await second.evaluate('document.querySelectorAll(".image-attachment").length'),
+      0,
+      "a pre-disconnect decode cannot reappear after reconnect",
+    );
+    await second.until(
+      'document.querySelector("#attach-image").getAttribute("aria-label")==="Add images" && !document.querySelector("#attach-image").disabled',
+    );
+    await stagePngImages(second, 4, "image-only");
+    await second.until(
+      'document.querySelectorAll(".image-attachment").length===4 && document.querySelector("#message").value==="" && !document.querySelector("#send").disabled',
+    );
+    await second.click("#send");
+    await second.until(
+      'document.querySelector("#conversation").textContent.includes("Received 4 image(s): image/png, image/png, image/png, image/png. Text:") && document.querySelector("#send").getAttribute("aria-label")==="Send message"',
+    );
+    await second.until(
+      'document.querySelectorAll(".sent-image img").length===5 && [...document.querySelectorAll(".sent-image img")].every(image=>image.naturalWidth===64)',
+    );
+    await second.call("Page.reload");
+    await second.until(
+      'document.querySelectorAll(".sent-image img").length===5 && [...document.querySelectorAll(".sent-image img")].every(image=>image.naturalWidth===64)',
+    );
+    if (shots) {
+      const result = record(await second.call("Page.captureScreenshot", { format: "png" }));
+      await writeFile(
+        join(shots, `${mode}-desktop.png`),
+        Buffer.from(String(result.data), "base64"),
+      );
+    }
+    assert.equal(
+      await second.evaluate(
+        '(()=>{const chat=document.querySelector("#scroll");return chat.scrollHeight-chat.clientHeight-chat.scrollTop<3})()',
+      ),
+      true,
+      "saved image loading keeps a conversation at the latest response",
+    );
+    console.log(
+      `PASS ${mode} capability retry, reconnect attachment binding, delayed decode invalidation, and four-image image-only history`,
+    );
+    console.log(
+      `PASS ${mode} real Markdown, saved instruction context, grouped tools, exact Pi thinking levels, image upload/paste, and reload persistence`,
+    );
+
     const hostPort = Number(new URL(host.url).port);
     await host.close();
     host = await startHost({

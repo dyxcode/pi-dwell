@@ -208,6 +208,23 @@ function scriptedStream(
     }
 
     const prompt = latestUserText(context);
+    const lastUser = [...context.messages].reverse().find((item) => item.role === "user");
+    const attached =
+      lastUser && Array.isArray(lastUser.content)
+        ? lastUser.content.filter((part) => part.type === "image")
+        : [];
+    if (attached.length) {
+      const response = `Received ${attached.length} image(s): ${attached.map((part) => part.mimeType).join(", ")}. Text: ${prompt}`;
+      emitText(stream, message, response, [response]);
+      return;
+    }
+    if (prompt === "markdown") {
+      const response =
+        "# Review\n\n**Bold**, *italic*, ~~old~~ and `code`.\n\n- First\n  - Nested\n\n1. Ordered\n\n- [x] Done\n- [ ] Pending\n\n> A quoted paragraph.\n\n```text\nproject/\n  src/\n    client.ts\n```\n\n| Name | State |\n| :--- | ---: |\n| Web | Ready |\n\n---\n\n[Example](https://example.com)\n\n<img src=x onerror=alert(1)>";
+      emitText(stream, message, response, [response]);
+      return;
+    }
+
     const turnLog = process.env.DWELL_TEST_TURN_LOG;
     if (turnLog) await appendFile(turnLog, `${prompt}\n`, { mode: 0o600 });
     if (prompt === "tool") {
@@ -332,6 +349,36 @@ export default function registerDwellFixture(pi: ExtensionAPI): void {
         reasoning: false,
         contextWindow: 4096,
         maxTokens: 256,
+      },
+      {
+        id: "dwell-test-image",
+        name: "Dwell Image Fixture",
+        api: API,
+        baseUrl: "http://127.0.0.1",
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        reasoning: false,
+        contextWindow: 8192,
+        maxTokens: 1024,
+      },
+      {
+        id: "dwell-test-reasoning",
+        name: "Dwell Thinking Fixture",
+        api: API,
+        baseUrl: "http://127.0.0.1",
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        reasoning: true,
+        thinkingLevelMap: {
+          off: null,
+          minimal: null,
+          low: "low",
+          medium: "medium",
+          high: "high",
+          xhigh: "xhigh",
+        },
+        contextWindow: 8192,
+        maxTokens: 1024,
       },
     ],
     streamSimple: scriptedStream,

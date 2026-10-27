@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { createPrivateFile, prepareDataDirectory } from "../local/files.ts";
 import { hasCode } from "../local/paths.ts";
+import { isThinkingLevel, type ThinkingLevel } from "../shared/thinking.ts";
 import type { RuntimeConfiguration } from "../shared/sessions.ts";
 import { isTurnInfo, type TurnError, type TurnInfo, type TurnStatus } from "../shared/turns.ts";
 
@@ -14,6 +15,7 @@ export interface StoredSession {
   directory: string;
   provider: string | null;
   model: string | null;
+  thinkingLevel: ThinkingLevel | null;
   piSessionId: string;
   piSessionFile: string | null;
   historyExpected: boolean;
@@ -27,11 +29,17 @@ export interface StoredTurn extends TurnInfo {
   payloadIdentity: string;
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const V1_SCHEMA_VERSION = 1;
 const V2_SCHEMA_VERSION = 2;
+const V3_SCHEMA_VERSION = 3;
 const DATABASE_NAME = "catalog.sqlite";
 const SESSION_COLUMNS = `
+  id, request_id, payload_identity, directory, provider, model, pi_session_id,
+  pi_session_file, history_expected, status, created_at, updated_at, error,
+  thinking_level
+`;
+const V3_SESSION_COLUMNS = `
   id, request_id, payload_identity, directory, provider, model, pi_session_id,
   pi_session_file, history_expected, status, created_at, updated_at, error
 `;
@@ -40,8 +48,10 @@ const CONFIGURATION_SCHEMA =
   "CREATE TABLE runtime_configuration (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), executable TEXT NOT NULL CHECK (length(executable) > 0), entry_point TEXT CHECK (entry_point IS NULL OR length(entry_point) > 0)) STRICT";
 const V2_SESSIONS_SCHEMA =
   "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT NOT NULL CHECK (length(provider) > 0), model TEXT NOT NULL CHECK (length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT) STRICT";
-const SESSIONS_SCHEMA =
+const V3_SESSIONS_SCHEMA =
   "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT";
+const SESSIONS_SCHEMA =
+  "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, thinking_level TEXT CHECK (thinking_level IS NULL OR thinking_level IN ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')), CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT";
 const TURNS_SCHEMA =
   "CREATE TABLE turns (run_id TEXT NOT NULL PRIMARY KEY CHECK (length(run_id) > 0), session_id TEXT NOT NULL REFERENCES sessions(id), request_id TEXT NOT NULL CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) = 64), status TEXT NOT NULL CHECK (status IN ('accepted', 'dispatching', 'running', 'completed', 'failed', 'aborted', 'interrupted')), cancellation_requested INTEGER NOT NULL CHECK (cancellation_requested IN (0, 1)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error_code TEXT, error_message TEXT, entry_ids TEXT NOT NULL CHECK (json_valid(entry_ids)), UNIQUE (session_id, request_id), CHECK ((error_code IS NULL AND error_message IS NULL) OR (length(error_code) > 0 AND length(error_message) > 0))) STRICT";
 const ACTIVE_TURN_INDEX =
@@ -117,6 +127,8 @@ function isStoredSession(value: unknown): value is StoredSession {
     !("provider" in value) ||
     !Object.hasOwn(value, "model") ||
     !("model" in value) ||
+    !Object.hasOwn(value, "thinkingLevel") ||
+    !("thinkingLevel" in value) ||
     !Object.hasOwn(value, "piSessionId") ||
     !("piSessionId" in value) ||
     !Object.hasOwn(value, "piSessionFile") ||
@@ -134,7 +146,7 @@ function isStoredSession(value: unknown): value is StoredSession {
   ) {
     return false;
   }
-  if (Object.keys(value).length !== 13) {
+  if (Object.keys(value).length !== 14) {
     return false;
   }
   return (
@@ -144,6 +156,7 @@ function isStoredSession(value: unknown): value is StoredSession {
     isNonEmptyString(value.directory) &&
     ((value.provider === null && value.model === null) ||
       (isNonEmptyString(value.provider) && isNonEmptyString(value.model))) &&
+    (value.thinkingLevel === null || isThinkingLevel(value.thinkingLevel)) &&
     isNonEmptyString(value.piSessionId) &&
     isNullableNonEmptyString(value.piSessionFile) &&
     typeof value.historyExpected === "boolean" &&
@@ -267,6 +280,15 @@ function nullableStringFromDatabase(
   return value;
 }
 
+function nullableThinkingLevelFromDatabase(
+  row: Record<string, SQLOutputValue>,
+): ThinkingLevel | null {
+  const value = row.thinking_level;
+  if (value === null) return null;
+  if (!isThinkingLevel(value)) throw invalidCatalog("thinking level is invalid");
+  return value;
+}
+
 function sessionFromDatabase(row: Record<string, SQLOutputValue>): StoredSession {
   const historyExpected = integerFromDatabase(row, "history_expected");
   const status = stringFromDatabase(row, "status");
@@ -281,6 +303,7 @@ function sessionFromDatabase(row: Record<string, SQLOutputValue>): StoredSession
     directory: stringFromDatabase(row, "directory"),
     provider: nullableStringFromDatabase(row, "provider"),
     model: nullableStringFromDatabase(row, "model"),
+    thinkingLevel: nullableThinkingLevelFromDatabase(row),
     piSessionId: stringFromDatabase(row, "pi_session_id"),
     piSessionFile: nullableStringFromDatabase(row, "pi_session_file"),
     historyExpected: historyExpected === 1,
@@ -364,7 +387,7 @@ function hasUserSchema(database: DatabaseSync): boolean {
   );
 }
 
-function verifySchema(database: DatabaseSync, version: 1 | 2 | 3): void {
+function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4): void {
   const rows = databaseRows(
     database,
     "SELECT type, name, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -381,7 +404,12 @@ function verifySchema(database: DatabaseSync, version: 1 | 2 | 3): void {
           {
             type: "table",
             name: "sessions",
-            sql: version === V2_SCHEMA_VERSION ? V2_SESSIONS_SCHEMA : SESSIONS_SCHEMA,
+            sql:
+              version === V2_SCHEMA_VERSION
+                ? V2_SESSIONS_SCHEMA
+                : version === V3_SCHEMA_VERSION
+                  ? V3_SESSIONS_SCHEMA
+                  : SESSIONS_SCHEMA,
           },
           { type: "table", name: "turns", sql: TURNS_SCHEMA },
         ];
@@ -398,9 +426,9 @@ function verifySchema(database: DatabaseSync, version: 1 | 2 | 3): void {
 
 function migrateV2ToV3(database: DatabaseSync): void {
   database.exec("ALTER TABLE sessions RENAME TO sessions_v2");
-  database.exec(SESSIONS_SCHEMA);
+  database.exec(V3_SESSIONS_SCHEMA);
   database.exec(
-    `INSERT INTO sessions (${SESSION_COLUMNS}) SELECT ${SESSION_COLUMNS} FROM sessions_v2`,
+    `INSERT INTO sessions (${V3_SESSION_COLUMNS}) SELECT ${V3_SESSION_COLUMNS} FROM sessions_v2`,
   );
   database.exec("ALTER TABLE turns RENAME TO turns_v2");
   database.exec(TURNS_SCHEMA);
@@ -408,6 +436,22 @@ function migrateV2ToV3(database: DatabaseSync): void {
   database.exec("DROP TABLE turns_v2");
   database.exec(ACTIVE_TURN_INDEX);
   database.exec("DROP TABLE sessions_v2");
+  database.exec(`PRAGMA user_version = ${V3_SCHEMA_VERSION}`);
+  verifySchema(database, V3_SCHEMA_VERSION);
+}
+
+function migrateV3ToV4(database: DatabaseSync): void {
+  database.exec("ALTER TABLE sessions RENAME TO sessions_v3");
+  database.exec(SESSIONS_SCHEMA);
+  database.exec(
+    `INSERT INTO sessions (${SESSION_COLUMNS}) SELECT ${V3_SESSION_COLUMNS}, NULL FROM sessions_v3`,
+  );
+  database.exec("ALTER TABLE turns RENAME TO turns_v3");
+  database.exec(TURNS_SCHEMA);
+  database.exec(`INSERT INTO turns (${TURN_COLUMNS}) SELECT ${TURN_COLUMNS} FROM turns_v3`);
+  database.exec("DROP TABLE turns_v3");
+  database.exec(ACTIVE_TURN_INDEX);
+  database.exec("DROP TABLE sessions_v3");
   database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   verifySchema(database, SCHEMA_VERSION);
 }
@@ -436,9 +480,14 @@ function initializeSchema(database: DatabaseSync): void {
         database.exec(`PRAGMA user_version = ${V2_SCHEMA_VERSION}`);
         verifySchema(database, V2_SCHEMA_VERSION);
         migrateV2ToV3(database);
+        migrateV3ToV4(database);
       } else if (version === V2_SCHEMA_VERSION) {
         verifySchema(database, V2_SCHEMA_VERSION);
         migrateV2ToV3(database);
+        migrateV3ToV4(database);
+      } else if (version === V3_SCHEMA_VERSION) {
+        verifySchema(database, V3_SCHEMA_VERSION);
+        migrateV3ToV4(database);
       } else if (version === SCHEMA_VERSION) {
         verifySchema(database, SCHEMA_VERSION);
       } else {
@@ -578,7 +627,7 @@ export class SessionCatalog {
     validateRecord(record);
     this.database
       .prepare(
-        "INSERT INTO sessions (id, request_id, payload_identity, directory, provider, model, pi_session_id, pi_session_file, history_expected, status, created_at, updated_at, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        `INSERT INTO sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         record.id,
@@ -594,6 +643,7 @@ export class SessionCatalog {
         record.createdAt,
         record.updatedAt,
         record.error,
+        record.thinkingLevel,
       );
   }
 
@@ -601,7 +651,7 @@ export class SessionCatalog {
     validateRecord(record);
     const result = this.database
       .prepare(
-        "UPDATE sessions SET request_id = ?, payload_identity = ?, directory = ?, provider = ?, model = ?, pi_session_id = ?, pi_session_file = ?, history_expected = ?, status = ?, created_at = ?, updated_at = ?, error = ? WHERE id = ?",
+        "UPDATE sessions SET request_id = ?, payload_identity = ?, directory = ?, provider = ?, model = ?, pi_session_id = ?, pi_session_file = ?, history_expected = ?, status = ?, created_at = ?, updated_at = ?, error = ?, thinking_level = ? WHERE id = ?",
       )
       .run(
         record.requestId,
@@ -616,6 +666,7 @@ export class SessionCatalog {
         record.createdAt,
         record.updatedAt,
         record.error,
+        record.thinkingLevel,
         record.id,
       );
     if (result.changes !== 1 && result.changes !== 1n) {

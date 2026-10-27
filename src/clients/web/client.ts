@@ -5,11 +5,20 @@ import {
   isHostDirectoryListing,
   type PiModelOption,
 } from "../../shared/discovery.ts";
-import { type HistoryEntry, isHistoryPage } from "../../shared/history.ts";
+import { type ContextSource, type HistoryEntry, isHistoryPage } from "../../shared/history.ts";
 import { isHostStatus } from "../../shared/protocol.ts";
 import { isSessionInfo, type SessionInfo } from "../../shared/sessions.ts";
 import { isTurnInfo, type TurnInfo } from "../../shared/turns.ts";
 import { emptyConversationState, reconcileHistory, reduceFrame, SSEDecoder } from "./events.ts";
+import { Attachments } from "./attachments.ts";
+import { renderMarkdown } from "./markdown.ts";
+import { renderSavedConversation } from "./conversation.ts";
+import type { ImageContent } from "../../shared/images.ts";
+import {
+  isModelCapabilitiesResponse,
+  type ModelCapabilitiesResponse,
+  type ThinkingLevel,
+} from "../../shared/thinking.ts";
 import { setupComposer } from "./input.ts";
 import { ApiError, api, binding, headers, message, responseError } from "./transport.ts";
 
@@ -46,6 +55,20 @@ const modelDialog = el("model-dialog", HTMLDialogElement);
 const modelSearch = el("model-search", HTMLInputElement);
 const chooseModel = el("choose-model", HTMLButtonElement);
 let availableModels: PiModelOption[] = [];
+const capabilities = new Map<string, ModelCapabilitiesResponse>();
+const capabilityRequests = new Map<string, Promise<ModelCapabilitiesResponse>>();
+const capabilityErrors = new Set<string>();
+let capabilityGeneration = 0;
+let thinkingChoice: PiModelOption | null = null;
+const levelNames: Record<ThinkingLevel, string> = {
+  off: "Off",
+  minimal: "Minimal",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra high",
+  max: "Max",
+};
 let modelSession: string | null = null,
   changingModel: string | null = null;
 const older = el("load-older", HTMLButtonElement);
@@ -55,6 +78,8 @@ const turns = new Map<string, TurnInfo>();
 let sessions: SessionInfo[] = [],
   selected: string | null = null;
 let state = emptyConversationState();
+let contextSources: ContextSource[] = [];
+let contextSourcesTruncated = false;
 let entries: HistoryEntry[] = [],
   nextCursor: string | null = null;
 let controller: AbortController | null = null,
@@ -66,7 +91,12 @@ let polling = false,
 let historyPending = false,
   historyAgain = false,
   sending = false;
-let pendingSend: { session: string; requestId: string; message: string } | null = null;
+let pendingSend: {
+  session: string;
+  requestId: string;
+  message: string;
+  images: ImageContent[];
+} | null = null;
 let pendingCreate: {
   requestId: string;
   directory: string;
@@ -78,6 +108,128 @@ let hostMode = "",
   historyError = "",
   streamConnected = false;
 let noticeSource: "action" | "stream" | undefined;
+const imageDialog = el("image-dialog", HTMLDialogElement);
+function showImage(url: string, name: string): void {
+  el("preview-image", HTMLImageElement).src = url;
+  el("preview-image", HTMLImageElement).alt = name;
+  el("image-title", HTMLElement).textContent = name;
+  imageDialog.showModal();
+}
+const attachments = new Attachments({
+  input: el("image-files", HTMLInputElement),
+  tray: el("image-attachments", HTMLElement),
+  button: el("attach-image", HTMLButtonElement),
+  change: () => navigation(),
+  error: (error) => showError(error),
+  preview: showImage,
+});
+const attachButton = el("attach-image", HTMLButtonElement);
+const imageFiles = el("image-files", HTMLInputElement);
+attachButton.onclick = () => {
+  const session = activeSession();
+  if (!session || !authenticated || session.provider === null || session.model === null) return;
+  const key = modelCapabilityKey(session.provider, session.model);
+  if (key === null) return;
+  const capability = capabilities.get(key);
+  if (capability?.supportsImages) {
+    imageFiles.click();
+    return;
+  }
+  if (capabilityErrors.has(key)) {
+    const authentication = authAttempt;
+    const epoch = capabilityGeneration;
+    void requestModelCapabilities({ provider: session.provider, id: session.model })
+      .then((result) => {
+        if (
+          result.supportsImages &&
+          authentication === authAttempt &&
+          epoch === capabilityGeneration &&
+          authenticated &&
+          selected === session.id &&
+          activeSession()?.provider === session.provider &&
+          activeSession()?.model === session.model
+        )
+          imageFiles.click();
+      })
+      .catch((error: unknown) => {
+        if (
+          authentication === authAttempt &&
+          epoch === capabilityGeneration &&
+          error instanceof ApiError &&
+          error.status === 401
+        )
+          showError(error);
+      });
+  }
+};
+const imageCache = new Map<string, Promise<string>>();
+let imageQueue: Promise<unknown> = Promise.resolve();
+let liveOrder: { kind: "message" | "tool"; id: string }[] = [];
+function releaseImages(): void {
+  for (const value of imageCache.values())
+    void value.then(
+      (url) => URL.revokeObjectURL(url),
+      () => {},
+    );
+  imageCache.clear();
+}
+function historyImage(entryId: string, index: number, mimeType: string): HTMLElement {
+  const button = node("button", "Loading image…", "sent-image");
+  button.type = "button";
+  const session = selected,
+    epoch = generation;
+  const key = `/api/v1/sessions/${session}/history/${encodeURIComponent(entryId)}/images/${index}`;
+  let pending = imageCache.get(key);
+  if (!pending) {
+    pending = imageQueue.then(async () => {
+      if (selected !== session || generation !== epoch) throw new Error("Session changed.");
+      const response = await fetch(key, {
+        headers: headers(),
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) throw await responseError(response);
+      if (response.headers.get("content-type") !== mimeType)
+        throw new Error("Invalid saved image type.");
+      const blob = await response.blob();
+      if (blob.size > 5 * 1024 * 1024) throw new Error("Saved image exceeds the display limit.");
+      return URL.createObjectURL(blob);
+    });
+    imageQueue = pending.catch(() => {});
+    imageCache.set(key, pending);
+  }
+  void pending.then(
+    (url) => {
+      if (selected !== session || generation !== epoch) return;
+      const image = node("img");
+      image.alt = `Image ${index + 1}`;
+      image.onload = () => {
+        if (selected !== session || generation !== epoch || !button.isConnected) return;
+        const atBottom = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 90;
+        button.replaceChildren(image);
+        if (atBottom) scroll.scrollTop = scroll.scrollHeight;
+      };
+      image.onerror = () => {
+        if (button.isConnected) button.textContent = "Saved image cannot be displayed.";
+      };
+      image.src = url;
+      button.setAttribute("aria-label", `Preview image ${index + 1}`);
+      button.onclick = () => showImage(url, `Image ${index + 1}`);
+    },
+    (error) => {
+      if (selected === session && generation === epoch) {
+        button.textContent = "Image unavailable · retry";
+        button.onclick = () => {
+          imageCache.delete(key);
+          renderConversation();
+        };
+        if (error instanceof ApiError && error.status === 401) showError(error);
+      }
+    },
+  );
+  return button;
+}
 const localPreferences: Record<string, string> = {};
 try {
   const value: unknown = JSON.parse(localStorage.getItem("dwell.web.preferences.v1") ?? "{}");
@@ -99,6 +251,67 @@ function savePreference(key: string, value: string): void {
 }
 function activeSession(): SessionInfo | undefined {
   return sessions.find((s) => s.id === selected);
+}
+function modelCapabilityKey(provider: string | null, model: string | null): string | null {
+  return provider !== null && model !== null ? JSON.stringify([provider, model]) : null;
+}
+function requestModelCapabilities(choice: PiModelOption): Promise<ModelCapabilitiesResponse> {
+  const key = modelCapabilityKey(choice.provider, choice.id);
+  if (key === null) return Promise.reject(new Error("This session has no selected model."));
+  const cached = capabilities.get(key);
+  if (cached) return Promise.resolve(cached);
+  const existing = capabilityRequests.get(key);
+  if (existing) return existing;
+
+  const epoch = capabilityGeneration;
+  capabilityErrors.delete(key);
+  let pending: Promise<ModelCapabilitiesResponse>;
+  pending = api("/api/v1/model-capabilities", {
+    provider: choice.provider,
+    model: choice.id,
+  })
+    .then((value) => {
+      if (
+        !isModelCapabilitiesResponse(value) ||
+        value.provider !== choice.provider ||
+        value.model !== choice.id
+      )
+        throw new Error("Invalid model capabilities.");
+      if (epoch === capabilityGeneration) capabilities.set(key, value);
+      return value;
+    })
+    .catch((error: unknown) => {
+      if (epoch === capabilityGeneration) capabilityErrors.add(key);
+      throw error;
+    })
+    .finally(() => {
+      if (capabilityRequests.get(key) === pending) capabilityRequests.delete(key);
+      if (epoch === capabilityGeneration) navigation();
+    });
+  capabilityRequests.set(key, pending);
+  navigation();
+  return pending;
+}
+function probeCurrentModel(sessionId: string | null = selected): void {
+  if (!authenticated || !sessionId) return;
+  const session = sessions.find((value) => value.id === sessionId);
+  if (!session || session.provider === null || session.model === null) return;
+  const key = modelCapabilityKey(session.provider, session.model);
+  if (key === null) return;
+  if (capabilities.has(key) || capabilityRequests.has(key) || capabilityErrors.has(key)) return;
+  const authentication = authAttempt;
+  const epoch = capabilityGeneration;
+  void requestModelCapabilities({ provider: session.provider, id: session.model }).catch(
+    (error: unknown) => {
+      if (
+        authentication === authAttempt &&
+        epoch === capabilityGeneration &&
+        error instanceof ApiError &&
+        error.status === 401
+      )
+        showError(error);
+    },
+  );
 }
 function label(s: SessionInfo): string {
   return names.get(s.id) || s.directory.split(/[\\/]/).filter(Boolean).pop() || s.directory;
@@ -193,6 +406,9 @@ function navigation(): void {
   contextDirectory.title = s?.directory ?? "";
   contextDirectory.setAttribute("aria-label", `Current directory: ${s?.directory ?? ""}`);
   el("model-label", HTMLElement).textContent = s?.model ?? "Choose model";
+  el("thinking-label", HTMLElement).textContent = s?.thinkingLevel
+    ? `· ${levelNames[s.thinkingLevel]}`
+    : "";
   chooseModel.title = s?.model ? `${s.provider} / ${s.model}` : "Choose model";
   chooseModel.setAttribute("aria-label", `Choose model, current: ${s?.model ?? "not selected"}`);
   const busy = !!s?.activeTurnId;
@@ -203,6 +419,7 @@ function navigation(): void {
     busy ||
     sending ||
     changingModel !== null ||
+    attachments.busy ||
     pendingSend?.session === selected;
   if (modelDialog.open) {
     const disabled = chooseModel.disabled || modelSession !== selected;
@@ -214,8 +431,54 @@ function navigation(): void {
   }
   input.disabled = !s || !authenticated || s.status !== "ready";
   input.readOnly = sending || changingModel === selected || pendingSend?.session === selected;
-  send.disabled = !s || !authenticated || sending || changingModel === selected;
-  send.textContent = busy ? "□" : pendingSend?.session === selected ? "↻" : "↑";
+  const key = s ? modelCapabilityKey(s.provider, s.model) : null;
+  const capability = key !== null ? capabilities.get(key) : undefined;
+  const capabilityChecking = key !== null && capabilityRequests.has(key);
+  const capabilityFailed = key !== null && capabilityErrors.has(key);
+  const capabilityUnknown = s !== undefined && (key === null || (!capability && !capabilityFailed));
+  const attachmentBaseDisabled =
+    !s ||
+    !authenticated ||
+    s.status !== "ready" ||
+    sending ||
+    busy ||
+    changingModel !== null ||
+    pendingSend !== null;
+  const attachmentIntakeDisabled =
+    attachmentBaseDisabled ||
+    capabilityChecking ||
+    capabilityUnknown ||
+    capabilityFailed ||
+    capability?.supportsImages === false;
+  attachments.setDisabled(attachmentBaseDisabled, attachmentIntakeDisabled);
+  const retryCapability = capabilityFailed && !attachmentBaseDisabled && !attachments.busy;
+  attachButton.disabled = attachments.busy || (attachmentIntakeDisabled && !retryCapability);
+  attachButton.title =
+    capabilityChecking || capabilityUnknown
+      ? "Checking image support for this model"
+      : capabilityFailed
+        ? "Image support check failed · select to retry"
+        : capability?.supportsImages === false
+          ? "Choose a model that supports images"
+          : "Add images";
+  attachButton.setAttribute(
+    "aria-label",
+    capabilityChecking || capabilityUnknown
+      ? "Checking image support"
+      : capabilityFailed
+        ? "Retry image support check"
+        : capability?.supportsImages === false
+          ? "Images are not supported by this model"
+          : "Add images",
+  );
+  send.disabled =
+    !s ||
+    !authenticated ||
+    sending ||
+    changingModel === selected ||
+    attachments.busy ||
+    (!busy && !pendingSend && !input.value.trim() && attachments.count === 0);
+  send.textContent = busy ? "Stop □" : pendingSend?.session === selected ? "Retry ↻" : "Send ↑";
   send.setAttribute(
     "aria-label",
     busy
@@ -224,34 +487,6 @@ function navigation(): void {
         ? "Retry the same message"
         : "Send message",
   );
-}
-function detail(title: string, text: string): HTMLDetailsElement {
-  const result = node("details");
-  result.append(node("summary", title), node("pre", text, "tool-body"));
-  return result;
-}
-function renderEntry(entry: HistoryEntry): HTMLElement {
-  const role = entry.role === "user" ? "user" : entry.role === "assistant" ? "assistant" : "system";
-  const article = node("article", "", `message ${role}`);
-  if (entry.role === "toolResult") {
-    article.append(
-      detail(entry.toolName ?? "Tool result", entry.blocks.map((b) => b.text).join("\n")),
-    );
-    return article;
-  }
-  article.append(
-    node("div", role === "user" ? "You" : role === "assistant" ? "Pi" : "Context", "byline"),
-  );
-  const body = node("div", "", "message-body");
-  for (const block of entry.blocks) {
-    if (block.type === "thinking") body.append(detail("Thinking", block.text));
-    else if (block.type === "tool_call") body.append(detail(block.name ?? "Tool call", block.text));
-    else body.append(node("p", block.text));
-  }
-  if (entry.truncated)
-    body.append(node("p", "This saved entry was truncated for display.", "footnote"));
-  article.append(body);
-  return article;
 }
 function renderConversation(): void {
   const atBottom = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 90;
@@ -269,33 +504,75 @@ function renderConversation(): void {
     );
     conversation.append(empty);
   } else {
-    for (const entry of entries) {
-      const element = renderEntry(entry);
-      element.dataset.entryId = entry.id;
-      element.querySelectorAll("details").forEach((d, index) => {
-        d.dataset.key = `${entry.id}:${index}`;
-        d.open = expanded.has(d.dataset.key);
-      });
-      conversation.append(element);
+    conversation.append(
+      renderSavedConversation(entries, contextSources, contextSourcesTruncated, historyImage),
+    );
+    for (const element of Array.from(
+      conversation.querySelectorAll<HTMLDetailsElement>("details[data-key]"),
+    )) {
+      if (expanded.has(element.dataset.key)) element.open = true;
     }
     const liveVisible =
       state.liveRunId !== null && state.history?.coveredTurnId !== state.liveRunId;
     if (liveVisible) {
-      for (const live of state.messages) {
-        const article = node("article", "", "message assistant live");
-        article.append(
-          node("div", "Pi · live", "byline"),
-          node("div", live.text || "…", "message-body"),
-        );
-        conversation.append(article);
+      const article = node("article", "", "message assistant live"),
+        body = node("div", "", "message-body");
+      article.setAttribute("aria-label", "Pi live response");
+      article.append(body);
+      const order = [...liveOrder];
+      for (const item of state.messages)
+        if (!order.some((value) => value.kind === "message" && value.id === item.id))
+          order.push({ kind: "message", id: item.id });
+      for (const item of state.tools)
+        if (!order.some((value) => value.kind === "tool" && value.id === item.id))
+          order.push({ kind: "tool", id: item.id });
+      for (const item of order) {
+        if (item.kind === "message") {
+          const live = state.messages.find((value) => value.id === item.id);
+          if (!live?.text) continue;
+          const text = node("div");
+          renderMarkdown(text, live.text);
+          body.append(text);
+        } else {
+          const tool = state.tools.find((value) => value.id === item.id);
+          if (!tool) continue;
+          let title = tool.name,
+            input = tool.input;
+          try {
+            const parsed: unknown = JSON.parse(input);
+            if (
+              tool.name === "bash" &&
+              parsed &&
+              typeof parsed === "object" &&
+              "command" in parsed &&
+              typeof parsed.command === "string"
+            ) {
+              title = `$ ${parsed.command}`;
+              input = "";
+            }
+          } catch {
+            /* incomplete live input */
+          }
+          const detail = node("details", "", "tool-run");
+          detail.dataset.key = `live-tool:${tool.id}`;
+          const summary = node("summary");
+          summary.append(
+            node("code", title),
+            node(
+              "span",
+              tool.status === "running" ? "Running" : tool.status === "failed" ? "Failed" : "✓",
+              "tool-status",
+            ),
+          );
+          detail.append(
+            summary,
+            node("pre", [input, tool.output].filter(Boolean).join("\n\n"), "tool-output"),
+          );
+          detail.open = expanded.has(detail.dataset.key) || tool.status === "failed";
+          body.append(detail);
+        }
       }
-      for (const tool of state.tools)
-        conversation.append(
-          detail(
-            `${tool.name} · ${tool.status}`,
-            [tool.input, tool.output].filter(Boolean).join("\n\n"),
-          ),
-        );
+      if (body.childNodes.length) conversation.append(article);
       if (state.liveTruncated || state.liveIncomplete)
         conversation.append(
           node(
@@ -341,6 +618,8 @@ async function loadHistory(more = false): Promise<void> {
       throw new Error("Invalid saved-history response.");
     if (epoch !== generation) return;
     historyError = "";
+    contextSources = result.contextSources ?? [];
+    contextSourcesTruncated = result.contextSourcesTruncated === true;
     if (more) {
       const seen = new Set(entries.map((e) => e.id));
       entries = [...result.entries.filter((e) => !seen.has(e.id)), ...entries];
@@ -405,9 +684,43 @@ async function stream(id: string, epoch: number): Promise<void> {
         if (epoch !== generation) return;
         for (const frame of decoder.push(text.decode(part.value, { stream: true }))) {
           if (frame.sessionId !== id) throw new Error("Event stream changed sessions.");
+          const previousRun = state.liveRunId;
           state = reduceFrame(state, frame);
-          if (state.session)
+          if (
+            state.liveRunId !== previousRun ||
+            frame.type === "resync" ||
+            frame.type === "snapshot"
+          )
+            liveOrder = [];
+          const liveItem =
+            frame.type === "message.started" || frame.type === "message.finished"
+              ? { kind: "message" as const, id: frame.payload.id }
+              : frame.type === "message.delta"
+                ? { kind: "message" as const, id: frame.payload.messageId }
+                : frame.type === "tool.started" ||
+                    frame.type === "tool.updated" ||
+                    frame.type === "tool.finished"
+                  ? { kind: "tool" as const, id: frame.payload.id }
+                  : null;
+          if (
+            liveItem &&
+            !liveOrder.some((value) => value.kind === liveItem.kind && value.id === liveItem.id)
+          )
+            liveOrder = [...liveOrder.slice(-127), liveItem];
+          if (state.session) {
+            const previous = activeSession();
+            const previousKey = previous
+              ? modelCapabilityKey(previous.provider, previous.model)
+              : null;
             sessions = sessions.map((s) => (s.id === id && state.session ? state.session : s));
+            const current = activeSession();
+            if (
+              id === selected &&
+              current &&
+              modelCapabilityKey(current.provider, current.model) !== previousKey
+            )
+              probeCurrentModel(id);
+          }
           const confirmed = state.activeTurn ?? state.latestTurn;
           if (
             pendingSend &&
@@ -415,6 +728,7 @@ async function stream(id: string, epoch: number): Promise<void> {
             confirmed.sessionId === pendingSend.session
           ) {
             drafts.set(pendingSend.session, "");
+            attachments.clear(pendingSend.session);
             if (selected === pendingSend.session) {
               input.value = "";
               composer.resize();
@@ -464,6 +778,11 @@ async function select(id: string): Promise<void> {
   stopStream();
   generation++;
   selected = id;
+  attachments.select(id);
+  releaseImages();
+  contextSources = [];
+  contextSourcesTruncated = false;
+  liveOrder = [];
   savePreference("selected", id);
   state = emptyConversationState(id);
   entries = [];
@@ -474,6 +793,7 @@ async function select(id: string): Promise<void> {
   navigation();
   renderConversation();
   scroll.scrollTop = 0;
+  probeCurrentModel(id);
   void stream(id, generation);
   await loadHistory();
 }
@@ -482,11 +802,16 @@ function connection(text: string): void {
 }
 async function refresh(): Promise<void> {
   const attempt = authAttempt;
+  const previous = activeSession();
+  const previousKey = previous ? modelCapabilityKey(previous.provider, previous.model) : null;
   const result = await api("/api/v1/sessions");
   if (!Array.isArray(result) || !result.every(isSessionInfo))
     throw new Error("Invalid session list.");
   if (attempt !== authAttempt || !authenticated) return;
   sessions = result;
+  const current = activeSession();
+  if (current && modelCapabilityKey(current.provider, current.model) !== previousKey)
+    probeCurrentModel(selected);
   if (!selected && sessions.length)
     await select(
       sessions.find((s) => s.id === localPreferences.selected)?.id ?? sessions[0]?.id ?? "",
@@ -535,6 +860,13 @@ async function poll(): Promise<void> {
   }
 }
 function disconnect(reason: string): void {
+  attachments.dispose();
+  capabilityGeneration++;
+  capabilities.clear();
+  capabilityRequests.clear();
+  capabilityErrors.clear();
+  releaseImages();
+  imageDialog.close();
   authenticated = false;
   authAttempt++;
   generation++;
@@ -566,6 +898,10 @@ async function connect(): Promise<void> {
     await refresh();
     if (attempt !== authAttempt || !authenticated) return;
     if (selected) {
+      if (sessions.some((session) => session.id === selected)) {
+        attachments.select(selected);
+        probeCurrentModel(selected);
+      }
       stopStream();
       void stream(selected, generation);
     }
@@ -610,11 +946,23 @@ async function submit(): Promise<void> {
     session: s.id,
     requestId: crypto.randomUUID(),
     message: input.value,
+    images: attachments.payload(),
   };
-  if (!attempt.message.trim()) return;
-  const payload = { requestId: attempt.requestId, message: attempt.message };
   if (
-    new TextEncoder().encode(JSON.stringify(payload)).length > 8192 ||
+    attempt.images.length > 0 &&
+    capabilities.get(modelCapabilityKey(s.provider, s.model) ?? "")?.supportsImages === false
+  ) {
+    showError(new Error("Choose an image-capable model or remove the attached images."));
+    return;
+  }
+  if (attachments.busy || (!attempt.message.trim() && attempt.images.length === 0)) return;
+  const payload = {
+    requestId: attempt.requestId,
+    message: attempt.message,
+    ...(attempt.images.length ? { images: attempt.images } : {}),
+  };
+  if (
+    new TextEncoder().encode(attempt.message).length > 8192 ||
     attempt.message.trimStart().startsWith("/")
   ) {
     showError(new Error("Send plain text under 8 KiB. Slash commands are not supported here."));
@@ -631,6 +979,7 @@ async function submit(): Promise<void> {
     turns.set(s.id, value);
     pendingSend = null;
     drafts.set(s.id, "");
+    attachments.clear(s.id);
     if (selected === s.id) {
       input.value = "";
       composer.resize();
@@ -721,7 +1070,7 @@ function renderModels(): void {
     button.append(text);
     if (current) button.append(node("span", "✓", "tick"));
     button.onclick = () => {
-      void changeModel(item);
+      void showThinking(item);
     };
     container.append(button);
   }
@@ -737,6 +1086,10 @@ async function showModels(): Promise<void> {
     authentication = authAttempt;
   modelSession = session.id;
   availableModels = [];
+  thinkingChoice = null;
+  modelSearch.hidden = false;
+  el("back-models", HTMLButtonElement).hidden = true;
+  el("model-title", HTMLElement).textContent = "Model";
   modelSearch.value = "";
   el("model-error", HTMLElement).textContent = "";
   el("model-options", HTMLElement).replaceChildren(node("p", "Loading models…", "footnote"));
@@ -761,10 +1114,71 @@ async function showModels(): Promise<void> {
     el("model-error", HTMLElement).textContent = message(error);
   }
 }
-async function changeModel(choice: PiModelOption): Promise<void> {
+async function showThinking(choice: PiModelOption): Promise<void> {
+  const session = activeSession();
+  if (!session) return;
+  const attempt = ++modelAttempt,
+    authentication = authAttempt;
+  thinkingChoice = choice;
+  modelSearch.hidden = true;
+  el("model-title", HTMLElement).textContent = "Thinking level";
+  const back = el("back-models", HTMLButtonElement);
+  back.hidden = false;
+  back.textContent = `← ${choice.id}`;
+  const container = el("model-options", HTMLElement);
+  container.replaceChildren(node("p", "Checking Pi capabilities…", "footnote"));
+  el("model-error", HTMLElement).textContent = "";
+  try {
+    const result = await requestModelCapabilities(choice);
+    if (
+      attempt !== modelAttempt ||
+      authentication !== authAttempt ||
+      !modelDialog.open ||
+      selected !== session.id
+    )
+      return;
+    if (result.thinkingLevels.length === 1) {
+      const level = result.thinkingLevels[0];
+      if (level) await changeModel(choice, level);
+      return;
+    }
+    container.replaceChildren();
+    for (const level of result.thinkingLevels) {
+      const current =
+        session.provider === choice.provider &&
+        session.model === choice.id &&
+        session.thinkingLevel === level;
+      const button = node(
+        "button",
+        "",
+        `model-option thinking-choice${current ? " selected" : ""}`,
+      );
+      button.type = "button";
+      button.dataset.level = level;
+      button.setAttribute("aria-pressed", String(current));
+      button.append(node("strong", levelNames[level]));
+      if (current) button.append(node("span", "✓", "tick"));
+      button.onclick = () => {
+        void changeModel(choice, level);
+      };
+      container.append(button);
+    }
+    back.focus();
+  } catch (error) {
+    if (attempt !== modelAttempt || authentication !== authAttempt || !modelDialog.open) return;
+    if (error instanceof ApiError && error.status === 401) showError(error);
+    container.replaceChildren();
+    el("model-error", HTMLElement).textContent = message(error);
+  }
+}
+async function changeModel(choice: PiModelOption, thinkingLevel: ThinkingLevel): Promise<void> {
   const session = activeSession();
   if (!session || modelSession !== session.id || chooseModel.disabled) return;
-  if (session.provider === choice.provider && session.model === choice.id) {
+  if (
+    session.provider === choice.provider &&
+    session.model === choice.id &&
+    session.thinkingLevel === thinkingLevel
+  ) {
     modelDialog.close();
     return;
   }
@@ -776,6 +1190,7 @@ async function changeModel(choice: PiModelOption): Promise<void> {
     const result = await api(`/api/v1/sessions/${session.id}/model`, {
       provider: choice.provider,
       model: choice.id,
+      thinkingLevel,
     });
     if (!isSessionInfo(result) || result.id !== session.id)
       throw new Error("Invalid model response. Reopen the picker to check the current model.");
@@ -798,7 +1213,7 @@ async function changeModel(choice: PiModelOption): Promise<void> {
   } finally {
     changingModel = null;
     navigation();
-    if (modelDialog.open) renderModels();
+    if (modelDialog.open && !thinkingChoice) renderModels();
   }
 }
 function newSession(): void {
@@ -853,7 +1268,7 @@ chooseModel.onclick = () => {
 el("close-model", HTMLButtonElement).onclick = () => modelDialog.close();
 modelSearch.oninput = renderModels;
 modelDialog.addEventListener("close", () => {
-  modelAttempt++;
+  if (!modelDialog.open) modelAttempt++;
 });
 el("open-nav", HTMLButtonElement).onclick = () => nav(true);
 el("close-nav", HTMLButtonElement).onclick = () => nav(false);
@@ -927,12 +1342,33 @@ form.onsubmit = (event) => {
   event.preventDefault();
   void submit();
 };
+input.addEventListener("paste", (event) => attachments.paste(event));
+el("close-image", HTMLButtonElement).onclick = () => imageDialog.close();
+imageDialog.addEventListener("close", () =>
+  el("preview-image", HTMLImageElement).removeAttribute("src"),
+);
+el("back-models", HTMLButtonElement).onclick = () => {
+  modelAttempt++;
+  thinkingChoice = null;
+  modelSearch.hidden = false;
+  el("back-models", HTMLButtonElement).hidden = true;
+  el("model-title", HTMLElement).textContent = "Model";
+  el("model-error", HTMLElement).textContent = "";
+  renderModels();
+};
 input.oninput = () => {
   if (selected) drafts.set(selected, input.value);
   composer.resize();
+  navigation();
 };
 input.onkeydown = (event) => {
-  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+  if (
+    matchMedia("(pointer:fine)").matches &&
+    event.key === "Enter" &&
+    !event.shiftKey &&
+    !event.isComposing &&
+    event.keyCode !== 229
+  ) {
     event.preventDefault();
     void submit();
   }

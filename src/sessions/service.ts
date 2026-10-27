@@ -4,10 +4,12 @@ import { open, readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
 import { prepareDataDirectory } from "../local/files.ts";
 import { hasCode } from "../local/paths.ts";
+import type { ImageContent } from "../shared/images.ts";
 import { HistoryReadError, readSavedHistory } from "../runtime/pi-history.ts";
 import { type PiEntry, PiProcess, verifyPiConfiguration } from "../runtime/pi-process.ts";
 import { isRecord, RpcCommandError } from "../runtime/pi-rpc.ts";
 import {
+  discoverPiModelCapabilities,
   discoverPiModels,
   listHostDirectories,
   SessionDiscoveryError,
@@ -21,7 +23,14 @@ import {
   type SessionCreateRequest,
   type SessionInfo,
   type SessionModelRequest,
+  isSessionModelRequest,
 } from "../shared/sessions.ts";
+import {
+  isModelCapabilitiesRequest,
+  type ModelCapabilitiesRequest,
+  type ModelCapabilitiesResponse,
+  type ThinkingLevel,
+} from "../shared/thinking.ts";
 import { isTurnCreateRequest, type TurnCreateRequest, type TurnInfo } from "../shared/turns.ts";
 import { SessionCatalog, type StoredSession, type StoredTurn } from "../storage/catalog.ts";
 import {
@@ -57,6 +66,18 @@ export interface SessionServiceOptions {
 
 const HISTORY_UNAVAILABLE = "Saved session history is unavailable.";
 const MAX_OPEN_SESSIONS = 8;
+
+function turnPayloadIdentity(message: string, images: readonly ImageContent[]): string {
+  const hash = createHash("sha256");
+  if (images.length === 0) return hash.update(message).digest("hex");
+  const canonicalImages = images.map((image) => ({
+    type: image.type,
+    mimeType: image.mimeType,
+    data: image.data,
+  }));
+  hash.update(JSON.stringify({ version: 1, message, images: canonicalImages }));
+  return hash.digest("hex");
+}
 
 function validateStored(stored: StoredSession): void {
   if (
@@ -109,6 +130,7 @@ export class SessionService {
   readonly #historyPages = new HistoryPages();
   readonly #reads = new Set<Promise<unknown>>();
   #modelDiscovery: Promise<PiModelOption[]> | undefined;
+  readonly #modelCapabilityDiscoveries = new Map<string, Promise<ModelCapabilitiesResponse>>();
   readonly #checkpoint: SessionServiceOptions["turnCheckpoint"];
   #queue: Promise<void> = Promise.resolve();
   #stopping = false;
@@ -215,6 +237,45 @@ export class SessionService {
         },
         () => {
           if (this.#modelDiscovery === discovery) this.#modelDiscovery = undefined;
+        },
+      );
+      return discovery;
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
+  getModelCapabilities(request: ModelCapabilitiesRequest): Promise<ModelCapabilitiesResponse> {
+    try {
+      this.#admit();
+      if (!isModelCapabilitiesRequest(request))
+        throw new SessionError(400, "invalid_input", "Provide a valid Pi provider and model.");
+      const configuration = this.#configuration();
+      const key = JSON.stringify([request.provider, request.model]);
+      const existing = this.#modelCapabilityDiscoveries.get(key);
+      if (existing) return existing;
+      if (this.#modelCapabilityDiscoveries.size >= 2)
+        throw new SessionError(
+          429,
+          "model_discovery_busy",
+          "Two model capability checks are already active. Try again shortly.",
+        );
+      const discovery = discoverPiModelCapabilities(configuration, this.#env, request).catch(
+        (error: unknown) => {
+          if (error instanceof SessionDiscoveryError)
+            throw new SessionError(error.status, error.code, error.message);
+          throw error;
+        },
+      );
+      this.#modelCapabilityDiscoveries.set(key, discovery);
+      void discovery.then(
+        () => {
+          if (this.#modelCapabilityDiscoveries.get(key) === discovery)
+            this.#modelCapabilityDiscoveries.delete(key);
+        },
+        () => {
+          if (this.#modelCapabilityDiscoveries.get(key) === discovery)
+            this.#modelCapabilityDiscoveries.delete(key);
         },
       );
       return discovery;
@@ -341,6 +402,7 @@ export class SessionService {
         directory,
         provider: typeof provider === "string" ? provider : null,
         model: typeof model === "string" ? model : null,
+        thinkingLevel: null,
         piSessionId: randomUUID(),
         piSessionFile: null,
         historyExpected: false,
@@ -369,18 +431,11 @@ export class SessionService {
 
   setSessionModel(id: string, request: SessionModelRequest): Promise<SessionInfo> {
     return this.#mutate(async () => {
-      if (
-        typeof request.provider !== "string" ||
-        request.provider.length === 0 ||
-        request.provider.length > 200 ||
-        typeof request.model !== "string" ||
-        request.model.length === 0 ||
-        request.model.length > 300
-      )
+      if (!isSessionModelRequest(request))
         throw new SessionError(
           400,
           "invalid_input",
-          "Provide a non-empty provider and model within their length limits.",
+          "Provide a valid provider, model, and optional thinking level.",
         );
 
       const stored = this.#stored(id);
@@ -389,7 +444,11 @@ export class SessionService {
         throw new SessionError(409, "session_not_ready", "Only a ready session can change model.");
       if (this.#turns.has(id))
         throw new SessionError(409, "session_busy", "Abort active work before changing model.");
-      if (stored.provider === request.provider && stored.model === request.model)
+      if (
+        stored.provider === request.provider &&
+        stored.model === request.model &&
+        (request.thinkingLevel === undefined || stored.thinkingLevel === request.thinkingLevel)
+      )
         return this.#view(stored);
 
       await this.#open(stored);
@@ -398,8 +457,17 @@ export class SessionService {
         throw new SessionError(409, "session_busy", "The session is not idle.");
 
       let selected: { provider: string; model: string };
+      let thinkingLevel: ThinkingLevel;
       try {
-        selected = await runtime.setModel(request.provider, request.model);
+        const before = await runtime.getState();
+        if (before.sessionId !== stored.piSessionId || !before.model)
+          throw new Error("Pi session state did not match the stored session.");
+        selected =
+          before.model.provider === request.provider && before.model.id === request.model
+            ? { provider: request.provider, model: request.model }
+            : await runtime.setModel(request.provider, request.model);
+        if (request.thinkingLevel !== undefined)
+          await runtime.setThinkingLevel(request.thinkingLevel);
         const state = await runtime.getState();
         if (
           state.sessionId !== stored.piSessionId ||
@@ -408,6 +476,7 @@ export class SessionService {
           state.model.id !== selected.model
         )
           throw new Error("Pi did not confirm the selected session model.");
+        thinkingLevel = state.thinkingLevel;
       } catch (error) {
         this.#runtimeObservers.get(id)?.();
         this.#runtimeObservers.delete(id);
@@ -440,6 +509,7 @@ export class SessionService {
         ...this.#stored(id),
         provider: selected.provider,
         model: selected.model,
+        thinkingLevel,
         updatedAt: this.#now(),
         error: null,
       };
@@ -536,6 +606,8 @@ export class SessionService {
           activeTurnId: session.activeTurnId,
           latestTurnId: session.latestTurnId,
           coveredTurnId: null,
+          contextSources: [],
+          contextSourcesTruncated: false,
         };
       }
       const slot = this.#turns.get(id);
@@ -563,10 +635,36 @@ export class SessionService {
         entries: slice.entries,
         nextCursor: slice.nextCursor,
         incompleteTail: slice.history.incompleteTail,
+        contextSources: slice.contextSources,
+        contextSourcesTruncated: slice.contextSourcesTruncated,
         activeTurnId: session.activeTurnId,
         latestTurnId: session.latestTurnId,
         coveredTurnId: covered && latest ? latest.runId : null,
       };
+    });
+  }
+
+  getHistoryImage(
+    id: string,
+    entryId: string,
+    imageIndex: number,
+  ): Promise<{ mimeType: string; data: Buffer } | null> {
+    return this.#read(async () => {
+      const stored = this.#stored(id);
+      const file = await this.#history(stored);
+      if (!file) {
+        if (stored.historyExpected)
+          throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+        return null;
+      }
+      return this.#historyPages.image({
+        sessionId: id,
+        file,
+        piSessionId: stored.piSessionId,
+        directory: stored.directory,
+        entryId,
+        imageIndex,
+      });
     });
   }
 
@@ -580,9 +678,10 @@ export class SessionService {
         throw new SessionError(
           400,
           "invalid_input",
-          "Provide a request UUID and a nonempty plain-text message (no slash commands).",
+          "Provide a request UUID and message text or supported images (no slash commands).",
         );
-      const identity = createHash("sha256").update(request.message).digest("hex");
+      const images = request.images ?? [];
+      const identity = turnPayloadIdentity(request.message, images);
       const existing = this.#catalog.findTurnRequest(id, request.requestId);
       if (existing) {
         if (existing.payloadIdentity !== identity)
@@ -627,7 +726,7 @@ export class SessionService {
       this.#turns.set(id, slot);
       this.#publishState(id, true);
       setImmediate(() => {
-        void this.#executeTurn(slot, request.message)
+        void this.#executeTurn(slot, request.message, images)
           .catch(() => {
             this.#storageFault(id);
           })
@@ -767,7 +866,11 @@ export class SessionService {
     return slot.abort;
   }
 
-  async #executeTurn(slot: ActiveTurn, message: string): Promise<void> {
+  async #executeTurn(
+    slot: ActiveTurn,
+    message: string,
+    images: readonly ImageContent[],
+  ): Promise<void> {
     const id = slot.sessionId;
     let markedHistory = false;
     let historyWasExpected = false;
@@ -788,7 +891,13 @@ export class SessionService {
         this.#publishState(id);
         throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
       }
-      const before = new Set((await runtime.getEntries()).entries.map((entry) => entry.id));
+      if (images.length > 0 && !(await runtime.supportsImages()))
+        throw new SessionError(
+          400,
+          "unsupported_image_model",
+          "The selected Pi model does not accept image input.",
+        );
+      const before = new Set((await this.#savedEntries(source)).map((entry) => entry.id));
       let turn = this.#storedTurn(id, slot.runId);
       if (!active(turn)) return;
       const stored = this.#stored(id);
@@ -822,14 +931,14 @@ export class SessionService {
         { interactive: false },
       );
       slot.dispatched = true;
-      const run = runtime.startRun(message);
+      const run = runtime.startRun(message, images);
       const disposition = await run.accepted;
       if (disposition === "handled") {
         await runtime.stop();
         throw new SessionError(
           409,
           "unsupported_prompt",
-          "An extension handled the prompt; its execution outcome is not tracked by this plain-text turn API.",
+          "An extension handled the prompt; its execution outcome is not tracked by this turn API.",
         );
       }
       this.#writeTurn({
@@ -842,8 +951,10 @@ export class SessionService {
       await this.#checkpoint?.("settled", turnView(this.#storedTurn(id, slot.runId)));
       if (slot.abort) await slot.abort;
       if (slot.abortFailed) throw new Error("Cancellation outcome is uncertain.");
-      const entries = (await runtime.getEntries()).entries.filter((entry) => !before.has(entry.id));
       await this.#rememberHistory(this.#stored(id), runtime);
+      const entries = (await this.#savedEntries(this.#stored(id))).filter(
+        (entry) => !before.has(entry.id),
+      );
       this.#writeTurn({
         ...this.#storedTurn(id, slot.runId),
         status: result.outcome === "handled" ? "interrupted" : result.outcome,
@@ -953,6 +1064,7 @@ export class SessionService {
       await Promise.allSettled([
         ...this.#reads,
         ...(this.#modelDiscovery ? [this.#modelDiscovery] : []),
+        ...this.#modelCapabilityDiscoveries.values(),
       ]);
       this.#catalog.close();
       if (failed) throw new Error("Session shutdown could not save all runtime metadata.");
@@ -1033,6 +1145,7 @@ export class SessionService {
       directory: stored.directory,
       provider: stored.provider,
       model: stored.model,
+      thinkingLevel: stored.thinkingLevel,
       piSessionId: stored.piSessionId,
       createdAt: stored.createdAt,
       updatedAt: stored.updatedAt,
@@ -1147,6 +1260,22 @@ export class SessionService {
     }
   }
 
+  async #savedEntries(stored: StoredSession): Promise<PiEntry[]> {
+    const file = await this.#history(stored);
+    if (!file) {
+      if (stored.historyExpected)
+        throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+      return [];
+    }
+    return (
+      await readSavedHistory({
+        file,
+        piSessionId: stored.piSessionId,
+        directory: stored.directory,
+      })
+    ).entries;
+  }
+
   async #open(stored: StoredSession): Promise<SessionInfo> {
     const existing = this.#runtimes.get(stored.id);
     if (existing && existing.state === "ready") return this.#view(stored);
@@ -1194,7 +1323,7 @@ export class SessionService {
       );
     }
     try {
-      const state = await runtime.getState();
+      let state = await runtime.getState();
       if (
         state.sessionId !== stored.piSessionId ||
         !state.model ||
@@ -1207,10 +1336,23 @@ export class SessionService {
           "runtime_mismatch",
           "Pi did not use the requested session and model selection.",
         );
+      if (stored.thinkingLevel !== null && state.thinkingLevel !== stored.thinkingLevel) {
+        await runtime.setThinkingLevel(stored.thinkingLevel);
+        state = await runtime.getState();
+      }
+      if (
+        !state.model ||
+        state.sessionId !== stored.piSessionId ||
+        !state.sessionFile ||
+        (stored.provider !== null && state.model.provider !== stored.provider) ||
+        (stored.model !== null && state.model.id !== stored.model)
+      )
+        throw new SessionError(503, "runtime_mismatch", "Pi did not restore the saved session.");
       const ready: StoredSession = {
         ...stored,
         provider: state.model.provider,
         model: state.model.id,
+        thinkingLevel: state.thinkingLevel,
         status: "ready",
         updatedAt: this.#now(),
         error: null,

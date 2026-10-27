@@ -193,6 +193,32 @@ test("native defaults and model changes work without changing global Pi settings
   await native.stop();
 });
 
+test("Pi thinking capabilities are model-specific, clamped, and restored from the session transcript", async (t) => {
+  const { pi, environment, options } = await runtime(t);
+  const settings = await readFile(join(environment.agentDir, "settings.json"), "utf8");
+  await pi.setModel("dwell-test", "dwell-test-reasoning");
+  const levels = await pi.getAvailableThinkingLevels();
+  assert.deepEqual(levels, ["low", "medium", "high", "xhigh"]);
+  assert.equal(await pi.setThinkingLevel("high"), "high");
+  assert.equal(await pi.setThinkingLevel("max"), "xhigh");
+  assert.equal(await readFile(join(environment.agentDir, "settings.json"), "utf8"), settings);
+  assert.equal((await pi.run("hello")).outcome, "completed");
+
+  const state = await pi.getState();
+  assert.ok(state.sessionFile);
+  await pi.stop();
+  const reopened = await PiProcess.start({
+    ...options,
+    provider: "dwell-test",
+    model: "dwell-test-reasoning",
+    resumeFile: state.sessionFile,
+  });
+  t.after(() => reopened.stop());
+  assert.equal((await reopened.getState()).thinkingLevel, "xhigh");
+  assert.deepEqual(await reopened.getAvailableThinkingLevels(), levels);
+  assert.equal(await readFile(join(environment.agentDir, "settings.json"), "utf8"), settings);
+});
+
 test("real Pi performs a tool turn, saves history, and reopens the same session", async (t) => {
   const { pi, options } = await runtime(t);
   const initial = await pi.getState();

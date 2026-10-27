@@ -74,6 +74,26 @@ test("sessions start without Pi configuration and create/reopen empty identities
   await restored.shutdown();
 });
 
+test("a model and thinking-level selection is one idle session mutation and survives reopen", async (t) => {
+  const { service, environment, configure, request } = await setup(t);
+  await configure();
+  const session = await service.createSession(request);
+  const selected = await service.setSessionModel(session.id, {
+    provider: "dwell-test",
+    model: "dwell-test-reasoning",
+    thinkingLevel: "max",
+  });
+  assert.equal(selected.model, "dwell-test-reasoning");
+  assert.equal(selected.thinkingLevel, "xhigh");
+  assert.equal(service.getSession(session.id).thinkingLevel, "xhigh");
+  await service.closeSession(session.id);
+  const reopened = await service.openSession(session.id);
+  assert.equal(reopened.model, "dwell-test-reasoning");
+  assert.equal(reopened.thinkingLevel, "xhigh");
+  const settings = await readFile(join(environment.agentDir, "settings.json"), "utf8");
+  assert.match(settings, /"defaultModel": "dwell-test"/u);
+});
+
 test("host restart reloads changed native instructions while preserving session history", async (t) => {
   const { service, environment, options, configure, request } = await setup(t, true);
   const report = join(environment.root, "prompt.txt");

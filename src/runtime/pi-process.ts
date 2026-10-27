@@ -8,6 +8,8 @@ import {
   type SessionModelRequest,
   SESSION_ID,
 } from "../shared/sessions.ts";
+import { isThinkingLevel, type ThinkingLevel } from "../shared/thinking.ts";
+import { isImageContentArray, type ImageContent } from "../shared/images.ts";
 import { isRecord, PiRpc, type RpcRecord } from "./pi-rpc.ts";
 
 const exec = promisify(execFile);
@@ -36,6 +38,7 @@ export interface SessionState {
   isCompacting: boolean;
   messageCount: number;
   pendingMessageCount: number;
+  thinkingLevel: ThinkingLevel;
   model?: { provider: string; id: string };
 }
 export interface RunResult {
@@ -78,7 +81,8 @@ function sessionState(value: unknown): SessionState {
     value.messageCount < 0 ||
     typeof value.pendingMessageCount !== "number" ||
     !Number.isSafeInteger(value.pendingMessageCount) ||
-    value.pendingMessageCount < 0
+    value.pendingMessageCount < 0 ||
+    !isThinkingLevel(value.thinkingLevel)
   ) {
     throw new Error("Pi returned invalid session state.");
   }
@@ -93,6 +97,7 @@ function sessionState(value: unknown): SessionState {
     isCompacting: value.isCompacting,
     messageCount: value.messageCount,
     pendingMessageCount: value.pendingMessageCount,
+    thinkingLevel: value.thinkingLevel,
     ...(model === undefined ? {} : { model }),
   };
 }
@@ -377,6 +382,38 @@ export class PiProcess {
     }
   }
 
+  async getAvailableThinkingLevels(): Promise<ThinkingLevel[]> {
+    try {
+      const response = await this.#rpc.request("get_available_thinking_levels");
+      if (
+        !isRecord(response) ||
+        !Array.isArray(response.levels) ||
+        response.levels.length === 0 ||
+        response.levels.length > 7 ||
+        !response.levels.every(isThinkingLevel) ||
+        new Set(response.levels).size !== response.levels.length
+      )
+        throw new Error("Pi returned invalid available thinking levels.");
+      return response.levels;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "Pi returned invalid available thinking levels."
+      )
+        this.#rpc.fail(error);
+      throw error;
+    }
+  }
+
+  async setThinkingLevel(level: ThinkingLevel): Promise<ThinkingLevel> {
+    if (!isThinkingLevel(level)) throw new Error("Select a valid Pi thinking level.");
+    if (this.#state === "running" || this.#run) throw new Error("Pi session is busy.");
+    if (this.#state !== "ready") throw this.#error ?? new Error("Pi runtime is not ready.");
+    await this.#rpc.request("set_thinking_level", { level });
+    const state = await this.getState();
+    return state.thinkingLevel;
+  }
+
   async setModel(provider: string, model: string): Promise<SessionModelRequest> {
     if (this.#state === "running" || this.#run) throw new Error("Pi session is busy.");
     if (this.#state !== "ready") throw this.#error ?? new Error("Pi runtime is not ready.");
@@ -432,14 +469,55 @@ export class PiProcess {
     }
   }
 
-  startRun(message: string): {
+  async supportsImages(): Promise<boolean> {
+    if (this.#state === "running" || this.#run) throw new Error("Pi session is busy.");
+    if (this.#state !== "ready") throw this.#error ?? new Error("Pi runtime is not ready.");
+    try {
+      const [state, response] = await Promise.all([
+        this.getState(),
+        this.#rpc.request("get_available_models"),
+      ]);
+      if (
+        !isRecord(response) ||
+        !Array.isArray(response.models) ||
+        response.models.length > 10_000 ||
+        !state.model
+      ) {
+        throw new Error("Pi returned invalid model capabilities.");
+      }
+      const model = response.models.find(
+        (candidate: unknown) =>
+          isRecord(candidate) &&
+          candidate.provider === state.model?.provider &&
+          candidate.id === state.model?.id,
+      );
+      if (
+        !isRecord(model) ||
+        !Array.isArray(model.input) ||
+        !model.input.every((item) => typeof item === "string")
+      )
+        throw new Error("Pi returned invalid model capabilities.");
+      return model.input.includes("image");
+    } catch (error) {
+      if (error instanceof Error && error.message === "Pi returned invalid model capabilities.")
+        this.#rpc.fail(error);
+      throw error;
+    }
+  }
+
+  startRun(
+    message: string,
+    images: readonly ImageContent[] = [],
+  ): {
     accepted: Promise<"started" | "handled">;
     settled: Promise<RunResult>;
   } {
     if (this.#state === "running" || this.#run) throw new Error("Pi session is busy.");
     if (this.#state !== "ready") throw this.#error ?? new Error("Pi runtime is not ready.");
     if (Buffer.byteLength(message) > 1024 * 1024) throw new Error("Pi prompt exceeds 1 MiB.");
-    if (message.trim().length === 0) throw new Error("Pi prompt must not be empty.");
+    if (message.trim().length === 0 && images.length === 0)
+      throw new Error("Pi prompt must not be empty.");
+    if (!isImageContentArray(images)) throw new Error("Pi prompt images are invalid.");
 
     let resolveAccepted!: (disposition: "started" | "handled") => void;
     let rejectAccepted!: (error: Error) => void;
@@ -461,7 +539,7 @@ export class PiProcess {
     this.#run = run;
     this.#setState("running");
 
-    void this.#rpc.request("prompt", { message }).then(
+    void this.#rpc.request("prompt", { message, ...(images.length ? { images } : {}) }).then(
       (data) => {
         if (!isRecord(data) || (data.disposition !== "started" && data.disposition !== "handled")) {
           const error = new Error("Pi returned an unexpected prompt disposition.");

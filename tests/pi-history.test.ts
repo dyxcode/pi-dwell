@@ -13,8 +13,8 @@ import type { PiEntry } from "../src/runtime/pi-process.ts";
 const PI_SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const DIRECTORY_NAME = "synthetic-project";
 const TIMESTAMP = "2026-10-26T02:00:00.000Z";
-const MAX_SOURCE_BYTES = 32 * 1024 * 1024;
-const MAX_RECORD_BYTES = 1024 * 1024;
+const MAX_SOURCE_BYTES = 128 * 1024 * 1024;
+const MAX_RECORD_BYTES = 8 * 1024 * 1024;
 
 interface Fixture {
   root: string;

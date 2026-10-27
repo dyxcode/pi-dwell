@@ -1,0 +1,98 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { HistoryEntry } from "../src/shared/history.ts";
+import { groupConversationEntries, pairToolResults } from "../src/clients/web/conversation.ts";
+
+function saved(
+  id: string,
+  role: HistoryEntry["role"],
+  blocks: HistoryEntry["blocks"] = [],
+  fields: Partial<HistoryEntry> = {},
+): HistoryEntry {
+  return {
+    id,
+    parentId: null,
+    timestamp: new Date(0).toISOString(),
+    type: "message",
+    role,
+    blocks,
+    toolCallId: null,
+    toolName: null,
+    targetId: null,
+    truncated: false,
+    ...fields,
+  };
+}
+
+test("assistant text and tool results stay in one group until the next user message", () => {
+  const entries = [
+    saved("user-1", "user"),
+    saved("assistant-1", "assistant"),
+    saved("result-1", "toolResult"),
+    saved("assistant-2", "assistant"),
+    saved("user-2", "user"),
+    saved("assistant-3", "assistant"),
+  ];
+  const groups = groupConversationEntries(entries);
+  assert.deepEqual(
+    groups.map((group) =>
+      group.kind === "assistant"
+        ? [group.kind, ...group.entries.map((entry) => entry.id)]
+        : [group.kind, group.entry.id],
+    ),
+    [
+      ["user", "user-1"],
+      ["assistant", "assistant-1", "result-1", "assistant-2"],
+      ["user", "user-2"],
+      ["assistant", "assistant-3"],
+    ],
+  );
+});
+
+test("tool results pair by call id across intervening messages and leave orphans visible", () => {
+  const call = saved("call-entry", "assistant", [
+    { type: "tool_call", callId: "call-1", name: "read", text: '{"path":"a.ts"}' },
+    { type: "tool_call", callId: "call-2", name: "bash", text: '{"command":"pwd"}' },
+  ]);
+  const middle = saved("middle", "assistant", [
+    { type: "text", callId: null, name: null, text: "While those run…" },
+  ]);
+  const duplicateCall = saved("duplicate-call", "assistant", [
+    { type: "tool_call", callId: "call-1", name: "read", text: '{"path":"b.ts"}' },
+  ]);
+  const matched = saved(
+    "matched",
+    "toolResult",
+    [{ type: "text", callId: null, name: null, text: "file contents" }],
+    { toolCallId: "call-1", toolName: "read" },
+  );
+  const orphan = saved(
+    "orphan",
+    "toolResult",
+    [{ type: "text", callId: null, name: null, text: "detached result" }],
+    { toolCallId: "missing-call", toolName: "grep" },
+  );
+
+  const paired = pairToolResults([call, middle, duplicateCall, matched, orphan]);
+  assert.equal(paired.byCall.get("call-entry:0"), matched);
+  assert.equal(paired.byCall.has("call-entry:1"), false);
+  assert.equal(paired.byCall.has("duplicate-call:0"), false);
+  assert.deepEqual([...paired.matchedResultIds], ["matched"]);
+  assert.equal(paired.orphanResults[0], orphan);
+});
+
+test("context and diagnostic blocks do not split a response before the next user", () => {
+  const groups = groupConversationEntries([
+    saved("assistant", "assistant"),
+    saved("diagnostic", "diagnostic"),
+    saved("context", "context"),
+    saved("bash", "bashExecution"),
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0]?.kind, "assistant");
+  if (groups[0]?.kind === "assistant")
+    assert.deepEqual(
+      groups[0].entries.map((entry) => entry.id),
+      ["assistant", "diagnostic", "context", "bash"],
+    );
+});

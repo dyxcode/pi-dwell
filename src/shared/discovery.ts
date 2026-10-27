@@ -13,6 +13,7 @@ export interface HostDirectoryListing {
 export interface PiModelOption {
   provider: string;
   id: string;
+  supportsImages?: boolean;
 }
 
 export interface AvailableModelsResponse {
@@ -38,7 +39,8 @@ function isModelOption(value: unknown): value is PiModelOption {
     value.provider.length <= 200 &&
     typeof value.id === "string" &&
     value.id.length > 0 &&
-    value.id.length <= 300
+    value.id.length <= 300 &&
+    (value.supportsImages === undefined || typeof value.supportsImages === "boolean")
   );
 }
 

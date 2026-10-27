@@ -13,7 +13,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { discoverPiModels, listHostDirectories } from "../src/server/session-discovery.ts";
+import {
+  discoverPiModelCapabilities,
+  discoverPiModels,
+  listHostDirectories,
+} from "../src/server/session-discovery.ts";
 import { SessionService } from "../src/sessions/service.ts";
 import { isAvailableModelsResponse, isHostDirectoryListing } from "../src/shared/discovery.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
@@ -123,7 +127,9 @@ if (args.length === 1 && args[0] === "--version") {
     },
   );
 
-  assert.deepEqual(models, [{ provider: "anthropic", id: "claude synthetic" }]);
+  assert.deepEqual(models, [
+    { provider: "anthropic", id: "claude synthetic", supportsImages: true },
+  ]);
   const records = (await readFile(report, "utf8"))
     .trim()
     .split("\n")
@@ -174,6 +180,82 @@ if (args.length === 1 && args[0] === "--version") {
     await readFile(join(sourceAgentDir, "auth.json"), "utf8"),
     JSON.stringify({ synthetic: "credential" }),
   );
+});
+
+test("model capability discovery uses Pi RPC in a private offline session", {
+  timeout: 30_000,
+}, async (t) => {
+  const environment = await createPiEnvironment();
+  t.after(() => environment.cleanup());
+  const settingsPath = join(environment.agentDir, "settings.json");
+  const settingsBefore = await readFile(settingsPath, "utf8");
+  await writeFile(
+    join(environment.agentDir, "models.json"),
+    JSON.stringify({
+      providers: {
+        "dwell-test": {
+          name: "Dwell Offline Fixture",
+          baseUrl: "http://127.0.0.1",
+          api: "openai-completions",
+          apiKey: "fixture-only-no-secret",
+          models: [
+            {
+              id: "dwell-test-image",
+              name: "Dwell Image Fixture",
+              input: ["text", "image"],
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              contextWindow: 8192,
+              maxTokens: 1024,
+            },
+            {
+              id: "dwell-test-reasoning",
+              name: "Dwell Thinking Fixture",
+              input: ["text", "image"],
+              reasoning: true,
+              thinkingLevelMap: {
+                off: null,
+                minimal: null,
+                low: "low",
+                medium: "medium",
+                high: "high",
+                xhigh: "xhigh",
+              },
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              contextWindow: 8192,
+              maxTokens: 1024,
+            },
+          ],
+        },
+      },
+    }),
+    { mode: 0o600 },
+  );
+  const configuration = {
+    executable: process.execPath,
+    entryPoint: fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry")),
+  };
+
+  const image = await discoverPiModelCapabilities(configuration, environment.env, {
+    provider: "dwell-test",
+    model: "dwell-test-image",
+  });
+  assert.deepEqual(image, {
+    provider: "dwell-test",
+    model: "dwell-test-image",
+    thinkingLevels: ["off"],
+    supportsImages: true,
+  });
+  const reasoning = await discoverPiModelCapabilities(configuration, environment.env, {
+    provider: "dwell-test",
+    model: "dwell-test-reasoning",
+  });
+  assert.deepEqual(reasoning, {
+    provider: "dwell-test",
+    model: "dwell-test-reasoning",
+    thinkingLevels: ["low", "medium", "high", "xhigh"],
+    supportsImages: true,
+  });
+  assert.equal(await readFile(settingsPath, "utf8"), settingsBefore);
 });
 
 test("Pi discovery recognizes an empty model list and sanitizes process failures", async (t) => {
@@ -260,9 +342,30 @@ test("Pi 1.4.0 lists a synthetic configured model without provider access", asyn
     env,
   );
 
-  assert.deepEqual(cliModels, [{ provider: "dwell-test", id: "dwell-test" }]);
+  assert.deepEqual(cliModels, [
+    { provider: "dwell-test", id: "dwell-test", supportsImages: false },
+  ]);
   assert.deepEqual(rpcModels, cliModels);
   assert.ok(isAvailableModelsResponse({ models: cliModels }));
+
+  const service = await SessionService.create({
+    dataDir: join(root, "dwell-service"),
+    env,
+  });
+  t.after(() => service.shutdown());
+  await service.configure({ executable: process.execPath, entryPoint: rpcEntryPoint });
+  const capabilityDiscovery = service.getModelCapabilities({
+    provider: "dwell-test",
+    model: "dwell-test",
+  });
+  const serviceShutdown = service.shutdown();
+  assert.deepEqual(await capabilityDiscovery, {
+    provider: "dwell-test",
+    model: "dwell-test",
+    thinkingLevels: ["off"],
+    supportsImages: false,
+  });
+  await serviceShutdown;
 });
 
 test("session discovery coalesces model scans and drains one before shutdown", async (t) => {
@@ -299,7 +402,7 @@ else if (args.includes("--list-models")) {
   const [first, second] = await Promise.all([firstDiscovery, secondDiscovery]);
   await shutdown;
 
-  assert.deepEqual(first, [{ provider: "dwell-test", id: "dwell-test" }]);
+  assert.deepEqual(first, [{ provider: "dwell-test", id: "dwell-test", supportsImages: false }]);
   assert.deepEqual(second, first);
   assert.equal((await readFile(report, "utf8")).trim().split("\n").length, 1);
 });

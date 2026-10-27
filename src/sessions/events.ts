@@ -240,6 +240,7 @@ function projectSession(value: SessionInfo): { value: SessionInfo; limited: bool
       directory: directory.value,
       provider: provider?.value ?? null,
       model: model?.value ?? null,
+      thinkingLevel: value.thinkingLevel,
       piSessionId: value.piSessionId,
       createdAt: value.createdAt,
       updatedAt: value.updatedAt,

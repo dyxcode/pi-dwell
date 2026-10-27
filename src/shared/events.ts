@@ -108,6 +108,7 @@ const SESSION_KEYS = [
   "directory",
   "provider",
   "model",
+  "thinkingLevel",
   "piSessionId",
   "createdAt",
   "updatedAt",

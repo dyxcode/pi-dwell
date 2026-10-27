@@ -3,8 +3,8 @@ import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import type { PiEntry } from "./pi-process.ts";
 
-const MAX_SOURCE_BYTES = 32 * 1024 * 1024;
-const MAX_RECORD_BYTES = 1024 * 1024;
+const MAX_SOURCE_BYTES = 128 * 1024 * 1024; // Several image-bearing turns, bounded per read.
+const MAX_RECORD_BYTES = 8 * 1024 * 1024; // Fits a 5 MiB decoded image plus JSON/base64 overhead.
 const MAX_ENTRIES = 100_000;
 const MAX_NATIVE_ID_BYTES = 1024;
 const MAX_TIMESTAMP_BYTES = 100;

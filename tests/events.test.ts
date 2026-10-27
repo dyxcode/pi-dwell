@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { RpcRecord } from "../src/runtime/pi-rpc.ts";
+import { SessionEvents } from "../src/sessions/events.ts";
 import {
   isStreamFrame,
   type LiveMessage,
@@ -8,7 +9,6 @@ import {
   type LiveTool,
   type StreamFrame,
 } from "../src/shared/events.ts";
-import { SessionEvents } from "../src/sessions/events.ts";
 import type { SessionInfo } from "../src/shared/sessions.ts";
 import type { TurnInfo } from "../src/shared/turns.ts";
 
@@ -424,11 +424,18 @@ test("Pi messages and tools become capped Dwell projections without raw record l
   assert.equal(message.finished, true);
   assert.notEqual(message.id, "private-entry-id");
   const deltas = received.filter((frame) => frame.type === "message.delta");
-  assert.equal(deltas.length, 2);
-  if (deltas[0]?.type === "message.delta" && deltas[1]?.type === "message.delta") {
-    assert.equal(deltas[0].payload.messageId, deltas[1].payload.messageId);
-    assert.equal(deltas.map((frame) => frame.payload.text).join(""), message.text);
+  assert.equal(deltas.length, 1, "the first provider delta repeats message_start content");
+  if (deltas[0]?.type === "message.delta") {
+    assert.equal(deltas[0].payload.messageId, message.id);
+    assert.equal(deltas[0].payload.text, " world");
   }
+  const started = ordinary(received, "message.started");
+  assert.equal(started.type, "message.started");
+  assert.equal(
+    started.payload.text +
+      deltas.map((frame) => (frame.type === "message.delta" ? frame.payload.text : "")).join(""),
+    message.text,
+  );
 
   const toolFrame = ordinary(received, "tool.finished");
   assert.equal(toolFrame.type, "tool.finished");
@@ -455,6 +462,321 @@ test("Pi messages and tools become capped Dwell projections without raw record l
   assert.equal(liveSnapshot.message?.text, "Hello world");
   assert.equal(liveSnapshot.tools[0]?.output, "done");
   latest.unsubscribe();
+  subscription.unsubscribe();
+  hub.endTurn(SESSION_ID, RUN_ID);
+  hub.close();
+});
+
+test("live assistant content preserves indexed visible thinking and deduplicates seeded prefixes", () => {
+  const hub = new SessionEvents();
+  const received: StreamFrame[] = [];
+  const subscription = connect(hub, session(), null, null, undefined, (frame) =>
+    received.push(frame),
+  );
+  hub.beginTurn(SESSION_ID, RUN_ID);
+  const initial = [
+    { type: "text", text: "Before " },
+    { type: "thinking", thinking: "Check the source", signature: "opaque-start-signature" },
+    { type: "text", text: "after" },
+    { type: "thinking", thinking: "", redacted: true, signature: "opaque-redacted-signature" },
+  ];
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_start", {
+      message: { role: "assistant", content: initial, providerMetadata: "private-metadata" },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_update", {
+      assistantMessageEvent: {
+        type: "thinking_start",
+        contentIndex: 1,
+        partial: { content: initial },
+      },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_update", {
+      assistantMessageEvent: { type: "thinking_delta", contentIndex: 1, delta: "Check the source" },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_update", {
+      assistantMessageEvent: { type: "thinking_delta", contentIndex: 1, delta: " and compare." },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_update", {
+      assistantMessageEvent: {
+        type: "thinking_end",
+        contentIndex: 1,
+        content: "Check the source and compare.",
+        contentSignature: "opaque-end-signature",
+      },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_update", {
+      assistantMessageEvent: { type: "text_delta", contentIndex: 2, delta: "after" },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_end", {
+      message: {
+        role: "assistant",
+        id: "private-entry-id",
+        content: [
+          { type: "text", text: "Before " },
+          { type: "thinking", thinking: "Check the source and compare.", signature: "opaque" },
+          { type: "text", text: "after" },
+          { type: "thinking", thinking: "", redacted: true, signature: "opaque-redacted" },
+        ],
+        providerMetadata: "private-metadata",
+      },
+    }),
+  );
+
+  const started = ordinary(received, "message.started");
+  assert.equal(started.type, "message.started");
+  const finished = ordinary(received, "message.finished");
+  assert.equal(finished.type, "message.finished");
+  const message = messagePayload(finished);
+  assert.equal(message.text, "Before after");
+  assert.equal(message.finished, true);
+  assert.deepEqual(
+    message.blocks?.map((block) => [block.type, block.contentIndex]),
+    [
+      ["text", 0],
+      ["thinking", 1],
+      ["text", 2],
+      ["thinking", 3],
+    ],
+  );
+  const thinking = message.blocks?.filter((block) => block.type === "thinking");
+  assert.deepEqual(
+    thinking?.map((block) => (block.type === "thinking" ? block.text : "")),
+    ["Check the source and compare.", ""],
+  );
+  const textBlocks = message.blocks?.filter((block) => block.type === "text");
+  assert.deepEqual(
+    textBlocks?.map((block) =>
+      block.type === "text"
+        ? block.ranges.map(({ start, end }) => message.text.slice(start, end)).join("")
+        : "",
+    ),
+    ["Before ", "after"],
+  );
+  const serialized = JSON.stringify(received);
+  for (const forbidden of [
+    "opaque-start-signature",
+    "opaque-end-signature",
+    "opaque-redacted-signature",
+    "private-metadata",
+    "contentSignature",
+    "providerMetadata",
+  ])
+    assert.equal(serialized.includes(forbidden), false, `leaked ${forbidden}`);
+  const textDeltas = received.filter(
+    (frame) => frame.type === "message.delta" && frame.payload.block?.type === "text",
+  );
+  assert.equal(
+    textDeltas
+      .filter((frame) => frame.type === "message.delta")
+      .map((frame) => frame.payload.text)
+      .join(""),
+    "",
+    "the provider repeated text already visible in the message_start prefix",
+  );
+  const thinkingDeltas = received.filter(
+    (frame) => frame.type === "message.delta" && frame.payload.block?.type === "thinking",
+  );
+  assert.equal(
+    thinkingDeltas
+      .filter((frame) => frame.type === "message.delta")
+      .map((frame) => (frame.payload.block?.type === "thinking" ? frame.payload.block.text : ""))
+      .join(""),
+    " and compare.",
+  );
+  assert.ok(received.every(isStreamFrame));
+  subscription.unsubscribe();
+  hub.endTurn(SESSION_ID, RUN_ID);
+  hub.close();
+});
+
+test("authoritative cumulative partials preserve a repeated legitimate prefix delta", () => {
+  const hub = new SessionEvents();
+  const received: StreamFrame[] = [];
+  const subscription = connect(hub, session(), null, null, undefined, (frame) =>
+    received.push(frame),
+  );
+  hub.beginTurn(SESSION_ID, RUN_ID);
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_start", {
+      message: { role: "assistant", content: [{ type: "text", text: "abc" }] },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_update", {
+      assistantMessageEvent: {
+        type: "text_delta",
+        contentIndex: 0,
+        delta: "abc",
+        partial: { content: [{ type: "text", text: "abcabc" }] },
+      },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_update", {
+      assistantMessageEvent: {
+        type: "text_delta",
+        contentIndex: 0,
+        delta: "!",
+        partial: { content: [{ type: "text", text: "abcabc!" }] },
+      },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_end", {
+      message: { role: "assistant", content: [{ type: "text", text: "abcabc!" }] },
+    }),
+  );
+
+  const deltas = received.filter((frame) => frame.type === "message.delta");
+  assert.deepEqual(
+    deltas.map((frame) => (frame.type === "message.delta" ? frame.payload.text : "")),
+    ["abc", "!"],
+  );
+  const finished = ordinary(received, "message.finished");
+  assert.equal(finished.type, "message.finished");
+  assert.equal(finished.payload.text, "abcabc!");
+  assert.ok(received.every(isStreamFrame));
+  subscription.unsubscribe();
+  hub.endTurn(SESSION_ID, RUN_ID);
+  hub.close();
+});
+
+test("sequential assistant messages get distinct live identities and clear the prior native key", () => {
+  const hub = new SessionEvents();
+  const received: StreamFrame[] = [];
+  const subscription = connect(hub, session(), null, null, undefined, (frame) =>
+    received.push(frame),
+  );
+  hub.beginTurn(SESSION_ID, RUN_ID);
+  for (const text of ["first response", "second response"]) {
+    hub.observe(
+      SESSION_ID,
+      RUN_ID,
+      makeRecord("message_start", {
+        message: { role: "assistant", content: [{ type: "text", text }] },
+      }),
+    );
+    hub.observe(
+      SESSION_ID,
+      RUN_ID,
+      makeRecord("message_end", {
+        message: { role: "assistant", content: [{ type: "text", text }] },
+      }),
+    );
+  }
+
+  const started = received.filter((frame) => frame.type === "message.started");
+  const finished = received.filter((frame) => frame.type === "message.finished");
+  assert.equal(started.length, 2);
+  assert.equal(finished.length, 2);
+  const firstStarted = started[0];
+  const secondStarted = started[1];
+  const firstFinished = finished[0];
+  const secondFinished = finished[1];
+  assert.ok(firstStarted?.type === "message.started");
+  assert.ok(secondStarted?.type === "message.started");
+  assert.ok(firstFinished?.type === "message.finished");
+  assert.ok(secondFinished?.type === "message.finished");
+  assert.notEqual(firstStarted.payload.id, secondStarted.payload.id);
+  assert.ok((secondStarted.payload.order ?? 0) > (firstStarted.payload.order ?? 0));
+  assert.equal(secondStarted.payload.nativeKey, undefined);
+  assert.notEqual(firstFinished.payload.nativeKey, secondFinished.payload.nativeKey);
+  assert.ok(received.every(isStreamFrame));
+  subscription.unsubscribe();
+  hub.endTurn(SESSION_ID, RUN_ID);
+  hub.close();
+});
+
+test("live content exceeding the supported block count is explicitly truncated", () => {
+  const hub = new SessionEvents();
+  const received: StreamFrame[] = [];
+  const subscription = connect(hub, session(), null, null, undefined, (frame) =>
+    received.push(frame),
+  );
+  hub.beginTurn(SESSION_ID, RUN_ID);
+  const content = Array.from({ length: 65 }, (_, index) =>
+    index === 63 ? { type: "toolCall", id: "call-63" } : { type: "text", text: "x" },
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_start", {
+      message: { role: "assistant", content },
+    }),
+  );
+  const frame = ordinary(received, "message.started");
+  assert.equal(frame.type, "message.started");
+  assert.equal(frame.payload.truncated, true);
+  assert.ok(frame.payload.blocks?.every((block) => block.contentIndex < 64));
+  assert.ok(isStreamFrame(frame));
+  subscription.unsubscribe();
+  hub.endTurn(SESSION_ID, RUN_ID);
+  hub.close();
+});
+
+test("bounded live thinking keeps the SSE event and snapshot limits", () => {
+  const hub = new SessionEvents();
+  const received: StreamFrame[] = [];
+  const subscription = connect(hub, session(), null, null, undefined, (frame) =>
+    received.push(frame),
+  );
+  hub.beginTurn(SESSION_ID, RUN_ID);
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_start", {
+      message: { role: "assistant", content: [] },
+    }),
+  );
+  hub.observe(
+    SESSION_ID,
+    RUN_ID,
+    makeRecord("message_update", {
+      assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "x".repeat(70_000) },
+    }),
+  );
+  const finishedMessage = received.filter((frame) => frame.type === "message.delta").at(-1);
+  assert.ok(finishedMessage?.type === "message.delta");
+  assert.ok(Buffer.byteLength(JSON.stringify(finishedMessage)) <= 64 * 1024);
+  assert.ok(finishedMessage.payload.truncated);
+  const current = snapshot(connect(hub).initial);
+  assert.ok(Buffer.byteLength(JSON.stringify(current)) <= 224 * 1024);
+  assert.equal(current.payload.live.message?.blocks?.[0]?.type, "thinking");
   subscription.unsubscribe();
   hub.endTurn(SESSION_ID, RUN_ID);
   hub.close();

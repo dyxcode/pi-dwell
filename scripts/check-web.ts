@@ -1372,6 +1372,8 @@ const modes: BrowserMode[] = args.includes("--https")
 
 for (const mode of modes) {
   const environment = await createPiEnvironment();
+  const thinkingRelease = join(environment.root, "thinking-release");
+  environment.env.DWELL_TEST_STREAM_RELEASE = thinkingRelease;
   const longPathParts = [
     `directory-${"a".repeat(58)}`,
     `nested-${"b".repeat(58)}`,
@@ -2240,6 +2242,35 @@ for (const mode of modes) {
     console.log(
       `PASS ${mode} DOM reconciliation preserves focus, handlers, selection, and disclosures`,
     );
+    await second.type("#message", "thinking-stream");
+    await second.click("#send");
+    await second.until(
+      'document.querySelector(".live .thinking-run .thinking-content")?.textContent.includes("The reasoning is still")',
+    );
+    assert.equal(
+      await second.evaluate('document.querySelector(".live .thinking-run").open'),
+      false,
+      "live thinking starts collapsed",
+    );
+    await second.click(".live .thinking-run>summary");
+    await second.evaluate('window.dispatchEvent(new Event("online"))');
+    await second.until(
+      'document.querySelector(".live .thinking-run")?.open && document.querySelector("#connection-badge").textContent.includes("Connected")',
+    );
+    await writeFile(thinkingRelease, "release", { mode: 0o600 });
+    await second.until(
+      'document.querySelector("#conversation").textContent.includes("Thinking complete; final answer is visible.") && document.querySelector("#send").getAttribute("aria-label")==="Send message" && !document.querySelector(".live")',
+    );
+    const thinkingHandoff = record(
+      await second.evaluate(`(()=>{
+      const thoughts=[...document.querySelectorAll('.thinking-run')].filter(value=>value.textContent.includes('The reasoning is still'));
+      return {count:thoughts.length,open:thoughts[0]?.open,text:thoughts[0]?.textContent};
+    })()`),
+    );
+    assert.equal(thinkingHandoff.count, 1, "saved history replaces live thinking once");
+    assert.equal(thinkingHandoff.open, true, "thinking stays expanded across reconnect and save");
+    assert.ok(String(thinkingHandoff.text).includes("in progress, then it finishes."));
+    console.log(`PASS ${mode} live thinking reconnect and saved-history handoff`);
     const beforeModel = record(await request(`/sessions/${String(session.id)}`)).model;
     await second.evaluate(`(()=>{
       const original=window.fetch.bind(window);

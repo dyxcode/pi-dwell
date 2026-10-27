@@ -17,11 +17,38 @@ export interface TurnProjection {
   errorTruncated: boolean;
 }
 
+export interface LiveMessageTextRange {
+  /** UTF-16 offsets into the containing LiveMessage.text compatibility string. */
+  start: number;
+  end: number;
+}
+
+export type LiveMessageBlock =
+  | {
+      type: "text";
+      contentIndex: number;
+      ranges: LiveMessageTextRange[];
+      finished: boolean;
+      truncated: boolean;
+    }
+  | {
+      type: "thinking";
+      contentIndex: number;
+      text: string;
+      finished: boolean;
+      truncated: boolean;
+    };
+
+export type LiveMessageBlockDelta =
+  | { type: "text"; contentIndex: number }
+  | { type: "thinking"; contentIndex: number; text: string };
+
 export interface LiveMessage {
   nativeKey?: string;
   order?: number;
   id: string;
   text: string;
+  blocks?: LiveMessageBlock[];
   finished: boolean;
   truncated: boolean;
 }
@@ -30,6 +57,7 @@ export interface LiveMessageDelta {
   messageId: string;
   text: string;
   truncated: boolean;
+  block?: LiveMessageBlockDelta;
 }
 
 export interface LiveTool {
@@ -141,6 +169,8 @@ const LIVE_KEYS = ["message", "tools", "truncated"] as const;
 const MESSAGE_KEYS = ["id", "text", "finished", "truncated"] as const;
 const MESSAGE_DELTA_KEYS = ["messageId", "text", "truncated"] as const;
 const TOOL_KEYS = ["id", "name", "input", "output", "status", "truncated"] as const;
+const MAX_LIVE_MESSAGE_BLOCKS = 64;
+const MAX_LIVE_TEXT_RANGES = 64;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -219,34 +249,114 @@ function isTurnProjection(value: unknown): value is TurnProjection {
 }
 
 function isLiveMessage(value: unknown): value is LiveMessage {
-  return (
-    isRecord(value) &&
-    hasExactKeys(value, [
-      ...MESSAGE_KEYS,
-      ...(value.nativeKey === undefined ? [] : ["nativeKey"]),
-      ...(value.order === undefined ? [] : ["order"]),
-    ]) &&
-    (value.nativeKey === undefined ||
-      (typeof value.nativeKey === "string" &&
-        /^[a-f0-9]{64}:[1-9][0-9]{0,8}$/.test(value.nativeKey))) &&
-    (value.order === undefined ||
-      (Number.isSafeInteger(value.order) && Number(value.order) >= 0)) &&
-    typeof value.id === "string" &&
-    UUID.test(value.id) &&
-    isBoundedString(value.text, STREAM_EVENT_MAX_BYTES) &&
-    typeof value.finished === "boolean" &&
-    typeof value.truncated === "boolean"
-  );
+  if (
+    !(
+      isRecord(value) &&
+      hasExactKeys(value, [
+        ...MESSAGE_KEYS,
+        ...(value.nativeKey === undefined ? [] : ["nativeKey"]),
+        ...(value.order === undefined ? [] : ["order"]),
+        ...(value.blocks === undefined ? [] : ["blocks"]),
+      ]) &&
+      (value.nativeKey === undefined ||
+        (typeof value.nativeKey === "string" &&
+          /^[a-f0-9]{64}:[1-9][0-9]{0,8}$/.test(value.nativeKey))) &&
+      (value.order === undefined ||
+        (Number.isSafeInteger(value.order) && Number(value.order) >= 0)) &&
+      typeof value.id === "string" &&
+      UUID.test(value.id) &&
+      isBoundedString(value.text, STREAM_EVENT_MAX_BYTES) &&
+      typeof value.finished === "boolean" &&
+      typeof value.truncated === "boolean"
+    )
+  )
+    return false;
+  if (value.blocks === undefined) return true;
+  if (!Array.isArray(value.blocks)) return false;
+  if (value.blocks.length > MAX_LIVE_MESSAGE_BLOCKS) return false;
+  let previousIndex = -1;
+  const ranges: LiveMessageTextRange[] = [];
+  for (const block of value.blocks) {
+    if (
+      !isRecord(block) ||
+      typeof block.contentIndex !== "number" ||
+      !Number.isSafeInteger(block.contentIndex) ||
+      block.contentIndex < 0 ||
+      block.contentIndex >= MAX_LIVE_MESSAGE_BLOCKS ||
+      block.contentIndex <= previousIndex ||
+      typeof block.finished !== "boolean" ||
+      typeof block.truncated !== "boolean"
+    )
+      return false;
+    previousIndex = block.contentIndex;
+    if (block.type === "text") {
+      if (
+        !hasExactKeys(block, ["type", "contentIndex", "ranges", "finished", "truncated"]) ||
+        !Array.isArray(block.ranges) ||
+        block.ranges.length > MAX_LIVE_TEXT_RANGES
+      )
+        return false;
+      let previousEnd = -1;
+      for (const range of block.ranges) {
+        if (
+          !isRecord(range) ||
+          !hasExactKeys(range, ["start", "end"]) ||
+          !Number.isSafeInteger(range.start) ||
+          !Number.isSafeInteger(range.end) ||
+          Number(range.start) < 0 ||
+          Number(range.end) <= Number(range.start) ||
+          Number(range.end) > value.text.length ||
+          Number(range.start) < previousEnd
+        )
+          return false;
+        previousEnd = Number(range.end);
+        ranges.push({ start: Number(range.start), end: Number(range.end) });
+      }
+    } else if (
+      block.type === "thinking" &&
+      hasExactKeys(block, ["type", "contentIndex", "text", "finished", "truncated"]) &&
+      isBoundedString(block.text, STREAM_EVENT_MAX_BYTES)
+    ) {
+    } else return false;
+  }
+  ranges.sort((left, right) => left.start - right.start);
+  for (let index = 1; index < ranges.length; index += 1) {
+    const current = ranges[index];
+    const previous = ranges[index - 1];
+    if (!current || !previous || current.start < previous.end) return false;
+  }
+  return true;
 }
 
 function isLiveMessageDelta(value: unknown): value is LiveMessageDelta {
+  if (
+    !(
+      isRecord(value) &&
+      hasExactKeys(value, [
+        ...MESSAGE_DELTA_KEYS,
+        ...(value.block === undefined ? [] : ["block"]),
+      ]) &&
+      typeof value.messageId === "string" &&
+      UUID.test(value.messageId) &&
+      isBoundedString(value.text, STREAM_EVENT_MAX_BYTES) &&
+      typeof value.truncated === "boolean"
+    )
+  )
+    return false;
+  if (value.block === undefined) return true;
+  if (!isRecord(value.block)) return false;
+  if (
+    !Number.isSafeInteger(value.block.contentIndex) ||
+    Number(value.block.contentIndex) < 0 ||
+    Number(value.block.contentIndex) >= MAX_LIVE_MESSAGE_BLOCKS
+  )
+    return false;
+  if (value.block.type === "text") return hasExactKeys(value.block, ["type", "contentIndex"]);
   return (
-    isRecord(value) &&
-    hasExactKeys(value, MESSAGE_DELTA_KEYS) &&
-    typeof value.messageId === "string" &&
-    UUID.test(value.messageId) &&
-    isBoundedString(value.text, STREAM_EVENT_MAX_BYTES) &&
-    typeof value.truncated === "boolean"
+    value.block.type === "thinking" &&
+    hasExactKeys(value.block, ["type", "contentIndex", "text"]) &&
+    value.text.length === 0 &&
+    isBoundedString(value.block.text, STREAM_EVENT_MAX_BYTES)
   );
 }
 

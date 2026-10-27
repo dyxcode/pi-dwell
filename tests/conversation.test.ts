@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { HistoryEntry } from "../src/shared/history.ts";
 import {
   groupConversationEntries,
   pairToolResults,
+  thinkingDisclosureKey,
   thinkingPresentation,
 } from "../src/clients/web/conversation.ts";
 import { commandPresentation } from "../src/clients/web/tool-command.ts";
+import type { HistoryEntry } from "../src/shared/history.ts";
 
 test("command presentation previews the first meaningful line and counts physical lines", () => {
   assert.deepEqual(commandPresentation("npm test"), {
@@ -56,6 +57,14 @@ test("thinking uses a short existing heading without repeating it in the body", 
     `## ${"x".repeat(73)}\nBody`,
   ])
     assert.deepEqual(thinkingPresentation(text), { title: "Thinking", text });
+});
+
+test("live and saved thinking share the native message and content-index disclosure key", () => {
+  const nativeKey = `${"a".repeat(64)}:1`;
+  const live = thinkingDisclosureKey(nativeKey, 3);
+  const saved = thinkingDisclosureKey(nativeKey, 3);
+  assert.equal(live, `thinking:${nativeKey}:3`);
+  assert.equal(saved, live);
 });
 
 function saved(

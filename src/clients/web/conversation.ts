@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import type { LiveTool } from "../../shared/events.ts";
+import type { LiveMessage, LiveMessageBlock, LiveTool } from "../../shared/events.ts";
 
 import type { ContextSource, HistoryBlock, HistoryEntry } from "../../shared/history.ts";
 import { actionIcon } from "./icons.ts";
@@ -141,14 +141,16 @@ export function thinkingPresentation(source: string): { title: string; text: str
   return { title, text: source.slice(heading[0].length).replace(/^(?:[ \t]*\r?\n)+/, "") };
 }
 
-function thinkingDetails(
-  entry: HistoryEntry,
-  block: HistoryBlock,
-  index: number,
-): HTMLDetailsElement {
-  const details = keyed(node("details"), `thinking:${entry.id}:${index}`, entry.id);
+/** Stable across live completion and saved-history handoff for the same native message. */
+export function thinkingDisclosureKey(identity: string, contentIndex: number): string {
+  return `thinking:${identity}:${contentIndex}`;
+}
+
+function thinkingDisclosure(text: string, key: string, entryId?: string): HTMLDetailsElement {
+  const details = keyed(node("details"), key, entryId);
   details.className = "thinking-run";
-  const presentation = thinkingPresentation(block.text);
+  details.open = false;
+  const presentation = thinkingPresentation(text);
   const summary = node("summary", presentation.title);
   summary.setAttribute("aria-label", `Thinking details: ${presentation.title}`);
   details.append(summary);
@@ -156,6 +158,48 @@ function thinkingDetails(
   markdown(content, presentation.text);
   details.append(content);
   return details;
+}
+
+/** Render one bounded live block with the same safe Markdown and quiet thinking disclosure as saved history. */
+export function renderLiveMessageBlock(
+  message: LiveMessage,
+  block: LiveMessageBlock,
+): HTMLElement | null {
+  if (block.type === "thinking") {
+    const details = thinkingDisclosure(
+      block.text,
+      thinkingDisclosureKey(message.nativeKey ?? message.id, block.contentIndex),
+    );
+    details.dataset.messageId = message.id;
+    details.dataset.contentIndex = String(block.contentIndex);
+    if (message.nativeKey) details.dataset.nativeKey = message.nativeKey;
+    return details;
+  }
+  const text = block.ranges
+    .filter(
+      (range) => range.start >= 0 && range.end <= message.text.length && range.end > range.start,
+    )
+    .map((range) => message.text.slice(range.start, range.end))
+    .join("");
+  if (!text) return null;
+  const output = node("div");
+  output.dataset.key = `live-message:${message.id}:${block.contentIndex}`;
+  output.dataset.messageId = message.id;
+  output.dataset.contentIndex = String(block.contentIndex);
+  markdown(output, text);
+  return output;
+}
+
+function thinkingDetails(
+  entry: HistoryEntry,
+  block: HistoryBlock,
+  index: number,
+): HTMLDetailsElement {
+  return thinkingDisclosure(
+    block.text,
+    thinkingDisclosureKey(entry.nativeKey ?? entry.id, index),
+    entry.id,
+  );
 }
 
 function appendRawOutput(

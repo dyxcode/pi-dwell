@@ -8,6 +8,7 @@ import {
   type Model,
   type SimpleStreamOptions,
   type TextContent,
+  type ThinkingContent,
   type ToolCall,
   type TranscriptContext,
   Type,
@@ -75,7 +76,8 @@ function emitText(
 ): void {
   const block: TextContent = { type: "text", text: "" };
   const contentIndex = message.content.length;
-  stream.push({ type: "start", partial: message });
+  // Snapshot the first event before later stream pushes mutate this message.
+  stream.push({ type: "start", partial: structuredClone(message) });
   message.content.push(block);
   stream.push({ type: "text_start", contentIndex, partial: message });
   for (const chunk of chunks) {
@@ -102,7 +104,7 @@ function emitToolCall(
     arguments: { text },
   };
   const contentIndex = message.content.length;
-  stream.push({ type: "start", partial: message });
+  stream.push({ type: "start", partial: structuredClone(message) });
   message.content.push(toolCall);
   stream.push({ type: "toolcall_start", contentIndex, partial: message });
   stream.push({ type: "toolcall_end", contentIndex, toolCall, partial: message });
@@ -167,7 +169,7 @@ async function emitGatedText(
   const second = "stream-second";
   const block: TextContent = { type: "text", text: "" };
   const contentIndex = message.content.length;
-  stream.push({ type: "start", partial: message });
+  stream.push({ type: "start", partial: structuredClone(message) });
   message.content.push(block);
   stream.push({ type: "text_start", contentIndex, partial: message });
   block.text = first;
@@ -188,6 +190,68 @@ async function emitGatedText(
   block.text += second;
   stream.push({ type: "text_delta", contentIndex, delta: second, partial: message });
   stream.push({ type: "text_end", contentIndex, content: block.text, partial: message });
+  message.stopReason = "stop";
+  stream.push({ type: "done", reason: "stop", message });
+  stream.end();
+}
+
+async function emitGatedThinking(
+  stream: AssistantMessageEventStream,
+  message: AssistantMessage,
+  options?: SimpleStreamOptions,
+): Promise<void> {
+  const first = "## Checking the response\n\nThe reasoning is still";
+  const second = " in progress, then it finishes.";
+  const answer = "Thinking complete; final answer is visible.";
+  const thinking: ThinkingContent = { type: "thinking", thinking: first };
+  const thinkingIndex = message.content.length;
+  stream.push({ type: "start", partial: structuredClone(message) });
+  message.content.push(thinking);
+  // This fixture deliberately includes the first prefix in the start partial;
+  // the matching delta below reproduces providers that echo that prefix.
+  stream.push({ type: "thinking_start", contentIndex: thinkingIndex, partial: message });
+  stream.push({
+    type: "thinking_delta",
+    contentIndex: thinkingIndex,
+    delta: first,
+    partial: message,
+  });
+
+  const startedPath = process.env.DWELL_TEST_STREAM_STARTED;
+  if (startedPath) await appendFile(startedPath, "thinking-first-chunk\n", { mode: 0o600 });
+  const releasePath = process.env.DWELL_TEST_STREAM_RELEASE;
+  if (releasePath && !(await waitForRelease(options?.signal, releasePath))) {
+    emitError(stream, message, "aborted", "Scripted response aborted.");
+    return;
+  }
+  if (options?.signal?.aborted) {
+    emitError(stream, message, "aborted", "Scripted response aborted.");
+    return;
+  }
+
+  thinking.thinking += second;
+  stream.push({
+    type: "thinking_delta",
+    contentIndex: thinkingIndex,
+    delta: second,
+    partial: message,
+  });
+  stream.push({
+    type: "thinking_end",
+    contentIndex: thinkingIndex,
+    content: thinking.thinking,
+    partial: message,
+  });
+
+  const text: TextContent = { type: "text", text: "" };
+  const textIndex = message.content.length;
+  message.content.push(text);
+  stream.push({ type: "text_start", contentIndex: textIndex, partial: message });
+  for (const chunk of ["Thinking complete; ", "final answer is visible."]) {
+    text.text += chunk;
+    stream.push({ type: "text_delta", contentIndex: textIndex, delta: chunk, partial: message });
+  }
+  stream.push({ type: "text_end", contentIndex: textIndex, content: answer, partial: message });
   message.stopReason = "stop";
   stream.push({ type: "done", reason: "stop", message });
   stream.end();
@@ -247,6 +311,11 @@ function scriptedStream(
       return;
     }
 
+    if (prompt === "thinking-stream") {
+      await emitGatedThinking(stream, message, options);
+      return;
+    }
+
     if (prompt === "burst") {
       const echoResult = latestEchoResult(context);
       if (echoResult === undefined) {
@@ -262,7 +331,7 @@ function scriptedStream(
       const marker = "dwell-slow-start";
       const block: TextContent = { type: "text", text: "" };
       const contentIndex = message.content.length;
-      stream.push({ type: "start", partial: message });
+      stream.push({ type: "start", partial: structuredClone(message) });
       message.content.push(block);
       stream.push({ type: "text_start", contentIndex, partial: message });
       block.text = marker;
@@ -292,7 +361,7 @@ function scriptedStream(
     }
 
     if (prompt === "fail") {
-      stream.push({ type: "start", partial: message });
+      stream.push({ type: "start", partial: structuredClone(message) });
       emitError(stream, message, "error", "Synthetic scripted provider failure.");
       return;
     }

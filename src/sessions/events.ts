@@ -4,6 +4,8 @@ import type { RpcRecord } from "../runtime/pi-rpc.ts";
 import {
   isStreamFrame,
   type LiveMessage,
+  type LiveMessageBlock,
+  type LiveMessageBlockDelta,
   type LiveMessageDelta,
   type LiveProjection,
   type LiveTool,
@@ -69,6 +71,8 @@ interface CachedView {
 }
 
 interface LiveState extends LiveProjection {
+  content: Map<number, LiveContentBlock>;
+  contentTruncated: boolean;
   messageCounts: Map<string, number>;
   messageIdentityKnown: boolean;
   unidentifiedMessages: number;
@@ -76,6 +80,15 @@ interface LiveState extends LiveProjection {
   readonly toolIds: Map<string, string>;
   readonly limited: Set<ProjectionLimitScope>;
   projectionErrorReported: boolean;
+}
+
+interface LiveContentBlock {
+  type: "text" | "thinking";
+  contentIndex: number;
+  text: string;
+  finished: boolean;
+  truncated: boolean;
+  suppressRepeatedPrefix: boolean;
 }
 
 interface SessionStream {
@@ -102,6 +115,10 @@ interface BoundedText {
   truncated: boolean;
 }
 
+interface BoundedAppend extends BoundedText {
+  delta: string;
+}
+
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const CURSOR = /^([a-f0-9-]{36}):([a-f0-9-]{36}):(0|[1-9][0-9]*)$/;
 const encoder = new TextEncoder();
@@ -111,6 +128,7 @@ const MAX_REPLAY_BYTES = 1024 * 1024;
 const MAX_SESSION_SUBSCRIBERS = 8;
 const MAX_SUBSCRIBERS = 32;
 const MAX_MESSAGE_JSON_BYTES = 56 * 1024;
+const MAX_MESSAGE_CONTENT_BLOCKS = 64;
 const MAX_TOOL_FIELD_JSON_BYTES = 8 * 1024;
 const MAX_TOOL_NAME_JSON_BYTES = 512;
 const MAX_TOOL_CALL_ID_BYTES = 1024;
@@ -159,11 +177,7 @@ function appendBoundedJsonString(
   existing: string,
   addition: string,
   maxBytes: number,
-): {
-  value: string;
-  delta: string;
-  truncated: boolean;
-} {
+): BoundedAppend {
   let used = jsonStringBytes(existing);
   const appended: string[] = [];
   let truncated = false;
@@ -204,8 +218,18 @@ function equalJson(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function blockDelta(
+  type: LiveContentBlock["type"],
+  contentIndex: number,
+  text: string,
+): LiveMessageBlockDelta {
+  return type === "thinking" ? { type, contentIndex, text } : { type, contentIndex };
+}
+
 function emptyLiveState(): LiveState {
   return {
+    content: new Map(),
+    contentTruncated: false,
     messageCounts: new Map(),
     messageIdentityKnown: true,
     unidentifiedMessages: 0,
@@ -929,9 +953,11 @@ export class SessionEvents {
       return;
     }
     if (event.message.role !== "assistant") return;
-    // Pi's message_start payload can already reflect the first provider chunk;
-    // text_delta events carry that chunk too, so start with an empty accumulator.
-    this.#setMessage(stream, "", false, "message.started");
+    const parsed = this.#parseContent(event.message.content, false);
+    stream.live.message = null;
+    stream.live.content = parsed.content;
+    stream.live.contentTruncated = parsed.truncated;
+    this.#publishMessage(stream, "message.started");
   }
 
   #messageUpdate(stream: SessionStream, event: RpcRecord): void {
@@ -942,29 +968,125 @@ export class SessionEvents {
       this.#projectionError(stream);
       return;
     }
-    if (event.assistantMessageEvent.type !== "text_delta") return;
-    if (typeof event.assistantMessageEvent.delta !== "string") {
+    const update = event.assistantMessageEvent;
+    const type = update.type;
+    if (
+      type !== "text_start" &&
+      type !== "text_delta" &&
+      type !== "text_end" &&
+      type !== "thinking_start" &&
+      type !== "thinking_delta" &&
+      type !== "thinking_end"
+    )
+      return;
+    if (!Number.isSafeInteger(update.contentIndex) || Number(update.contentIndex) < 0) {
       this.#projectionError(stream);
       return;
     }
-    const current = stream.live.message;
-    if (!current) this.#setMessage(stream, "", false, "message.started");
-    const active = stream.live.message;
-    if (!active || active.truncated) return;
-    const bounded = appendBoundedJsonString(
-      active.text,
-      event.assistantMessageEvent.delta,
-      MAX_MESSAGE_JSON_BYTES,
-    );
+    const contentIndex = Number(update.contentIndex);
+    if (contentIndex >= MAX_MESSAGE_CONTENT_BLOCKS) {
+      this.#limited(stream, "message", MAX_MESSAGE_JSON_BYTES);
+      return;
+    }
+    if (!stream.live.message) {
+      stream.live.content = new Map();
+      stream.live.contentTruncated = false;
+      this.#publishMessage(stream, "message.started");
+    }
+    const contentType = type.startsWith("thinking") ? "thinking" : "text";
+    if (type.endsWith("_start")) {
+      const raw = this.#partialContent(update.partial, contentIndex, contentType);
+      const existing = stream.live.content.get(contentIndex);
+      const block = existing ?? {
+        type: contentType,
+        contentIndex,
+        text: "",
+        finished: false,
+        truncated: false,
+        suppressRepeatedPrefix: false,
+      };
+      if (block.type !== contentType) {
+        this.#projectionError(stream);
+        return;
+      }
+      let seed = "";
+      if (!existing || (raw !== undefined && block.text.length === 0 && raw.length > 0)) {
+        if (raw !== undefined) {
+          const bounded = this.#appendContent(stream.live.content, block, raw);
+          seed = bounded.delta;
+          stream.live.contentTruncated ||= bounded.truncated;
+        }
+      } else if (raw?.startsWith(block.text) && raw.length > block.text.length) {
+        const bounded = this.#appendContent(
+          stream.live.content,
+          block,
+          raw.slice(block.text.length),
+        );
+        seed = bounded.delta;
+        stream.live.contentTruncated ||= bounded.truncated;
+      }
+      block.suppressRepeatedPrefix ||= block.text.length > 0;
+      stream.live.content.set(contentIndex, block);
+      if (existing && seed.length === 0) return;
+      const message = this.#publishMessage(stream);
+      const delta: LiveMessageDelta = {
+        messageId: message.id,
+        text: contentType === "text" ? seed : "",
+        truncated: block.truncated,
+        block: blockDelta(contentType, contentIndex, seed),
+      };
+      this.#emit(stream, stream.activeRunId, "message.delta", delta);
+      return;
+    }
+    const block = this.#contentBlock(stream, contentIndex, contentType);
+    if (type.endsWith("_end")) {
+      let appended = "";
+      if (typeof update.content === "string") {
+        const finalText = update.content;
+        if (finalText.startsWith(block.text)) {
+          const bounded = this.#appendContent(
+            stream.live.content,
+            block,
+            finalText.slice(block.text.length),
+          );
+          appended = bounded.delta;
+          stream.live.contentTruncated ||= bounded.truncated;
+        }
+      }
+      block.finished = true;
+      const message = this.#publishMessage(stream);
+      const delta: LiveMessageDelta = {
+        messageId: message.id,
+        text: contentType === "text" ? appended : "",
+        truncated: block.truncated,
+        block: blockDelta(contentType, contentIndex, appended),
+      };
+      this.#emit(stream, stream.activeRunId, "message.delta", delta);
+      return;
+    }
+    if (typeof update.delta !== "string") {
+      this.#projectionError(stream);
+      return;
+    }
+    let addition = update.delta;
+    const cumulative = this.#partialContent(update.partial, contentIndex, contentType);
+    if (cumulative?.startsWith(block.text)) {
+      addition = cumulative.slice(block.text.length);
+      block.suppressRepeatedPrefix = false;
+    } else if (block.suppressRepeatedPrefix) {
+      block.suppressRepeatedPrefix = false;
+      if (addition.startsWith(block.text)) addition = addition.slice(block.text.length);
+      else if (block.text.startsWith(addition)) addition = "";
+    }
+    const bounded = this.#appendContent(stream.live.content, block, addition);
+    stream.live.contentTruncated ||= bounded.truncated;
     if (bounded.delta.length === 0 && !bounded.truncated) return;
-    const message: LiveMessage = { ...active, text: bounded.value, truncated: bounded.truncated };
-    stream.live.message = message;
-    stream.live.truncated ||= bounded.truncated;
-    if (bounded.truncated) this.#limited(stream, "message", MAX_MESSAGE_JSON_BYTES);
+    const message = this.#publishMessage(stream);
     const delta: LiveMessageDelta = {
       messageId: message.id,
-      text: bounded.delta,
+      text: contentType === "text" ? bounded.delta : "",
       truncated: bounded.truncated,
+      block: blockDelta(contentType, contentIndex, bounded.delta),
     };
     this.#emit(stream, stream.activeRunId, "message.delta", delta);
   }
@@ -979,7 +1101,9 @@ export class SessionEvents {
       ? nextMessageKey(event.message, stream.live.messageCounts)
       : undefined;
     if (!nativeKey) stream.live.unidentifiedMessages += 1;
-    const text = this.#messageText(event.message);
+    const parsed = this.#parseContent(event.message.content, true);
+    stream.live.content = parsed.content;
+    stream.live.contentTruncated = parsed.truncated;
     stream.live.toolOwners.clear();
     if (nativeKey && Array.isArray(event.message.content)) {
       for (const block of event.message.content.slice(0, MAX_TOOLS)) {
@@ -988,62 +1112,145 @@ export class SessionEvents {
       }
     }
     const current = stream.live.message;
-    if (!current) this.#setMessage(stream, text, true, "message.finished", nativeKey);
-    else {
-      const bounded = boundedJsonString(text, MAX_MESSAGE_JSON_BYTES);
-      const message: LiveMessage = {
-        ...current,
-        ...(nativeKey ? { nativeKey } : {}),
-        text: bounded.value,
-        finished: true,
-        truncated: current.truncated || bounded.truncated,
-      };
-      stream.live.message = message;
-      stream.live.truncated ||= bounded.truncated;
-      if (bounded.truncated) this.#limited(stream, "message", MAX_MESSAGE_JSON_BYTES);
-      this.#emit(stream, stream.activeRunId, "message.finished", message);
-    }
+    this.#publishMessage(stream, "message.finished", nativeKey, current?.id);
   }
 
-  #messageText(message: Record<string, unknown>): string {
-    if (message.content === undefined) return "";
-    if (!Array.isArray(message.content)) {
-      this.#projectionErrorForMessage();
-      return "";
-    }
-    const pieces: string[] = [];
-    for (const block of message.content) {
-      if (isRecord(block) && block.type === "text" && typeof block.text === "string")
-        pieces.push(block.text);
-    }
-    return pieces.join("");
-  }
-
-  #projectionErrorForMessage(): void {
-    // A malformed content value is reported by its caller's guarded projection path.
-    throw new Error("Invalid assistant message content.");
-  }
-
-  #setMessage(
-    stream: SessionStream,
-    text: string,
+  #parseContent(
+    content: unknown,
     finished: boolean,
-    type: "message.started" | "message.finished",
+  ): { content: Map<number, LiveContentBlock>; truncated: boolean } {
+    if (content === undefined) return { content: new Map(), truncated: false };
+    if (!Array.isArray(content)) throw new Error("Invalid assistant message content.");
+    const result = new Map<number, LiveContentBlock>();
+    let truncated = content.length > MAX_MESSAGE_CONTENT_BLOCKS;
+    for (const [contentIndex, value] of content.slice(0, MAX_MESSAGE_CONTENT_BLOCKS).entries()) {
+      if (!isRecord(value)) continue;
+      const type = value.type === "text" ? "text" : value.type === "thinking" ? "thinking" : null;
+      if (type === null) continue;
+      const text = type === "text" ? value.text : value.thinking;
+      if (typeof text !== "string") continue;
+      const block: LiveContentBlock = {
+        type,
+        contentIndex,
+        text: "",
+        finished,
+        truncated: false,
+        suppressRepeatedPrefix: false,
+      };
+      const bounded = this.#appendContent(result, block, text);
+      block.finished = finished;
+      block.suppressRepeatedPrefix = !finished && block.text.length > 0;
+      result.set(contentIndex, block);
+      if (bounded.truncated) {
+        block.truncated = true;
+        truncated = true;
+      }
+    }
+    return { content: result, truncated };
+  }
+
+  #contentBlock(
+    stream: SessionStream,
+    contentIndex: number,
+    type: LiveContentBlock["type"],
+  ): LiveContentBlock {
+    const existing = stream.live.content.get(contentIndex);
+    if (existing) {
+      if (existing.type !== type) throw new Error("Pi changed a live content block type.");
+      return existing;
+    }
+    const block: LiveContentBlock = {
+      type,
+      contentIndex,
+      text: "",
+      finished: false,
+      truncated: false,
+      suppressRepeatedPrefix: false,
+    };
+    stream.live.content.set(contentIndex, block);
+    return block;
+  }
+
+  #partialContent(
+    partial: unknown,
+    contentIndex: number,
+    type: LiveContentBlock["type"],
+  ): string | undefined {
+    if (!isRecord(partial) || !Array.isArray(partial.content)) return undefined;
+    const block = partial.content[contentIndex];
+    if (!isRecord(block) || block.type !== type) return undefined;
+    const text = type === "text" ? block.text : block.thinking;
+    return typeof text === "string" ? text : undefined;
+  }
+
+  #appendContent(
+    content: Map<number, LiveContentBlock>,
+    block: LiveContentBlock,
+    text: string,
+  ): BoundedAppend {
+    let otherBytes = 0;
+    for (const other of content.values()) {
+      if (other !== block) otherBytes += jsonStringBytes(other.text) - 2;
+    }
+    const maxBytes = Math.max(2, MAX_MESSAGE_JSON_BYTES - otherBytes);
+    const bounded = appendBoundedJsonString(block.text, text, maxBytes);
+    block.text = bounded.value;
+    block.truncated ||= bounded.truncated;
+    content.set(block.contentIndex, block);
+    return bounded;
+  }
+
+  #publishMessage(
+    stream: SessionStream,
+    type?: "message.started" | "message.finished",
     nativeKey?: string,
-  ): void {
-    const bounded = boundedJsonString(text, MAX_MESSAGE_JSON_BYTES);
+    messageId?: string,
+  ): LiveMessage {
+    const previous = stream.live.message;
+    const ordered = [...stream.live.content.values()].sort(
+      (left, right) => left.contentIndex - right.contentIndex,
+    );
+    let text = "";
+    const blocks: LiveMessageBlock[] = [];
+    for (const block of ordered) {
+      if (block.type === "text") {
+        const start = text.length;
+        text += block.text;
+        const end = text.length;
+        blocks.push({
+          type: "text",
+          contentIndex: block.contentIndex,
+          ranges: end > start ? [{ start, end }] : [],
+          finished: block.finished,
+          truncated: block.truncated,
+        });
+      } else {
+        blocks.push({
+          type: "thinking",
+          contentIndex: block.contentIndex,
+          text: block.text,
+          finished: block.finished,
+          truncated: block.truncated,
+        });
+      }
+    }
+    const truncated = stream.live.contentTruncated || ordered.some((block) => block.truncated);
+    const identity = nativeKey ?? previous?.nativeKey;
     const message: LiveMessage = {
-      ...(nativeKey ? { nativeKey } : {}),
-      order: stream.sequence + 1,
-      id: randomUUID(),
-      text: bounded.value,
-      finished,
-      truncated: bounded.truncated,
+      ...(identity === undefined ? {} : { nativeKey: identity }),
+      order: previous?.order ?? stream.sequence + 1,
+      id: messageId ?? previous?.id ?? randomUUID(),
+      text,
+      blocks,
+      finished: type === "message.finished",
+      truncated,
     };
     stream.live.message = message;
-    stream.live.truncated ||= bounded.truncated;
-    if (bounded.truncated) this.#limited(stream, "message", MAX_MESSAGE_JSON_BYTES);
-    this.#emit(stream, stream.activeRunId, type, message);
+    stream.live.truncated ||= truncated;
+    if (truncated) this.#limited(stream, "message", MAX_MESSAGE_JSON_BYTES);
+    if (type === "message.started" || type === "message.finished")
+      this.#emit(stream, stream.activeRunId, type, message);
+    return message;
   }
 
   #toolStart(stream: SessionStream, event: RpcRecord): void {

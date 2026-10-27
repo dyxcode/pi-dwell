@@ -21,9 +21,14 @@ import { appendToolCommand } from "./tool-command.ts";
 import { actionIcon, labelWithIcon } from "./icons.ts";
 import { Attachments } from "./attachments.ts";
 import { renderMarkdown } from "./markdown.ts";
-import { SavedConversationRenderer } from "./conversation.ts";
+import {
+  SavedConversationRenderer,
+  renderLiveMessageBlock,
+  thinkingDisclosureKey,
+} from "./conversation.ts";
 import { reconcileChildren } from "./dom.ts";
 import type { ImageContent } from "../../shared/images.ts";
+import type { LiveMessage } from "../../shared/events.ts";
 import {
   isModelCapabilitiesResponse,
   type ModelCapabilitiesResponse,
@@ -1040,6 +1045,18 @@ async function openFromSidebar(id: string): Promise<void> {
     navigation();
   }
 }
+function identifyLiveThinking(message: LiveMessage): void {
+  if (!message.nativeKey) return;
+  for (const detail of Array.from(
+    conversation.querySelectorAll<HTMLDetailsElement>(".thinking-run[data-message-id]"),
+  )) {
+    if (detail.dataset.messageId !== message.id) continue;
+    const contentIndex = Number(detail.dataset.contentIndex);
+    if (!Number.isSafeInteger(contentIndex)) continue;
+    detail.dataset.key = thinkingDisclosureKey(message.nativeKey, contentIndex);
+    detail.dataset.nativeKey = message.nativeKey;
+  }
+}
 function renderConversation(): void {
   const focused = document.activeElement;
   const focusedToolKey =
@@ -1107,7 +1124,18 @@ function renderConversation(): void {
       for (const item of order) {
         if (item.kind === "message") {
           const live = state.messages.find((value) => value.id === item.id);
-          if (!live?.text) continue;
+          if (!live) continue;
+          if (live.blocks?.length) {
+            for (const block of live.blocks) {
+              const rendered = renderLiveMessageBlock(live, block);
+              if (!rendered) continue;
+              if (rendered instanceof HTMLDetailsElement)
+                rendered.open = expanded.has(rendered.dataset.key);
+              body.append(rendered);
+            }
+            continue;
+          }
+          if (!live.text) continue;
           const text = node("div");
           text.dataset.key = `live-message:${live.id}`;
           renderMarkdown(text, live.text);
@@ -1399,6 +1427,11 @@ async function stream(id: string, epoch: number): Promise<void> {
         for (const frame of decoder.push(text.decode(part.value, { stream: true }))) {
           if (frame.sessionId !== id) throw new Error("Event stream changed sessions.");
           const previousRun = state.liveRunId;
+          // Rendering is batched; preserve the confirmed identity before covered history
+          // can clear the live projection in a later frame from the same batch.
+          if (frame.type === "message.finished") identifyLiveThinking(frame.payload);
+          else if (frame.type === "snapshot" && frame.payload.live.message)
+            identifyLiveThinking(frame.payload.live.message);
           state = reduceFrame(state, frame);
           if (state.liveRunId !== previousRun) {
             liveOrder = [];

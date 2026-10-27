@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  visibleLiveContent,
-  SSEDecoder,
-  SseDecodeError,
   emptyConversationState,
   mergeHistoryEntries,
   reconcileHistory,
   reduceFrame,
+  SSEDecoder,
+  SseDecodeError,
+  visibleLiveContent,
 } from "../src/clients/web/events.ts";
 import {
   isStreamFrame,
@@ -100,7 +100,10 @@ function snapshotFrame(
     session?: SessionInfo;
     activeTurn?: TurnProjection | null;
     latestTurn?: TurnProjection | null;
-    message?: { id: string; text: string; finished: boolean; truncated?: boolean } | null;
+    message?:
+      | (Pick<LiveMessage, "id" | "text" | "finished"> &
+          Partial<Omit<LiveMessage, "id" | "text" | "finished">>)
+      | null;
     tools?: Array<{
       id: string;
       name: string;
@@ -133,12 +136,7 @@ function snapshotFrame(
       metadataTruncated: false,
       live: {
         message: options.message
-          ? {
-              id: options.message.id,
-              text: options.message.text,
-              finished: options.message.finished,
-              truncated: options.message.truncated ?? false,
-            }
+          ? { ...options.message, truncated: options.message.truncated ?? false }
           : null,
         tools: (options.tools ?? []).map((tool) => ({
           ...tool,
@@ -258,6 +256,71 @@ test("SSEDecoder reports malformed JSON, invalid frames, and mismatched event me
   );
 });
 
+test("stream frame guards validate block text spans and thinking-only deltas", () => {
+  const message: LiveMessage = {
+    id: MESSAGE_ID,
+    text: "visible",
+    finished: false,
+    truncated: false,
+    blocks: [
+      {
+        type: "text",
+        contentIndex: 0,
+        ranges: [{ start: 0, end: 7 }],
+        finished: false,
+        truncated: false,
+      },
+      {
+        type: "thinking",
+        contentIndex: 2,
+        text: "plan",
+        finished: false,
+        truncated: false,
+      },
+    ],
+  };
+  const valid = snapshotFrame(1, { message });
+  assert.equal(isStreamFrame(valid), true);
+  if (valid.type !== "snapshot") assert.fail("expected snapshot");
+
+  const invalidRanges: unknown = {
+    ...valid,
+    payload: {
+      ...valid.payload,
+      live: {
+        ...valid.payload.live,
+        message: {
+          ...message,
+          blocks: [
+            {
+              type: "text",
+              contentIndex: 0,
+              ranges: [{ start: 0, end: 8 }],
+              finished: false,
+              truncated: false,
+            },
+          ],
+        },
+      },
+    },
+  };
+  assert.equal(isStreamFrame(invalidRanges), false);
+
+  const invalidThinkingDelta: unknown = {
+    sessionId: SESSION_ID,
+    runId: RUN_ID,
+    cursor: cursor(2),
+    type: "message.delta",
+    payload: {
+      messageId: MESSAGE_ID,
+      text: "must not be exposed to legacy text renderers",
+      truncated: false,
+      block: { type: "thinking", contentIndex: 2, text: "private reasoning" },
+    },
+  };
+  assert.equal(isStreamFrame(invalidThinkingDelta), false);
+});
+
 test("SSEDecoder bounds an unfinished frame", () => {
   const decoder = new SSEDecoder();
   assertDecodeError(() => decoder.push(`data: ${"x".repeat(256 * 1024)}`), "frame_too_large");
@@ -338,6 +401,96 @@ test("reduceFrame accumulates multiple assistant messages and updates tool outpu
     },
   ]);
   assert.equal(state.cursor, cursor(9));
+});
+
+test("reduceFrame retains ordered text spans and thinking deltas through snapshot resync", () => {
+  const active = turn(RUN_ID, "running");
+  const initialMessage: LiveMessage = {
+    id: MESSAGE_ID,
+    text: "Before after",
+    finished: false,
+    truncated: false,
+    blocks: [
+      {
+        type: "text",
+        contentIndex: 0,
+        ranges: [{ start: 0, end: 7 }],
+        finished: false,
+        truncated: false,
+      },
+      {
+        type: "thinking",
+        contentIndex: 1,
+        text: "Plan",
+        finished: false,
+        truncated: false,
+      },
+      {
+        type: "text",
+        contentIndex: 2,
+        ranges: [{ start: 7, end: 12 }],
+        finished: false,
+        truncated: false,
+      },
+    ],
+  };
+  let state = reduceFrame(
+    emptyConversationState(SESSION_ID),
+    snapshotFrame(1, { activeTurn: active, latestTurn: active, message: initialMessage }),
+  );
+  state = reduceFrame(
+    state,
+    messageFrame("message.delta", 2, {
+      messageId: MESSAGE_ID,
+      text: "",
+      truncated: false,
+      block: { type: "thinking", contentIndex: 1, text: " and more" },
+    }),
+  );
+  state = reduceFrame(
+    state,
+    messageFrame("message.delta", 3, {
+      messageId: MESSAGE_ID,
+      text: " final",
+      truncated: false,
+      block: { type: "text", contentIndex: 2 },
+    }),
+  );
+
+  const current = state.messages[0];
+  assert.ok(current?.blocks);
+  assert.deepEqual(
+    current.blocks.map((block) => [
+      block.contentIndex,
+      block.type,
+      block.type === "thinking"
+        ? block.text
+        : block.ranges.map(({ start, end }) => current.text.slice(start, end)).join(""),
+    ]),
+    [
+      [0, "text", "Before "],
+      [1, "thinking", "Plan and more"],
+      [2, "text", "after final"],
+    ],
+  );
+  assert.equal(current.text, "Before after final");
+
+  state = reduceFrame(state, {
+    sessionId: SESSION_ID,
+    cursor: null,
+    type: "resync",
+    payload: { reason: "cursor_stale" },
+  });
+  state = reduceFrame(
+    state,
+    snapshotFrame(5, {
+      activeTurn: active,
+      latestTurn: active,
+      message: { ...current, truncated: false },
+    }),
+  );
+  assert.deepEqual(state.messages[0]?.blocks, current.blocks);
+  assert.equal(state.messages[0]?.text, current.text);
 });
 
 test("reduceFrame leaves previous state and frame payloads untouched", () => {

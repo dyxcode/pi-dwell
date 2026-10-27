@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { test, type TestContext } from "node:test";
+import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { SessionService } from "../src/sessions/service.ts";
 import type { StreamFrame } from "../src/shared/events.ts";

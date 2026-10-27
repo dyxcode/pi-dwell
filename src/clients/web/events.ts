@@ -1,6 +1,8 @@
 import {
   isStreamFrame,
   type LiveMessage,
+  type LiveMessageBlock,
+  type LiveMessageBlockDelta,
   type LiveTool,
   type StreamFrame,
   type TurnProjection,
@@ -227,7 +229,18 @@ function copyTurn(value: TurnProjection | null): TurnProjection | null {
 }
 
 function copyMessage(value: LiveMessage): LiveMessage {
-  return { ...value };
+  return {
+    ...value,
+    ...(value.blocks
+      ? {
+          blocks: value.blocks.map((block) =>
+            block.type === "text"
+              ? { ...block, ranges: block.ranges.map((range) => ({ ...range })) }
+              : { ...block },
+          ),
+        }
+      : {}),
+  };
 }
 
 function copyTool(value: LiveTool): LiveTool {
@@ -337,11 +350,36 @@ function preserveCompatiblePrefix(previous: string, incoming: string, truncated:
 }
 
 function mergeSnapshotMessage(previous: LiveMessage, incoming: LiveMessage): LiveMessage {
+  const text = preserveCompatiblePrefix(previous.text, incoming.text, incoming.truncated);
+  const previousBlocks = new Map(
+    (previous.blocks ?? []).map((block) => [block.contentIndex, block]),
+  );
+  const blocks = incoming.blocks?.map((block): LiveMessageBlock => {
+    const old = previousBlocks.get(block.contentIndex);
+    if (!old || old.type !== block.type || !incoming.truncated) return copyMessageBlock(block);
+    if (block.type === "text" && old.type === "text" && previous.text.startsWith(incoming.text))
+      return copyMessageBlock(old);
+    if (block.type === "thinking" && old.type === "thinking") {
+      return {
+        ...block,
+        text: preserveCompatiblePrefix(old.text, block.text, true),
+        truncated: old.truncated || block.truncated,
+      };
+    }
+    return copyMessageBlock(block);
+  });
   return {
     ...copyMessage(incoming),
-    text: preserveCompatiblePrefix(previous.text, incoming.text, incoming.truncated),
+    text,
+    ...(blocks ? { blocks } : previous.blocks ? { blocks: copyMessage(previous).blocks } : {}),
     truncated: previous.truncated || incoming.truncated,
   };
+}
+
+function copyMessageBlock(block: LiveMessageBlock): LiveMessageBlock {
+  return block.type === "text"
+    ? { ...block, ranges: block.ranges.map((range) => ({ ...range })) }
+    : { ...block };
 }
 
 function mergeSnapshotTool(previous: LiveTool, incoming: LiveTool): LiveTool {
@@ -506,6 +544,7 @@ function appendDelta(
   messageId: string,
   delta: string,
   truncated: boolean,
+  blockDelta?: LiveMessageBlockDelta,
 ): { messages: LiveMessage[]; truncated: boolean; dropped: boolean } {
   const index = messages.findIndex((message) => message.id === messageId);
   const current =
@@ -513,11 +552,13 @@ function appendDelta(
   if (!current) return { messages: [...messages], truncated: false, dropped: false };
   if (current.finished) return { messages: [...messages], truncated: false, dropped: false };
 
-  const existingBytes = new TextEncoder().encode(current.text).byteLength;
+  const existingBytes =
+    new TextEncoder().encode(current.text).byteLength + messageThinkingBytes(current);
   let remaining = Math.max(0, MAX_LIVE_MESSAGE_BYTES - existingBytes);
   let suffix = "";
   let clipped = false;
-  for (const character of delta) {
+  const incoming = blockDelta?.type === "thinking" ? blockDelta.text : delta;
+  for (const character of incoming) {
     const size = utf8Bytes(character);
     if (size > remaining) {
       clipped = true;
@@ -526,18 +567,79 @@ function appendDelta(
     suffix += character;
     remaining -= size;
   }
+  let blocks = current.blocks?.map(copyMessageBlock);
+  if (blockDelta?.type === "text") {
+    blocks ??= [];
+    let textBlock = blocks.find(
+      (block): block is Extract<LiveMessageBlock, { type: "text" }> =>
+        block.type === "text" && block.contentIndex === blockDelta.contentIndex,
+    );
+    if (!textBlock) {
+      textBlock = {
+        type: "text",
+        contentIndex: blockDelta.contentIndex,
+        ranges: [],
+        finished: false,
+        truncated: false,
+      };
+      blocks.push(textBlock);
+    }
+    const start = current.text.length;
+    const end = start + suffix.length;
+    if (end > start) {
+      const previousRange = textBlock.ranges.at(-1);
+      if (previousRange?.end === start) previousRange.end = end;
+      else if (textBlock.ranges.length < 64) textBlock.ranges.push({ start, end });
+      else textBlock.truncated = true;
+    }
+    textBlock.truncated ||= clipped || truncated;
+    blocks.sort((left, right) => left.contentIndex - right.contentIndex);
+  } else if (blockDelta?.type === "thinking") {
+    blocks ??= [];
+    let thinkingBlock = blocks.find(
+      (block): block is Extract<LiveMessageBlock, { type: "thinking" }> =>
+        block.type === "thinking" && block.contentIndex === blockDelta.contentIndex,
+    );
+    if (!thinkingBlock) {
+      thinkingBlock = {
+        type: "thinking",
+        contentIndex: blockDelta.contentIndex,
+        text: "",
+        finished: false,
+        truncated: false,
+      };
+      blocks.push(thinkingBlock);
+    }
+    thinkingBlock.text += suffix;
+    thinkingBlock.truncated ||= clipped || truncated;
+    blocks.sort((left, right) => left.contentIndex - right.contentIndex);
+  }
+
   const next: LiveMessage = {
     ...current,
-    text: current.text + suffix,
-    truncated: current.truncated || truncated || clipped,
+    text: blockDelta?.type === "thinking" ? current.text : current.text + suffix,
+    ...(blocks ? { blocks } : {}),
+    truncated:
+      current.truncated ||
+      truncated ||
+      clipped ||
+      blocks?.some((block) => block.truncated) === true,
   };
   const combined = index < 0 ? [...messages, next] : [...messages];
   if (index >= 0) combined[index] = next;
   return {
     messages: combined.slice(-MAX_LIVE_MESSAGES),
-    truncated: clipped,
+    truncated: clipped || blocks?.some((block) => block.truncated) === true,
     dropped: combined.length > MAX_LIVE_MESSAGES,
   };
+}
+
+function messageThinkingBytes(message: LiveMessage): number {
+  return (message.blocks ?? []).reduce(
+    (bytes, block) =>
+      block.type === "thinking" ? bytes + new TextEncoder().encode(block.text).byteLength : bytes,
+    0,
+  );
 }
 
 function upsertTool(
@@ -659,6 +761,7 @@ export function reduceFrame(state: ConversationState, frame: StreamFrame): Conve
         frame.payload.messageId,
         frame.payload.text,
         frame.payload.truncated,
+        frame.payload.block,
       );
       next = {
         ...next,

@@ -21,7 +21,8 @@ import { appendToolCommand } from "./tool-command.ts";
 import { actionIcon, labelWithIcon } from "./icons.ts";
 import { Attachments } from "./attachments.ts";
 import { renderMarkdown } from "./markdown.ts";
-import { renderSavedConversation } from "./conversation.ts";
+import { SavedConversationRenderer } from "./conversation.ts";
+import { reconcileChildren } from "./dom.ts";
 import type { ImageContent } from "../../shared/images.ts";
 import {
   isModelCapabilitiesResponse,
@@ -55,6 +56,8 @@ const gate = el("gate", HTMLElement),
 const scroll = el("scroll", HTMLElement),
   conversation = el("conversation", HTMLElement);
 const composer = setupComposer(input, form, scroll);
+const savedRenderer = new SavedConversationRenderer();
+let imageGeneration = 0;
 const send = el("send", HTMLButtonElement),
   notice = el("notice", HTMLElement);
 const dialog = el("new-dialog", HTMLDialogElement);
@@ -231,6 +234,8 @@ function releaseImages(): void {
       () => {},
     );
   imageCache.clear();
+  imageGeneration++;
+  savedRenderer.clear();
 }
 function historyImage(entryId: string, index: number, mimeType: string): HTMLElement {
   const button = node("button", "Loading image…", "sent-image");
@@ -238,6 +243,8 @@ function historyImage(entryId: string, index: number, mimeType: string): HTMLEle
   const session = selected,
     epoch = generation;
   const key = `/api/v1/sessions/${session}/history/${encodeURIComponent(entryId)}/images/${index}`;
+  button.dataset.key = `saved-image:${key}`;
+  button.dataset.preserve = `${generation}:${imageGeneration}`;
   let pending = imageCache.get(key);
   if (!pending) {
     pending = imageQueue.then(async () => {
@@ -281,6 +288,8 @@ function historyImage(entryId: string, index: number, mimeType: string): HTMLEle
         button.textContent = "Image unavailable · retry";
         button.onclick = () => {
           imageCache.delete(key);
+          imageGeneration++;
+          savedRenderer.clear();
           renderConversation();
         };
         if (error instanceof ApiError && error.status === 401) showError(error);
@@ -508,8 +517,8 @@ function navigation(): void {
   const list = el("session-list", HTMLElement),
     tabs = el("status-list", HTMLElement);
   synchronizeTabSlots();
-  list.replaceChildren();
-  tabs.replaceChildren();
+  const listNodes = document.createDocumentFragment();
+  const tabNodes = document.createDocumentFragment();
   const slotNumber = (id: string): string => String(tabSlots.get(id) ?? 0).padStart(2, "0");
   sessions.forEach((s) => {
     const row = node("button", "", `name-row${s.id === selected ? " active" : ""}`);
@@ -526,7 +535,7 @@ function navigation(): void {
     row.onclick = () => {
       void openFromSidebar(s.id);
     };
-    list.append(row);
+    listNodes.append(row);
   });
   for (const s of sessions) {
     if (!runtimeOpen(s)) continue;
@@ -578,8 +587,10 @@ function navigation(): void {
       };
       tab.append(closeButton);
     }
-    tabs.append(tab);
+    tabNodes.append(tab);
   }
+  reconcileChildren(list, listNodes);
+  reconcileChildren(tabs, tabNodes);
   el("session-count", HTMLElement).textContent = String(sessions.length).padStart(2, "0");
   const s = activeSession();
   el("composer-footer", HTMLElement).hidden = !s;
@@ -1006,6 +1017,11 @@ async function openFromSidebar(id: string): Promise<void> {
   }
 }
 function renderConversation(): void {
+  const focused = document.activeElement;
+  const focusedToolKey =
+    focused instanceof HTMLElement && focused.tagName === "SUMMARY"
+      ? focused.closest<HTMLElement>("details[data-key]")?.dataset.key
+      : undefined;
   const atBottom = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 90;
   const oldTop = scroll.scrollTop;
   const scrollEdge = scroll.getBoundingClientRect().top;
@@ -1023,17 +1039,17 @@ function renderConversation(): void {
       (d) => d.dataset.key,
     ),
   );
-  conversation.replaceChildren();
+  const desired = document.createDocumentFragment();
   if (!selected) {
     const empty = node("div", "", "empty");
     empty.append(
       node("h1", "A little room to think."),
       node("p", "Open a directory to start a conversation."),
     );
-    conversation.append(empty);
+    desired.append(empty);
   } else {
-    conversation.append(
-      renderSavedConversation(
+    desired.append(
+      savedRenderer.render(
         entries,
         contextSources,
         contextSourcesTruncated,
@@ -1042,7 +1058,7 @@ function renderConversation(): void {
       ),
     );
     for (const element of Array.from(
-      conversation.querySelectorAll<HTMLDetailsElement>("details[data-key]"),
+      desired.querySelectorAll<HTMLDetailsElement>("details[data-key]"),
     )) {
       if (expanded.has(element.dataset.key)) element.open = true;
     }
@@ -1054,6 +1070,7 @@ function renderConversation(): void {
       const article = node("article", "", "message assistant live"),
         body = node("div", "", "message-body");
       article.setAttribute("aria-label", "Pi live response");
+      article.dataset.key = `live:${state.liveRunId}`;
       article.append(body);
       const visible = visibleLiveContent(state, entries);
       const order = visible.some((item) => item.order > 0)
@@ -1068,6 +1085,7 @@ function renderConversation(): void {
           const live = state.messages.find((value) => value.id === item.id);
           if (!live?.text) continue;
           const text = node("div");
+          text.dataset.key = `live-message:${live.id}`;
           renderMarkdown(text, live.text);
           body.append(text);
         } else {
@@ -1115,14 +1133,12 @@ function renderConversation(): void {
           body.append(detail);
         }
       }
-      if (body.childNodes.length) conversation.append(article);
+      if (body.childNodes.length) desired.append(article);
     }
     const native = state.session?.nativeExecution;
-    if (native?.error)
-      conversation.append(node("p", `${native.status}: ${native.error}`, "feedback"));
+    if (native?.error) desired.append(node("p", `${native.status}: ${native.error}`, "feedback"));
     const turn = native ? null : (state.activeTurn ?? state.latestTurn);
-    if (turn?.error)
-      conversation.append(node("p", `${turn.status}: ${turn.error.message}`, "feedback"));
+    if (turn?.error) desired.append(node("p", `${turn.status}: ${turn.error.message}`, "feedback"));
     const retryMore = historyProblem();
     if (retryMore !== null) {
       const recovery = node("div", "", "history-recovery");
@@ -1137,7 +1153,7 @@ function renderConversation(): void {
         renderConversation();
       };
       recovery.append(retry);
-      conversation.append(recovery);
+      desired.append(recovery);
     }
     if (
       !entries.length &&
@@ -1147,7 +1163,14 @@ function renderConversation(): void {
       !nativeRunning(state.session ?? undefined) &&
       retryMore === null
     )
-      conversation.append(node("p", "Start a conversation in this directory.", "empty-copy"));
+      desired.append(node("p", "Start a conversation in this directory.", "empty-copy"));
+  }
+  reconcileChildren(conversation, desired);
+  if (focusedToolKey && focused && !focused.isConnected) {
+    Array.from(conversation.querySelectorAll<HTMLDetailsElement>("details[data-key]"))
+      .find((element) => element.dataset.key === focusedToolKey)
+      ?.querySelector<HTMLElement>(":scope > summary")
+      ?.focus({ preventScroll: true });
   }
   older.hidden = !nextCursor;
   if (atBottom) scroll.scrollTop = scroll.scrollHeight;
@@ -1312,6 +1335,15 @@ function stopStream(): void {
   controller = null;
   window.clearTimeout(reconnectTimer);
 }
+let renderFrame: number | undefined;
+function scheduleStreamRender(): void {
+  if (renderFrame !== undefined) return;
+  renderFrame = requestAnimationFrame(() => {
+    renderFrame = undefined;
+    navigation();
+    renderConversation();
+  });
+}
 async function stream(id: string, epoch: number): Promise<void> {
   if (epoch !== generation || !authenticated || suspended) return;
   const abort = new AbortController();
@@ -1406,8 +1438,7 @@ async function stream(id: string, epoch: number): Promise<void> {
               !["accepted", "dispatching", "running"].includes(frame.payload.status))
           )
             void loadHistory();
-          navigation();
-          renderConversation();
+          scheduleStreamRender();
         }
       }
     } finally {
@@ -2171,6 +2202,7 @@ function resume(): void {
   window.clearTimeout(pollTimer);
   stopStream();
   generation++;
+  releaseImages();
   streamConnected = false;
   connection("Reconnecting…");
   state = { ...state, cursor: null };

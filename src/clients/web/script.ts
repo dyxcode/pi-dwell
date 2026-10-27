@@ -4,6 +4,7 @@ import { stripTypeScriptTypes } from "node:module";
 // A fixed asset allowlist, compiled by Node's native type stripper. No filesystem
 // path comes from a request and no build-time package is required by the host.
 const modules = {
+  "/dom.js": new URL("./dom.ts", import.meta.url),
   "/tool-command.js": new URL("./tool-command.ts", import.meta.url),
   "/icons.js": new URL("./icons.ts", import.meta.url),
   "/client.js": new URL("./client.ts", import.meta.url),

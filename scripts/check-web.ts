@@ -77,7 +77,7 @@ class BrowserPage {
       await delay(100);
     }
     throw new Error(
-      `Browser condition timed out: ${expression}; ${JSON.stringify(await this.evaluate('({notice:document.querySelector("#notice")?.textContent,chat:document.querySelector("#conversation")?.textContent,send:document.querySelector("#send")?.outerHTML})'))}; errors=${JSON.stringify(this.errors)}`,
+      `Browser condition timed out: ${expression}; ${JSON.stringify(await this.evaluate('({notice:document.querySelector("#notice")?.textContent,chat:document.querySelector("#conversation")?.textContent,send:document.querySelector("#send")?.outerHTML,attach:document.querySelector("#attach-image")?.outerHTML,imageInput:document.querySelector("#image-files")?.outerHTML,composer:{disabled:document.querySelector("#message")?.disabled,readOnly:document.querySelector("#message")?.readOnly,value:document.querySelector("#message")?.value,model:document.querySelector("#model-label")?.textContent,thinking:document.querySelector("#thinking-label")?.textContent}})'))}; errors=${JSON.stringify(this.errors)}`,
     );
   }
   async click(selector: string): Promise<void> {
@@ -400,6 +400,110 @@ async function assertNoPartialOrRecoveryRow(page: BrowserPage, context: string):
     await page.evaluate('document.querySelector(".history-recovery") === null'),
     true,
     `${context} does not show a content-recovery failure row when history is available`,
+  );
+}
+
+async function assertSavedRendererCacheAndImageGeneration(page: BrowserPage): Promise<void> {
+  const result = record(
+    await page.evaluate(`(async()=>{
+      const [{SavedConversationRenderer},{reconcileChildren}]=await Promise.all([
+        import('/conversation.js'),import('/dom.js')
+      ]);
+      const renderer=new SavedConversationRenderer();
+      const fixture=document.createElement('div');
+      fixture.hidden=true;
+      document.body.append(fixture);
+      const host=document.createElement('div');
+      const imageHost=document.createElement('div');
+      fixture.append(host,imageHost);
+      const entries=[];
+      const context=[{
+        path:'/synthetic/AGENTS.md',
+        content:'Context source restored after an empty history response.',
+        truncated:false
+      }];
+      try {
+        const render=sources=>renderer.render(entries,sources,false,()=>document.createElement('span'),[]);
+        reconcileChildren(host,render(context));
+        const initial=host.querySelector('.session-details');
+        const initialText=initial?.querySelector('.context-content')?.textContent??'';
+        reconcileChildren(host,render([]));
+        const absent=host.querySelector('.session-details')===null;
+        reconcileChildren(host,render(context));
+        const restored=host.querySelector('.session-details');
+        const restoredText=restored?.querySelector('.context-content')?.textContent??'';
+
+        const oldButton=document.createElement('button');
+        oldButton.dataset.key='saved-image:synthetic/entry/0';
+        oldButton.dataset.preserve='session-1:retry-1';
+        oldButton.textContent='Loading old image';
+        imageHost.append(oldButton);
+        if(!oldButton.isConnected) throw new Error('Initial image callback target is disconnected.');
+        const oldCallback=()=>{if(oldButton.isConnected) oldButton.textContent='stale callback';};
+        const replacement=document.createElement('button');
+        replacement.dataset.key='saved-image:synthetic/entry/0';
+        replacement.dataset.preserve='session-1:retry-2';
+        replacement.textContent='Loading replacement image';
+        const desired=document.createDocumentFragment();
+        desired.append(replacement);
+        reconcileChildren(imageHost,desired);
+        const replacementConnected=replacement.isConnected;
+        oldCallback();
+        const newCallback=()=>{
+          if(!replacement.isConnected) return;
+          const image=document.createElement('img');
+          image.alt='Replacement image';
+          replacement.replaceChildren(image);
+        };
+        newCallback();
+        return {
+          firstSourcePresent:initialText.includes('Context source restored after an empty history response.'),
+          removedWhenEmpty:absent,
+          restoredSourcePresent:restoredText.includes('Context source restored after an empty history response.'),
+          restoredDetailsNotEmpty:!!restored?.querySelector('.context-content p'),
+          replacedImageButton:imageHost.firstElementChild===replacement,
+          replacementConnected,
+          oldCallbackTargetDetached:!oldButton.isConnected,
+          oldCallbackIgnored:oldButton.textContent==='Loading old image',
+          newCallbackTargetsReplacement:replacement.querySelector('img')?.alt==='Replacement image'
+        };
+      } finally {
+        fixture.remove();
+      }
+    })()`),
+  );
+  assert.equal(result.firstSourcePresent, true, "initial cached context renders its source");
+  assert.equal(result.removedWhenEmpty, true, "empty context removes the details node");
+  assert.equal(result.restoredSourcePresent, true, "the same context renders again after empty");
+  assert.equal(
+    result.restoredDetailsNotEmpty,
+    true,
+    "restored context details contain rendered prose",
+  );
+  assert.equal(
+    result.replacedImageButton,
+    true,
+    "a new preserve generation replaces the old image node",
+  );
+  assert.equal(
+    result.replacementConnected,
+    true,
+    "replacement image callback target is connected before completion",
+  );
+  assert.equal(
+    result.oldCallbackTargetDetached,
+    true,
+    "old image callbacks target a detached node",
+  );
+  assert.equal(
+    result.oldCallbackIgnored,
+    true,
+    "a stale image callback cannot mutate the replacement",
+  );
+  assert.equal(
+    result.newCallbackTargetsReplacement,
+    true,
+    "the new image callback updates the replacement node",
   );
 }
 
@@ -1503,6 +1607,8 @@ for (const mode of modes) {
     );
     console.log(`PASS ${mode} real browser pairing and session selection`);
     await assertStatusCloseGeometry(first, "desktop");
+    await assertSavedRendererCacheAndImageGeneration(first);
+    console.log(`PASS ${mode} saved-context cache and image callback generations`);
     if (proxy) {
       const proxyOrigin = proxy.origin;
       const certificate = proxy.certificate;
@@ -1639,6 +1745,48 @@ for (const mode of modes) {
       1,
     );
     console.log(`PASS ${mode} real Pi turn and history/live convergence`);
+    await first.evaluate(`(()=>{
+      const row=document.querySelector('#session-list .name-row[data-session-id="${String(session.id)}"]');
+      if(!(row instanceof HTMLButtonElement)) throw new Error('The active sidebar row is missing.');
+      row.focus();
+      window.__dwellSidebarRow=row;
+      window.__dwellSessionListsParsed=0;
+      const original=window.fetch.bind(window);
+      window.__restoreDwellSessionFetch=()=>window.fetch=original;
+      window.fetch=async(input,init)=>{
+        const response=await original(input,init);
+        if(new URL(typeof input==='string'?input:input.url,location.href).pathname==='/api/v1/sessions'){
+          const json=response.json.bind(response);
+          response.json=async()=>{
+            const value=await json();
+            window.__dwellSessionListsParsed++;
+            return value;
+          };
+        }
+        return response;
+      };
+    })()`);
+    await first.evaluate(
+      "window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))",
+    );
+    await first.until("window.__dwellSessionListsParsed>0");
+    await delay(50);
+    const refreshedSidebar = record(
+      await first.evaluate(`(()=>({
+        sameNode:document.querySelector('#session-list .name-row[data-session-id="${String(session.id)}"]')===window.__dwellSidebarRow,
+        connected:window.__dwellSidebarRow.isConnected,
+        retainedFocus:document.activeElement===window.__dwellSidebarRow
+      }))()`),
+    );
+    await first.evaluate("window.__restoreDwellSessionFetch()");
+    assert.equal(
+      refreshedSidebar.sameNode,
+      true,
+      "a session-list refresh retains the focused sidebar row node",
+    );
+    assert.equal(refreshedSidebar.connected, true);
+    assert.equal(refreshedSidebar.retainedFocus, true);
+    console.log(`PASS ${mode} sidebar refresh keeps the focused row`);
     await first.call("Page.reload");
     await first.until(
       'document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
@@ -2003,6 +2151,107 @@ for (const mode of modes) {
     assert.equal(
       await second.evaluate('document.querySelectorAll("#conversation .byline").length'),
       0,
+    );
+    const expandedTool = record(
+      await second.evaluate(`(()=>{
+        const tool=document.querySelector('#conversation .tool-run');
+        const paragraph=[...document.querySelectorAll('#conversation .message.user .message-body p')]
+          .find(value=>value.textContent==='hello');
+        if(!(tool instanceof HTMLDetailsElement)||!(paragraph instanceof HTMLElement))
+          return {present:false};
+        tool.open=true;
+        window.__dwellReconcileTool=tool;
+        window.__dwellReconcileParagraph=paragraph;
+        return {present:true,key:tool.dataset.key};
+      })()`),
+    );
+    assert.equal(expandedTool.present, true, "saved tool disclosure and paragraph are available");
+    const activeTab = record(
+      await second.evaluate(`(()=>{
+        const button=document.querySelector('#status-list .status-tab.active .tab-select');
+        if(!(button instanceof HTMLButtonElement)) return {present:false};
+        window.__dwellReconcileTab=button;
+        return {present:true};
+      })()`),
+    );
+    assert.equal(activeTab.present, true);
+    await second.evaluate("window.__dwellReconcileTab.click()");
+    await second.until('document.querySelector("#status-list .status-tab.active.close-armed")');
+    assert.equal(
+      await second.evaluate(
+        'document.querySelector("#status-list .status-tab.active .tab-select")===window.__dwellReconcileTab',
+      ),
+      true,
+      "arming a status tab retains the selected button node",
+    );
+    await second.evaluate("window.__dwellReconcileTab.click()");
+    await second.until('!document.querySelector("#status-list .status-tab.active.close-armed")');
+    assert.equal(
+      await second.evaluate(
+        'document.querySelector("#status-list .status-tab.active .tab-select")===window.__dwellReconcileTab',
+      ),
+      true,
+      "retained buttons receive the fresh onclick handler after rendering",
+    );
+
+    await second.type("#message", "slow");
+    await second.click("#send");
+    await second.until(
+      'document.querySelector("#conversation").textContent.includes("dwell-slow-start") && document.querySelector("#send").getAttribute("aria-label")==="Stop response"',
+    );
+    const duringStream = record(
+      await second.evaluate(`(()=>({
+        toolSame:[...document.querySelectorAll('#conversation .tool-run')].find(value=>value.dataset.key===${JSON.stringify(String(expandedTool.key))})===window.__dwellReconcileTool,
+        toolOpen:window.__dwellReconcileTool.open,
+        paragraphSame:[...document.querySelectorAll('#conversation .message.user .message-body p')].find(value=>value.textContent==='hello')===window.__dwellReconcileParagraph
+      }))()`),
+    );
+    assert.equal(duringStream.toolSame, true, "a streaming render retains the expanded tool node");
+    assert.equal(duringStream.toolOpen, true, "a streaming render retains tool disclosure state");
+    assert.equal(
+      duringStream.paragraphSame,
+      true,
+      "a streaming render retains saved paragraph identity",
+    );
+    await second.evaluate(`(()=>{
+      const paragraph=window.__dwellReconcileParagraph;
+      const range=document.createRange();
+      range.selectNodeContents(paragraph);
+      const selection=window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      window.__dwellReconcileSelection=selection.toString();
+    })()`);
+    const activeTurn = record(await request(`/sessions/${String(session.id)}`)).activeTurnId;
+    assert.equal(typeof activeTurn, "string");
+    await request(`/sessions/${String(session.id)}/turns/${String(activeTurn)}/abort`, {});
+    await second.until(
+      'document.querySelector("#send").getAttribute("aria-label")==="Send message" && document.querySelector("#conversation").textContent.includes("slow")',
+    );
+    const afterAbort = record(
+      await second.evaluate(`(()=>({
+        toolSame:[...document.querySelectorAll('#conversation .tool-run')].find(value=>value.dataset.key===${JSON.stringify(String(expandedTool.key))})===window.__dwellReconcileTool,
+        toolOpen:window.__dwellReconcileTool.open,
+        paragraphSame:[...document.querySelectorAll('#conversation .message.user .message-body p')].find(value=>value.textContent==='hello')===window.__dwellReconcileParagraph,
+        selectionInsideParagraph:window.__dwellReconcileParagraph.contains(window.getSelection()?.anchorNode),
+        selection:window.getSelection()?.toString()
+      }))()`),
+    );
+    assert.equal(afterAbort.toolSame, true, "terminal streaming refresh retains the tool node");
+    assert.equal(afterAbort.toolOpen, true, "terminal streaming refresh keeps the tool expanded");
+    assert.equal(
+      afterAbort.paragraphSame,
+      true,
+      "terminal history refresh retains saved paragraph identity",
+    );
+    assert.equal(
+      afterAbort.selectionInsideParagraph,
+      true,
+      "streaming history refresh keeps the text selection attached",
+    );
+    assert.equal(afterAbort.selection, "hello", "streaming history refresh retains selected text");
+    console.log(
+      `PASS ${mode} DOM reconciliation preserves focus, handlers, selection, and disclosures`,
     );
     const beforeModel = record(await request(`/sessions/${String(session.id)}`)).model;
     await second.type("#message", "Keep this image-review draft");

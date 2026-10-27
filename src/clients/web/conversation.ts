@@ -453,3 +453,83 @@ export function renderSavedConversation(
   }
   return fragment;
 }
+
+/** Cache unchanged response groups, leaving their live DOM and Markdown intact. */
+export class SavedConversationRenderer {
+  #entries: readonly HistoryEntry[] | undefined;
+  #groups: { group: SavedConversationGroup; signature: string; owners: Set<string> }[] = [];
+  #contextSources: readonly ContextSource[] | undefined;
+  #contextTruncated = false;
+  #contextSignature = "";
+  #versions = new Map<string, { signature: string; shell: HTMLElement }>();
+  #serial = 0;
+
+  clear(): void {
+    this.#entries = undefined;
+    this.#groups = [];
+    this.#versions.clear();
+  }
+
+  render(
+    entries: readonly HistoryEntry[],
+    contextSources: readonly ContextSource[],
+    contextSourcesTruncated: boolean,
+    renderImage: SavedImageRenderer,
+    liveTools: readonly LiveTool[],
+  ): DocumentFragment {
+    if (this.#entries !== entries) {
+      this.#entries = entries;
+      this.#groups = groupConversationEntries(entries).map((group) => {
+        const values = group.kind === "user" ? [group.entry] : group.entries;
+        return {
+          group,
+          signature: JSON.stringify(values),
+          owners: new Set(values.flatMap((entry) => (entry.nativeKey ? [entry.nativeKey] : []))),
+        };
+      });
+    }
+    const fragment = document.createDocumentFragment();
+    const used = new Set<string>();
+    const append = (key: string, signature: string, create: () => HTMLElement | null): void => {
+      used.add(key);
+      const previous = this.#versions.get(key);
+      if (previous?.signature === signature) {
+        fragment.append(previous.shell.cloneNode(false));
+        return;
+      }
+      const element = create();
+      if (!element) {
+        this.#versions.delete(key);
+        return;
+      }
+      element.dataset.key = key;
+      element.dataset.renderVersion = String(++this.#serial);
+      const shell = element.cloneNode(false);
+      if (shell instanceof HTMLElement) this.#versions.set(key, { signature, shell });
+      fragment.append(element);
+    };
+    if (
+      this.#contextSources !== contextSources ||
+      this.#contextTruncated !== contextSourcesTruncated
+    ) {
+      this.#contextSources = contextSources;
+      this.#contextTruncated = contextSourcesTruncated;
+      this.#contextSignature = JSON.stringify([contextSources, contextSourcesTruncated]);
+    }
+    append("saved-context", this.#contextSignature, () =>
+      renderContext(contextSources, contextSourcesTruncated),
+    );
+    for (const { group, signature, owners } of this.#groups) {
+      const values = group.kind === "user" ? [group.entry] : group.entries;
+      const tools = liveTools.filter((tool) => tool.ownerKey && owners.has(tool.ownerKey));
+      const key = `saved-${group.kind}:${values[0]?.id}`;
+      append(key, tools.length ? `${signature}:${JSON.stringify(tools)}` : signature, () =>
+        group.kind === "user"
+          ? renderUser(group.entry, renderImage)
+          : renderAssistant(values, renderImage, tools),
+      );
+    }
+    for (const key of this.#versions.keys()) if (!used.has(key)) this.#versions.delete(key);
+    return fragment;
+  }
+}

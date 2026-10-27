@@ -73,6 +73,11 @@ interface Run {
   source: "dwell";
   resolve(result: RunResult): void;
   reject(error: Error): void;
+  disposition?: "started" | "handled";
+  agentStarted: boolean;
+  agentSettled: boolean;
+  nativeFollowupStarted: boolean;
+  settledResult?: RunResult;
   error?: string;
   aborted: boolean;
 }
@@ -596,6 +601,9 @@ export class PiProcess {
       source: "dwell",
       resolve: resolveSettled,
       reject: rejectSettled,
+      agentStarted: false,
+      agentSettled: false,
+      nativeFollowupStarted: false,
       aborted: false,
     };
     this.#run = run;
@@ -609,13 +617,21 @@ export class PiProcess {
           rejectAccepted(error);
           return;
         }
+        run.disposition = data.disposition;
         resolveAccepted(data.disposition);
-        if (data.disposition === "handled") this.#finish(run, { outcome: "handled" });
+        if (data.disposition === "handled") {
+          if (run.nativeFollowupStarted) run.resolve({ outcome: "handled" });
+          else if (run.agentStarted) this.#transferHandledRun(run);
+          else this.#finish(run, { outcome: "handled" });
+        } else if (run.nativeFollowupStarted) {
+          run.resolve(run.settledResult ?? { outcome: "completed" });
+        } else if (run.settledResult) this.#finish(run, run.settledResult);
       },
       (error: unknown) => {
         const failure = error instanceof Error ? error : new Error("Pi rejected the prompt.");
         rejectAccepted(failure);
         if (this.#run === run) this.#rejectRun(run, failure);
+        else run.reject(failure);
       },
     );
     return { accepted, settled };
@@ -707,6 +723,15 @@ export class PiProcess {
     const run = this.#run;
     if (record.type === "agent_start") {
       if (!run) this.#beginNativeRun();
+      else if (run.source === "dwell") {
+        if (run.agentSettled) {
+          run.nativeFollowupStarted = true;
+          this.#beginNativeRun();
+          if (run.disposition === "handled") run.resolve({ outcome: "handled" });
+          else if (run.disposition === "started")
+            run.resolve(run.settledResult ?? { outcome: "completed" });
+        } else run.agentStarted = true;
+      }
     } else if (record.type === "agent_settled") {
       if (typeof record.aborted !== "boolean") throw new Error("Invalid Pi settlement.");
       if (run?.source === "native") {
@@ -716,10 +741,12 @@ export class PiProcess {
         };
         this.#finishNativeRun(run, result);
       } else if (run) {
-        this.#finish(run, {
+        run.agentSettled = true;
+        run.settledResult = {
           outcome: record.aborted || run.aborted ? "aborted" : run.error ? "failed" : "completed",
           ...(run.error ? { error: run.error } : {}),
-        });
+        };
+        if (run.disposition === "started") this.#finish(run, run.settledResult);
       }
     } else if (record.type === "message_end") {
       if (!isRecord(record.message) || typeof record.message.role !== "string")
@@ -754,11 +781,12 @@ export class PiProcess {
     }
   }
 
-  #beginNativeRun(): void {
+  #beginNativeRun(): NativeRun {
     const run: NativeRun = { source: "native", executionId: randomUUID(), aborted: false };
     this.#run = run;
     this.#setState("running");
     this.#publishNativeExecution({ type: "started", executionId: run.executionId });
+    return run;
   }
 
   #finishNativeRun(run: NativeRun, result: NativeExecutionResult): void {
@@ -767,6 +795,33 @@ export class PiProcess {
     this.#clearDialogs();
     if (this.#state === "running") this.#setState("ready");
     this.#publishNativeExecution({ type: "settled", executionId: run.executionId, result });
+  }
+
+  #transferHandledRun(run: Run): void {
+    if (this.#run !== run) {
+      run.resolve({ outcome: "handled" });
+      return;
+    }
+    const native: NativeRun = {
+      source: "native",
+      executionId: randomUUID(),
+      ...(run.error ? { error: run.error } : {}),
+      aborted: run.aborted,
+    };
+    this.#run = native;
+    this.#publishNativeExecution({ type: "started", executionId: native.executionId });
+    run.resolve({ outcome: "handled" });
+    const settled = run.settledResult;
+    if (!settled) return;
+    this.#finishNativeRun(native, {
+      outcome:
+        settled.outcome === "aborted"
+          ? "aborted"
+          : settled.outcome === "failed"
+            ? "failed"
+            : "completed",
+      ...(settled.error ? { error: settled.error } : {}),
+    });
   }
 
   #interruptRun(error: Error): void {

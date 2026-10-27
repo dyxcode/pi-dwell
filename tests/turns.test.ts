@@ -10,14 +10,25 @@ import { SessionCatalog } from "../src/storage/catalog.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
 const entryPoint = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry"));
-async function setup(t: TestContext) {
+const handledExtension = fileURLToPath(
+  new URL("./fixtures/pi-handled-extension.ts", import.meta.url),
+);
+async function setup(
+  t: TestContext,
+  options: {
+    extraExtensions?: readonly string[];
+    environment?: (
+      environment: Awaited<ReturnType<typeof createPiEnvironment>>,
+    ) => Record<string, string>;
+  } = {},
+) {
   const env = await createPiEnvironment();
-  const options = {
+  const serviceOptions = {
     dataDir: join(env.root, "dwell"),
-    env: env.env,
-    extensions: [env.extensionPath],
+    env: { ...env.env, ...(options.environment?.(env) ?? {}) },
+    extensions: [env.extensionPath, ...(options.extraExtensions ?? [])],
   };
-  const service = await SessionService.create(options);
+  const service = await SessionService.create(serviceOptions);
   t.after(async () => {
     await service.shutdown();
     await env.cleanup();
@@ -30,7 +41,7 @@ async function setup(t: TestContext) {
       provider: "dwell-test",
       model: "dwell-test",
     });
-  return { service, options, env, create, session: await create() };
+  return { service, options: serviceOptions, env, create, session: await create() };
 }
 async function until<T>(read: () => T, matches: (value: T) => boolean): Promise<T> {
   const deadline = Date.now() + 8000;
@@ -264,16 +275,79 @@ test("cancel during dispatch preparation preserves an empty session; completion 
   assert.equal(completed.cancellationRequested, true);
 });
 
-test("extension-handled text is interrupted explicitly rather than reported completed", async (t) => {
-  const { service, session } = await setup(t);
-  const { turn } = await service.submitTurn(session.id, {
-    requestId: randomUUID(),
-    message: "handled",
+test("extension-handled input completes without model work and leaves an empty session reopenable", async (t) => {
+  const { service, session, env } = await setup(t, {
+    extraExtensions: [handledExtension],
+    environment: (environment) => ({
+      DWELL_TEST_TURN_LOG: join(environment.root, "provider-turns.txt"),
+    }),
   });
+  const request = { requestId: randomUUID(), message: "handled-noop" };
+  const first = await service.submitTurn(session.id, request);
+  assert.equal(first.created, true);
   const handled = await until(
-    () => service.getTurn(session.id, turn.runId),
-    (value) => value.status === "interrupted",
+    () => service.getTurn(session.id, first.turn.runId),
+    (value) => value.status === "completed",
   );
-  assert.equal(handled.error?.code, "unsupported_prompt");
-  assert.equal(service.getSession(session.id).runtimeState, "closed");
+  assert.equal(handled.error, null);
+  assert.deepEqual(handled.entryIds, []);
+  assert.deepEqual(await service.getTurnResult(session.id, handled.runId), {
+    runId: handled.runId,
+    entries: [],
+  });
+  assert.equal((await service.getHistory(session.id)).status, "empty");
+  assert.equal(service.getSession(session.id).runtimeState, "ready");
+  const retry = await service.submitTurn(session.id, request);
+  assert.equal(retry.created, false);
+  assert.equal(retry.turn.runId, first.turn.runId);
+  await assert.rejects(readFile(join(env.root, "provider-turns.txt")), { code: "ENOENT" });
+  await assert.rejects(
+    service.submitTurn(session.id, { requestId: randomUUID(), message: "/dwell-notify" }),
+    /no slash commands/i,
+  );
+
+  await service.closeSession(session.id);
+  assert.equal((await service.openSession(session.id)).status, "ready");
+  assert.equal((await service.getHistory(session.id)).status, "empty");
+  assert.deepEqual(await service.getContext(session.id), { messages: [] });
+
+  const next = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  const completed = await until(
+    () => service.getTurn(session.id, next.turn.runId),
+    (value) => value.status === "completed",
+  );
+  assert.equal(completed.error, null);
+  assert.equal(await readFile(join(env.root, "provider-turns.txt"), "utf8"), "hello\n");
+});
+
+test("extension-handled custom messages are saved without a fabricated assistant", async (t) => {
+  const { service, session } = await setup(t, { extraExtensions: [handledExtension] });
+  const seed = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await until(
+    () => service.getTurn(session.id, seed.turn.runId),
+    (value) => value.status === "completed",
+  );
+  const request = { requestId: randomUUID(), message: "handled-custom" };
+  const first = await service.submitTurn(session.id, request);
+  const handled = await until(
+    () => service.getTurn(session.id, first.turn.runId),
+    (value) => value.status === "completed",
+  );
+  assert.ok(handled.entryIds.length > 0);
+  const result = await service.getTurnResult(session.id, handled.runId);
+  const serialized = JSON.stringify(result.entries);
+  assert.match(serialized, /The extension handled this input/u);
+  assert.doesNotMatch(serialized, /"role":"assistant"/u);
+  const saved = await service.getHistory(session.id);
+  assert.equal(saved.status, "available");
+  const retry = await service.submitTurn(session.id, request);
+  assert.equal(retry.created, false);
+  assert.equal(retry.turn.runId, first.turn.runId);
+  assert.equal((await service.getHistory(session.id)).entries.length, saved.entries.length);
 });

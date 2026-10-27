@@ -899,9 +899,13 @@ export class SessionService {
       const turn = this.#storedTurn(id, runId);
       if (active(turn))
         throw new SessionError(409, "turn_pending", "The turn has not settled yet.");
+      if (!turn.entryIds.length) {
+        if (turn.status === "completed") return { runId, entries: [] };
+        throw new SessionError(410, "result_unavailable", "Saved turn result is unavailable.");
+      }
       const stored = this.#stored(id);
       const file = await this.#history(stored);
-      if (!turn.entryIds.length || !file)
+      if (!file)
         throw new SessionError(410, "result_unavailable", "Saved turn result is unavailable.");
       const { entries } = await readSavedHistory({
         file,
@@ -1150,23 +1154,25 @@ export class SessionService {
       slot.dispatched = true;
       const disposition = await run.accepted;
       if (disposition === "handled") {
-        await runtime.stop();
-        throw new SessionError(
-          409,
-          "unsupported_prompt",
-          "An extension handled the prompt; its execution outcome is not tracked by this turn API.",
-        );
+        unobserve?.();
+        unobserve = undefined;
       }
-      this.#writeTurn({
-        ...this.#storedTurn(id, slot.runId),
-        status: "running",
-        updatedAt: this.#now(),
-      });
-      await this.#checkpoint?.("running", turnView(this.#storedTurn(id, slot.runId)));
+      if (disposition === "started") {
+        this.#writeTurn({
+          ...this.#storedTurn(id, slot.runId),
+          status: "running",
+          updatedAt: this.#now(),
+        });
+        await this.#checkpoint?.("running", turnView(this.#storedTurn(id, slot.runId)));
+      }
       const result = await run.settled;
       await this.#checkpoint?.("settled", turnView(this.#storedTurn(id, slot.runId)));
       if (slot.abort) await slot.abort;
       if (slot.abortFailed) throw new Error("Cancellation outcome is uncertain.");
+      if (result.outcome === "handled") {
+        await this.#completeHandledTurn(id, slot.runId, runtime, before, historyWasExpected);
+        return;
+      }
       await this.#rememberHistory(this.#stored(id), runtime);
       const historyAfter = await this.#savedHistory(this.#stored(id));
       const savedAfter = historyAfter?.entries ?? [];
@@ -1174,7 +1180,7 @@ export class SessionService {
       const entries = savedAfter.filter((entry) => !before.has(entry.id));
       this.#writeTurn({
         ...this.#storedTurn(id, slot.runId),
-        status: result.outcome === "handled" ? "interrupted" : result.outcome,
+        status: result.outcome,
         entryIds: entries.map((entry) => entry.id),
         updatedAt: this.#now(),
         error:
@@ -1247,6 +1253,57 @@ export class SessionService {
       this.#events.endTurn(id, slot.runId);
       this.#publishState(id, true);
     }
+  }
+
+  async #completeHandledTurn(
+    sessionId: string,
+    runId: string,
+    runtime: PiProcess,
+    before: ReadonlySet<string>,
+    historyWasExpected: boolean,
+  ): Promise<void> {
+    const state = await runtime.getState();
+    const latest = this.#stored(sessionId);
+    if (state.sessionId !== latest.piSessionId)
+      throw new SessionError(503, "runtime_mismatch", "Pi returned a different session state.");
+    const sessionFile = state.sessionFile ?? latest.piSessionFile;
+    const withState: StoredSession = {
+      ...latest,
+      piSessionFile: sessionFile,
+      provider: state.model?.provider ?? latest.provider,
+      model: state.model?.id ?? latest.model,
+      thinkingLevel: state.thinkingLevel,
+    };
+    const file = await this.#history(withState);
+    if (!file && historyWasExpected)
+      throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+    const history = file
+      ? await this.#savedHistory({ ...withState, historyExpected: true })
+      : undefined;
+    const entries = history?.entries.filter((entry) => !before.has(entry.id)) ?? [];
+    try {
+      this.#catalog.update({
+        ...withState,
+        historyExpected: file !== undefined,
+        error: null,
+        updatedAt: this.#now(),
+      });
+    } catch {
+      this.#storageFault(sessionId);
+      throw new SessionError(
+        503,
+        "storage_unavailable",
+        "Handled session state could not be saved.",
+      );
+    }
+    this.#historyIdentity.set(sessionId, this.#identityForHistory(history));
+    this.#writeTurn({
+      ...this.#storedTurn(sessionId, runId),
+      status: "completed",
+      entryIds: entries.map((entry) => entry.id),
+      updatedAt: this.#now(),
+      error: null,
+    });
   }
 
   shutdown(): Promise<void> {

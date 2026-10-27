@@ -13,6 +13,10 @@ import { isTurnInfo, type TurnInfo } from "../src/shared/turns.ts";
 import { SessionCatalog } from "../src/storage/catalog.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
+const handledExtension = fileURLToPath(
+  new URL("./fixtures/pi-handled-extension.ts", import.meta.url),
+);
+
 interface NativeExecutionView {
   id: string;
   status: string;
@@ -78,6 +82,31 @@ async function serviceWithNativePrompt(t: TestContext, prompt: string, onStart =
   return { environment, service, session };
 }
 
+async function serviceWithHandledInput(t: TestContext) {
+  const environment = await createPiEnvironment();
+  const service = await SessionService.create({
+    dataDir: join(environment.root, "dwell"),
+    env: environment.env,
+    extensions: [environment.extensionPath, handledExtension],
+  });
+  t.after(async () => {
+    await service.shutdown();
+    await environment.cleanup();
+  });
+  await service.configure({
+    executable: process.execPath,
+    entryPoint: fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry")),
+  });
+  const session = await service.createSession({
+    requestId: randomUUID(),
+    directory: environment.cwd,
+    provider: "dwell-test",
+    model: "dwell-test",
+  });
+  assert.equal(session.status, "ready");
+  return { environment, service, session };
+}
+
 test("a native extension execution during session startup is observed without rejecting Pi", {
   timeout: 20_000,
 }, async (t) => {
@@ -96,6 +125,90 @@ test("a native extension execution during session startup is observed without re
   );
   const history = await service.getHistory(session.id);
   assert.equal(history.coveredNativeExecutionId, native.id);
+});
+
+test("extension-handled requests retain asynchronous native follow-ups and permit later turns", {
+  timeout: 20_000,
+}, async (t) => {
+  const { service, session } = await serviceWithHandledInput(t);
+  const beforeAckRequest = { requestId: randomUUID(), message: "handled-followup-before" };
+  const beforeAck = await service.submitTurn(session.id, beforeAckRequest);
+  const beforeAckComplete = await waitFor(
+    () => Promise.resolve(service.getTurn(session.id, beforeAck.turn.runId)),
+    (value) => value.status === "completed",
+    "the extension-handled request to complete",
+  );
+  assert.equal(beforeAckComplete.error, null);
+  const retry = await service.submitTurn(session.id, beforeAckRequest);
+  assert.equal(retry.created, false);
+  assert.equal(retry.turn.runId, beforeAck.turn.runId);
+  const beforeAckNative = await waitFor(
+    () => Promise.resolve(nativeExecution(service.getSession(session.id))),
+    (value) => value?.status === "running",
+    "the follow-up started before the handled acknowledgement",
+  );
+  assert.ok(beforeAckNative);
+  await service.abortNativeExecution(session.id, beforeAckNative.id);
+  await waitFor(
+    () => Promise.resolve(nativeExecution(service.getSession(session.id))),
+    (value) => value?.id === beforeAckNative.id && value.status === "aborted",
+    "the pre-ack follow-up to abort",
+  );
+
+  const afterAck = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "handled-followup-after",
+  });
+  const afterAckComplete = await waitFor(
+    () => Promise.resolve(service.getTurn(session.id, afterAck.turn.runId)),
+    (value) => value.status === "completed",
+    "the post-ack handled request to complete",
+  );
+  assert.equal(afterAckComplete.error, null);
+  const afterAckNative = await waitFor(
+    () => Promise.resolve(nativeExecution(service.getSession(session.id))),
+    (value) => value?.status === "running",
+    "the follow-up started after the handled acknowledgement",
+  );
+  assert.ok(afterAckNative);
+  await service.abortNativeExecution(session.id, afterAckNative.id);
+  await waitFor(
+    () => Promise.resolve(nativeExecution(service.getSession(session.id))),
+    (value) => value?.id === afterAckNative.id && value.status === "aborted",
+    "the post-ack follow-up to abort",
+  );
+
+  const failing = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "handled-followup-error",
+  });
+  const failingComplete = await waitFor(
+    () => Promise.resolve(service.getTurn(session.id, failing.turn.runId)),
+    (value) => value.status === "completed",
+    "the handled request with a failing follow-up to complete",
+  );
+  assert.equal(failingComplete.error, null);
+  const failedNative = await waitFor(
+    () => Promise.resolve(nativeExecution(service.getSession(session.id))),
+    (value) => value?.status === "failed",
+    "the failed native follow-up to be reported",
+  );
+  assert.ok(failedNative?.error);
+  assert.equal(service.getSession(session.id).runtimeState, "ready");
+  const history = await service.getHistory(session.id);
+  assert.ok(history.entries.some((entry) => JSON.stringify(entry).includes("fail")));
+
+  const next = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  const nextComplete = await waitFor(
+    () => Promise.resolve(service.getTurn(session.id, next.turn.runId)),
+    (value) => value.status === "completed",
+    "the next ordinary prompt to complete",
+  );
+  assert.equal(nextComplete.error, null);
+  assert.equal(service.getSession(session.id).runtimeState, "ready");
 });
 
 test("startup native execution preserves Pi thinking when the saved Dwell setting differs", {

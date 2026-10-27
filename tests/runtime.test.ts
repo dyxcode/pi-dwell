@@ -11,6 +11,10 @@ import { isRecord } from "../src/runtime/pi-rpc.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
 const piEntry = import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry");
+const handledExtension = fileURLToPath(
+  new URL("./fixtures/pi-handled-extension.ts", import.meta.url),
+);
+const eventRaceEntry = fileURLToPath(new URL("./fixtures/pi-event-race.ts", import.meta.url));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -39,6 +43,7 @@ async function runtime(
   configureEnvironment?: (
     environment: Awaited<ReturnType<typeof createPiEnvironment>>,
   ) => void | Promise<void>,
+  extraExtensions: readonly string[] = [],
 ) {
   const environment = await createPiEnvironment();
   try {
@@ -57,7 +62,7 @@ async function runtime(
     cwd: environment.cwd,
     env: environment.env,
     sessionDirectory: environment.sessionDir,
-    extensions: [environment.extensionPath],
+    extensions: [environment.extensionPath, ...extraExtensions],
     provider: "dwell-test",
     model: "dwell-test",
     ...(resumeFile ? { resumeFile } : {}),
@@ -493,6 +498,89 @@ test("startRun exposes prompt acceptance separately from settled outcome", async
   await pi.abort();
   assert.equal((await run.settled).outcome, "aborted");
   assert.equal(pi.activeExecution, undefined);
+});
+
+test("extension-handled no-op and custom input stay truthful without a model turn", async (t) => {
+  const { pi, environment } = await runtime(
+    t,
+    undefined,
+    (env) => {
+      env.env.DWELL_TEST_TURN_LOG = join(env.root, "provider-turns.txt");
+    },
+    [handledExtension],
+  );
+  const noOp = await pi.run("handled-noop");
+  assert.equal(noOp.outcome, "handled");
+  assert.equal(pi.state, "ready");
+  await assert.rejects(access(environment.env.DWELL_TEST_TURN_LOG ?? ""), { code: "ENOENT" });
+
+  const custom = await pi.run("handled-custom");
+  assert.equal(custom.outcome, "handled");
+  assert.equal(pi.state, "ready");
+  const history = await pi.getEntries();
+  const serialized = JSON.stringify(history.entries);
+  assert.match(serialized, /The extension handled this input/u);
+  assert.doesNotMatch(serialized, /"role":"assistant"/u);
+  await assert.rejects(access(environment.env.DWELL_TEST_TURN_LOG ?? ""), { code: "ENOENT" });
+});
+
+test("a handled input that starts native work before acknowledgement transfers run ownership", {
+  timeout: 10_000,
+}, async (t) => {
+  const { pi } = await runtime(t, undefined, undefined, [handledExtension]);
+  const nativeStarted = deferred<string>();
+  const nativeSettled = deferred<{ executionId: string; outcome: string }>();
+  pi.subscribeNativeExecution((event) => {
+    if (event.type === "started") nativeStarted.resolve(event.executionId);
+    else nativeSettled.resolve({ executionId: event.executionId, outcome: event.result.outcome });
+  });
+
+  const handled = pi.startRun("handled-followup-before");
+  assert.equal(await handled.accepted, "handled");
+  assert.equal((await handled.settled).outcome, "handled");
+  const executionId = await nativeStarted.promise;
+  assert.deepEqual(pi.activeExecution, { source: "native", executionId });
+  assert.equal(pi.state, "running");
+  await pi.abort();
+  assert.deepEqual(await nativeSettled.promise, { executionId, outcome: "aborted" });
+  assert.equal(pi.state, "ready");
+});
+
+test("a native follow-up before prompt acknowledgement keeps native run ownership", async (t) => {
+  const environment = await createPiEnvironment();
+  let pi: PiProcess | undefined;
+  t.after(async () => {
+    await pi?.stop();
+    await environment.cleanup();
+  });
+  pi = await PiProcess.start({
+    executable: process.execPath,
+    entryPoint: eventRaceEntry,
+    cwd: environment.cwd,
+    env: environment.env,
+    sessionDirectory: environment.sessionDir,
+  });
+  const nativeStarted = deferred<string>();
+  const nativeSettled = deferred<{ executionId: string; outcome: string }>();
+  pi.subscribeNativeExecution((event) => {
+    if (event.type === "started") nativeStarted.resolve(event.executionId);
+    else nativeSettled.resolve({ executionId: event.executionId, outcome: event.result.outcome });
+  });
+
+  const run = pi.startRun("hello");
+  assert.equal(await run.accepted, "started");
+  assert.equal((await run.settled).outcome, "completed");
+  const active = pi.activeExecution;
+  assert.ok(active?.source === "native");
+  assert.equal(await nativeStarted.promise, active.executionId);
+  assert.equal(pi.state, "running");
+
+  await pi.abort();
+  assert.deepEqual(await nativeSettled.promise, {
+    executionId: active.executionId,
+    outcome: "aborted",
+  });
+  assert.equal(pi.state, "ready");
 });
 
 test("an extension can start a new idle execution without losing Pi runtime health", {

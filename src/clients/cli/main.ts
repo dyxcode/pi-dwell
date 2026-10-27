@@ -46,7 +46,7 @@ No project folder or model configuration is required to start.`);
   if (command.kind === "pair") {
     const pairing = await createPairing(options);
     console.log(
-      `Pairing code: ${pairing.code}\nExpires: ${new Date(pairing.expiresAt).toISOString()}\nPaste it into the local Dwell page. This code works once.`,
+      `Pairing code: ${pairing.code}\nExpires: ${new Date(pairing.expiresAt).toISOString()}\nEnter it on the Dwell page. This code works once.`,
     );
     return;
   }

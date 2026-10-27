@@ -9,7 +9,7 @@ test("the conversation page loads only same-origin external code and styles", ()
   assert.doesNotMatch(HOST_PAGE, /<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.match(HOST_PAGE, /id="pair-form"/);
   assert.match(HOST_PAGE, /npm run dwell -- pair/);
-  assert.match(HOST_PAGE, /pattern="\[0-9a-f\]\{32\}"/);
+  assert.ok(HOST_PAGE.includes('pattern="[A-HJ-NP-Za-hj-np-z2-9]{8}"'));
   assert.match(STYLE, /:focus-visible/);
 });
 

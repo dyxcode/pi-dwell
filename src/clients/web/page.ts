@@ -20,7 +20,7 @@ export const HOST_PAGE = `<!doctype html>
 <p class="footnote">For a development host, use <code>npm run dwell -- pair --dev</code>.</p>
 <form id="pair-form">
 <label for="pair-code">Pairing code</label>
-<input id="pair-code" pattern="[0-9a-f]{32}" minlength="32" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+<input id="pair-code" pattern="[A-HJ-NP-Za-hj-np-z2-9]{8}" minlength="8" maxlength="64" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
 <button id="pair-button" type="submit" class="action">Connect</button>
 </form>
 <button id="retry-button" type="button" class="text-button">Check connection ↗</button>

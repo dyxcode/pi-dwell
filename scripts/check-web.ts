@@ -272,7 +272,29 @@ for (const mode of modes) {
       'document.querySelector("#gate-message")?.textContent === "Pair this browser to connect." && !document.querySelector("#pair-button").disabled',
     );
     const pairing = record(await request("/auth/pairings", {}));
-    await first.type("#pair-code", String(pairing.code));
+    assert.match(String(pairing.code), /^[A-HJ-NP-Za-hj-np-z2-9]{8}$/);
+    for (const [value, valid] of [
+      ["AbCd2345", true],
+      ["abcdefgh", true],
+      ["ABCDEFGH", true],
+      ["AbCd234", false],
+      ["AbCd-2345", false],
+      ["AbCd234O", false],
+      ["AbCd234i", false],
+    ] as const) {
+      assert.equal(
+        await first.evaluate(`(() => {
+          const input = document.querySelector('#pair-code');
+          input.value = ${JSON.stringify(value)};
+          return input.checkValidity();
+        })()`),
+        valid,
+      );
+    }
+    await first.type("#pair-code", "");
+    await first.evaluate("document.querySelector('#pair-code').focus()");
+    await first.call("Input.insertText", { text: ` ${String(pairing.code)} ` });
+    assert.equal(await first.evaluate("document.querySelector('#pair-code').value"), pairing.code);
     await first.click("#pair-button");
     await first.until(
       '!document.querySelector("#app").hidden && !document.querySelector("#message").disabled',

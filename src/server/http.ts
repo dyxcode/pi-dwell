@@ -442,11 +442,11 @@ export async function startHost({
         if (
           Object.keys(body).length !== 2 ||
           typeof body.code !== "string" ||
-          !/^[a-f0-9]{32}$/.test(body.code) ||
+          !/^[A-HJ-NP-Za-hj-np-z2-9]{8}$/.test(body.code) ||
           typeof body.browserKey !== "string" ||
           !/^[a-f0-9]{64}$/.test(body.browserKey)
         )
-          fail(400, "invalid_input", "Enter the 32-character pairing code from the local CLI.");
+          fail(400, "invalid_input", "Enter the 8-character pairing code exactly as shown.");
         const token = await auth.redeem(body.code, body.browserKey);
         response.setHeader("Set-Cookie", browserCookie(access, token, SESSION_MS / 1000));
       } else {

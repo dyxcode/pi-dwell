@@ -883,6 +883,11 @@ el("dismiss-notice", HTMLButtonElement).onclick = clearNotice;
 el("retry-button", HTMLButtonElement).onclick = () => {
   void connect();
 };
+const pairingCode = el("pair-code", HTMLInputElement);
+pairingCode.oninput = () => {
+  const trimmed = pairingCode.value.trim();
+  if (trimmed !== pairingCode.value) pairingCode.value = trimmed;
+};
 el("pair-form", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();
   const code = el("pair-code", HTMLInputElement);

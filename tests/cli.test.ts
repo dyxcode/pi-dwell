@@ -68,7 +68,7 @@ test("CLI status, pair and revoke use authenticated HTTP and do not print the lo
   assert.ok(output && typeof output === "object" && "service" in output);
   assert.equal(output.service, "pi-dwell");
   const pairing = await exec(process.execPath, [...prefix, "pair"]);
-  assert.match(pairing.stdout, /Pairing code: [a-f0-9]{32}/);
+  assert.match(pairing.stdout, /Pairing code: [A-HJ-NP-Za-hj-np-z2-9]{8}\n/);
   const token = (await readFile(join(dataDir, "auth-token"), "utf8")).trim();
   assert.ok(!`${status.stdout}${status.stderr}${pairing.stdout}${pairing.stderr}`.includes(token));
   const revoked = await exec(process.execPath, [...prefix, "auth", "revoke"]);

@@ -143,7 +143,7 @@ test("Host, Origin, CSRF, media type, body sizes and rate limits are enforced", 
     const response = await fetch(pairUrl, {
       method: "POST",
       headers: browser,
-      body: JSON.stringify({ code: "0".repeat(32), browserKey: "a".repeat(64) }),
+      body: JSON.stringify({ code: "AbCd2345", browserKey: "a".repeat(64) }),
     });
     assert.equal(response.status, i < 20 ? 401 : 429);
   }

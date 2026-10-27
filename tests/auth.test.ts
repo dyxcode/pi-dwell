@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import { syncBuiltinESMExports } from "node:module";
 import {
   chmod,
   mkdtemp,
@@ -14,6 +16,39 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { startHost } from "../src/server/http.ts";
+import { LocalAuth } from "../src/server/auth.ts";
+
+test("short pairing codes regenerate pending collisions and preserve exact case", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "dwell-short-code-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const auth = await LocalAuth.open(root);
+  const choices = [...Array<number>(16).fill(0), ...Array<number>(8).fill(25)];
+  const random = t.mock.method(crypto, "randomInt", () => {
+    const choice = choices.shift();
+    assert.notEqual(choice, undefined, "pairing must retry only the colliding candidate");
+    return choice;
+  });
+  let first: { code: string; expiresAt: number };
+  let second: { code: string; expiresAt: number };
+  try {
+    syncBuiltinESMExports();
+    first = auth.createPairing();
+    second = auth.createPairing();
+  } finally {
+    random.mock.restore();
+    syncBuiltinESMExports();
+  }
+  assert.equal(first.code, "AAAAAAAA");
+  assert.equal(second.code, "bbbbbbbb");
+  assert.equal(choices.length, 0);
+  await assert.rejects(auth.redeem(second.code.toUpperCase(), "b".repeat(64)), /invalid/);
+  const firstToken = await auth.redeem(first.code, "a".repeat(64));
+  assert.match(firstToken, /^[a-f0-9]{64}$/);
+  const secondToken = await auth.redeem(second.code, "b".repeat(64));
+  assert.notEqual(firstToken, secondToken);
+  assert.equal(auth.isBrowser(firstToken, "a".repeat(64)), true);
+  assert.equal(auth.isBrowser(secondToken, "b".repeat(64)), true);
+});
 
 test("initialization is private, persistent, and status requires a credential", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "dwell-auth-"));
@@ -63,6 +98,7 @@ test("pair once, survive restart, forget and revoke browser sessions", async (t)
     assert.ok(
       value && typeof value === "object" && "code" in value && typeof value.code === "string",
     );
+    assert.match(value.code, /^[A-HJ-NP-Za-hj-np-z2-9]{8}$/);
     return value.code;
   };
   const redeem = (code: string) =>
@@ -72,6 +108,24 @@ test("pair once, survive restart, forget and revoke browser sessions", async (t)
       body: JSON.stringify({ code, browserKey: "a".repeat(64) }),
     });
   const code = await create();
+  for (const invalid of [
+    "AbCd234",
+    "AbCd23456",
+    "AbCd-2345",
+    "AbCd 2345",
+    "0",
+    "O",
+    "o",
+    "1",
+    "I",
+    "i",
+  ]) {
+    const candidate = invalid.length === 1 ? `AbCd234${invalid}` : invalid;
+    assert.equal((await redeem(candidate)).status, 400);
+  }
+  // A well-formed wrong guess is rejected by redemption, not input validation.
+  const wrongCode = `${code[0] === "A" ? "b" : "A"}${code.slice(1)}`;
+  assert.equal((await redeem(wrongCode)).status, 401);
   const attempts = await Promise.all([redeem(code), redeem(code)]);
   assert.deepEqual(attempts.map((r) => r.status).sort(), [200, 401]);
   const response = attempts.find((r) => r.status === 200);

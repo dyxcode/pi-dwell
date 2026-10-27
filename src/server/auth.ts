@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import {
   createPrivateFile,
@@ -12,6 +12,7 @@ import { hasCode } from "../local/paths.ts";
 export const PAIRING_MS = 5 * 60 * 1000;
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_SESSIONS = 100;
+const PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjklmnpqrstuvwxyz23456789";
 interface BrowserSession {
   hash: string;
   browserKeyHash: string;
@@ -164,9 +165,16 @@ export class LocalAuth {
         "pairing_limit",
         "Too many pending pairing codes. Wait five minutes before creating another.",
       );
-    const code = randomBytes(16).toString("hex");
+    let code: string;
+    let hash: string;
+    do {
+      code = Array.from({ length: 8 }, () =>
+        PAIRING_ALPHABET.charAt(randomInt(PAIRING_ALPHABET.length)),
+      ).join("");
+      hash = digest(code);
+    } while (this.codes.has(hash));
     const expiresAt = this.now() + PAIRING_MS;
-    this.codes.set(digest(code), expiresAt);
+    this.codes.set(hash, expiresAt);
     return { code, expiresAt };
   }
 

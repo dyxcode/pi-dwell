@@ -113,7 +113,7 @@ export async function createPairing(
     typeof value !== "object" ||
     !("code" in value) ||
     typeof value.code !== "string" ||
-    !/^[a-f0-9]{32}$/.test(value.code) ||
+    !/^[A-HJ-NP-Za-hj-np-z2-9]{8}$/.test(value.code) ||
     !("expiresAt" in value) ||
     typeof value.expiresAt !== "number" ||
     !Number.isSafeInteger(value.expiresAt)

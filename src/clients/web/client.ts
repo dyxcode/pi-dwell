@@ -333,7 +333,11 @@ function probeCurrentModel(sessionId: string | null = selected): void {
   );
 }
 function label(s: SessionInfo): string {
-  return names.get(s.id) || s.directory.split(/[\\/]/).filter(Boolean).pop() || s.directory;
+  const directory =
+    names.get(s.id) || s.directory.split(/[\\/]/).filter(Boolean).pop() || s.directory;
+  return [directory, s.model, s.thinkingLevel ? levelNames[s.thinkingLevel] : null]
+    .filter(Boolean)
+    .join(" · ");
 }
 function runtimeOpen(s: SessionInfo): boolean {
   return s.runtimeState !== "closed";
@@ -458,6 +462,8 @@ function navigation(): void {
     const row = node("button", "", `name-row${s.id === selected ? " active" : ""}`);
     row.type = "button";
     row.dataset.sessionId = s.id;
+    row.title = label(s);
+    row.setAttribute("aria-label", label(s));
     row.setAttribute("aria-current", String(s.id === selected && runtimeOpen(s)));
     row.disabled = !authenticated || attachments.busy || openingSessions.has(s.id);
     row.append(

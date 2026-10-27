@@ -325,8 +325,8 @@ header{padding:0 25px;gap:13px}
 }
 
 
-.session-names{display:grid;gap:6px}
-.name-row{display:flex;align-items:baseline;gap:10px;text-align:left;min-height:48px;padding:13px 10px;border:1px solid transparent;width:100%}
+.session-names{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;min-width:0}
+.name-row{display:flex;align-items:baseline;gap:10px;text-align:left;min-height:48px;min-width:0;overflow:hidden;padding:13px 10px;border:1px solid transparent;width:100%}
 .name-row.active{background:var(--surface);border-color:var(--teal);box-shadow:2px 2px #c8d7c9}
 .name-index{font:9px var(--mono);color:var(--muted);flex-shrink:0}
 .name-row .session-title{font-size:11px;overflow-wrap:anywhere;min-width:0}
@@ -583,9 +583,9 @@ button:disabled{opacity:.55;cursor:default}
 
 /* Context sources stay quiet until opened. */
 #conversation .session-details{border:0;background:none;margin:0 0 22px;padding:0}
-.session-details>summary{min-height:44px;padding:0;gap:8px;color:var(--muted);font:11px/1.6 var(--mono)}
-.session-details>summary::before{font-size:15px}
-.session-details>summary::after{content:'';height:1px;flex:1;margin-left:6px;background:#ddd5c8}
+.session-details>summary{min-height:44px;padding:0;gap:10px;justify-content:center;text-align:center;color:var(--muted);font:11px/1.6 var(--mono)}
+.session-details>summary::before,.session-details>summary::after{content:'';display:block;height:1px;min-width:0;flex:1;transform:none;background:#ddd5c8}
+.session-details[open]>summary::before,.session-details[open]>summary::after{transform:none}
 .session-details[open]>summary{color:var(--dark)}
 .session-details-body{padding:8px 14px 10px;background:#eee8dd;border-radius:2px}
 .session-details-caption{font:10px/1.5 var(--mono);color:var(--muted);margin:6px 0}
@@ -763,13 +763,13 @@ footer{padding:4px 22px 8px}
 
 /* Open sessions share one status strip on mobile and desktop. */
 :root{--close-wash:#f0ded5;--close-line:#bb8270;--close-ink:#904d3c;--close-fill:#a85e4a}
-main>header{display:flex;height:52px;min-height:52px;padding:0 16px;gap:8px;border-bottom:1px solid var(--line)}
+main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;border-bottom:1px solid var(--line)}
 #status-list{flex:1;display:flex;gap:8px;min-width:0;padding:4px 2px;overflow-x:auto;scrollbar-width:none}
-.status-tab{display:flex;flex:0 0 80px;width:80px;height:40px;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
+.status-tab{display:flex;flex:0 0 80px;width:80px;height:36px;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
 .status-tab.active{border-color:var(--teal);background:var(--pale);color:var(--dark);box-shadow:2px 2px #c8d7c9}
 .tab-select{display:flex;flex:1;min-width:0;align-items:center;justify-content:space-around;padding:0 4px;font:12px var(--mono);color:inherit}
 .tab-close{display:flex;flex:0 0 36px;align-items:center;justify-content:center;padding:0;color:var(--dark)}
-.tab-symbol{width:20px;height:20px;display:block;flex-shrink:0}
+.tab-symbol{width:18px;height:18px;display:block;flex-shrink:0}
 .tab-symbol svg{display:block;width:100%;height:100%}
 .tab-symbol.ready{color:var(--teal)}
 .tab-symbol.working,.tab-symbol.opening{color:var(--teal);animation:tab-turn 1.5s linear infinite}
@@ -781,9 +781,10 @@ main>header{display:flex;height:52px;min-height:52px;padding:0 16px;gap:8px;bord
 .close-armed .tab-select,.close-armed .tab-close{color:var(--close-ink)}
 .close-armed .tab-select:hover,.close-armed .tab-close:hover{background:#e9cec1}
 .close-armed button:focus-visible,#confirm-session-close:focus-visible{outline-color:var(--close-ink);outline-offset:1px}
-#new-mobile{display:grid;place-items:center;flex:0 0 38px;width:38px;min-height:38px;height:38px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:24px var(--mono)}
+#new-mobile{display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:36px;height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:22px var(--mono)}
 #rail #new-session{display:none}
 .name-row{min-height:44px;align-items:center}
+.name-row .session-title{display:block;flex:1 1 0;min-width:0;overflow:hidden;overflow-wrap:normal;text-overflow:ellipsis;white-space:nowrap}
 .name-index,.sidebar-slot{flex:0 0 20px;font:10px var(--mono);color:var(--muted)}
 .name-row.active .name-index,.name-row.active .sidebar-slot{color:var(--dark)}
 #close-session-dialog{position:fixed;inset:0;margin:auto;width:min(360px,calc(100vw - 32px));max-width:none;height:fit-content;max-height:calc(100dvh - 32px);padding:24px;border:1px solid var(--line);border-radius:0;background:var(--surface);box-shadow:4px 4px #dfc4b8;color:var(--ink)}
@@ -802,13 +803,15 @@ main>header{display:flex;height:52px;min-height:52px;padding:0 16px;gap:8px;bord
 #message::placeholder{font-size:14px;font-weight:400;opacity:1;letter-spacing:normal}
 @media(min-width:761px){#open-nav{display:none}}
 @media(max-width:760px){
- main>header{height:48px;min-height:48px;padding:0 10px;gap:7px}
- .status-tab{width:76px;flex-basis:76px;height:38px}
+ #rail{width:min(360px,calc(100vw - 24px))}
+ main>header{height:44px;min-height:44px;padding:0 10px;gap:7px}
+ #open-nav{height:40px;min-width:40px}
+ .status-tab{width:76px;flex-basis:76px;height:34px}
  #status-list{gap:6px}
- .tab-symbol{width:16px;height:16px}
+ .tab-symbol{width:14px;height:14px}
  .tab-select{font-size:11px}
- #new-mobile{font-size:20px;line-height:1}
- #open-nav .menu{font-size:16px;line-height:1}
+ #new-mobile{font-size:18px;line-height:1}
+ #open-nav .menu{font-size:14px;line-height:1}
  #close-session-dialog{padding:22px}
 }
 
@@ -823,8 +826,8 @@ main>header{display:flex;height:52px;min-height:52px;padding:0 16px;gap:8px;bord
 #conversation .tool-run .tool-status{margin-left:auto;padding:0 2px 0 8px;color:#797267;font-size:11px}
 #conversation .tool-run .tool-output{margin:0;padding:0 0 8px;background:none;border:0;color:#797267;font:12px/1.65 var(--mono);white-space:pre;overflow-x:auto;max-height:220px}
 #conversation .tool-run.error .tool-status{color:var(--close-ink,#904d3c)}
-#conversation .session-details summary::before{content:'';display:block;width:5px;height:5px;flex:0 0 5px;margin:0 4px 0 2px;border:solid currentColor;border-width:1px 1px 0 0;box-sizing:border-box;transform:rotate(45deg);transform-origin:center}
-#conversation .session-details[open]>summary::before,#conversation .context-source[open]>summary::before{transform:rotate(135deg)}
+#conversation .context-source>summary::before{content:'';display:block;width:5px;height:5px;flex:0 0 5px;margin:0 4px 0 2px;border:solid currentColor;border-width:1px 1px 0 0;box-sizing:border-box;transform:rotate(45deg);transform-origin:center}
+#conversation .context-source[open]>summary::before{transform:rotate(135deg)}
 #conversation :is(.thinking-run,.tool-run)>summary{position:relative;text-decoration:none}
 #conversation :is(.thinking-run,.tool-run)>summary::before{content:'';position:absolute;left:-11px;top:50%;width:5px;height:5px;margin:0;border:solid currentColor;border-width:1px 1px 0 0;transform:translateY(-50%) rotate(45deg);transform-origin:center;box-sizing:border-box}
 #conversation :is(.thinking-run,.tool-run)[open]>summary::before{transform:translateY(-50%) rotate(135deg)}

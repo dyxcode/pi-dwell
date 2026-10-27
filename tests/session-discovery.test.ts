@@ -188,6 +188,20 @@ test("model capability discovery uses Pi RPC in a private offline session", {
   const environment = await createPiEnvironment();
   t.after(() => environment.cleanup());
   const settingsPath = join(environment.agentDir, "settings.json");
+  const marker = join(environment.root, "discovery-extension-ran");
+  const extension = join(environment.root, "discovery-extension.mjs");
+  await writeFile(
+    extension,
+    `import { writeFileSync } from "node:fs";
+export default function () { writeFileSync(${JSON.stringify(marker)}, "loaded"); }`,
+  );
+  await writeFile(
+    settingsPath,
+    JSON.stringify({
+      ...JSON.parse(await readFile(settingsPath, "utf8")),
+      extensions: [extension],
+    }),
+  );
   const settingsBefore = await readFile(settingsPath, "utf8");
   await writeFile(
     join(environment.agentDir, "models.json"),
@@ -256,6 +270,7 @@ test("model capability discovery uses Pi RPC in a private offline session", {
     supportsImages: true,
   });
   assert.equal(await readFile(settingsPath, "utf8"), settingsBefore);
+  await assert.rejects(readFile(marker), { code: "ENOENT" });
 });
 
 test("Pi discovery recognizes an empty model list and sanitizes process failures", async (t) => {

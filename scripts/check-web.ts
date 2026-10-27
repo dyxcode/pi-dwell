@@ -106,7 +106,17 @@ async function assertComposerLayout(page: BrowserPage, viewport: string): Promis
   );
   assert.equal(
     await page.evaluate('getComputedStyle(document.querySelector(".tab-symbol")).width'),
-    viewport === "desktop" ? "20px" : "16px",
+    viewport === "desktop" ? "18px" : "14px",
+  );
+  assert.equal(
+    await page.evaluate('getComputedStyle(document.querySelector("main>header")).height'),
+    viewport === "desktop" ? "46px" : "44px",
+    `${viewport} status bar stays compact`,
+  );
+  assert.equal(
+    await page.evaluate('getComputedStyle(document.querySelector(".status-tab")).height'),
+    viewport === "desktop" ? "36px" : "34px",
+    `${viewport} status tabs stay compact and tappable`,
   );
 
   assert.equal(
@@ -140,6 +150,88 @@ async function assertComposerLayout(page: BrowserPage, viewport: string): Promis
     true,
     `${viewport} composer context stays compact, on one line above the input, and within the viewport`,
   );
+}
+
+async function assertSidebarLabel(
+  page: BrowserPage,
+  sessionId: string,
+  workspace: string,
+  model: string,
+  thinkingLevel?: string,
+): Promise<void> {
+  const label = record(
+    await page.evaluate(`(()=>{
+      const row=[...document.querySelectorAll("#session-list .name-row")].find(item=>item.dataset.sessionId===${JSON.stringify(sessionId)});
+      if(!(row instanceof HTMLButtonElement)) return {present:false};
+      const title=row.querySelector(".session-title");
+      if(!(title instanceof HTMLElement)) return {present:false};
+      const style=getComputedStyle(title);
+      const rect=title.getBoundingClientRect();
+      const rail=document.querySelector("#rail");
+      return {
+        present:true,text:title.textContent??"",title:row.title,aria:row.getAttribute("aria-label"),
+        whiteSpace:style.whiteSpace,overflow:style.overflowX,textOverflow:style.textOverflow,
+        fontSize:style.fontSize,height:rect.height,scrollWidth:title.scrollWidth,clientWidth:title.clientWidth,
+        railWidth:rail instanceof HTMLElement ? rail.getBoundingClientRect().width : 0,
+        railRight:rail instanceof HTMLElement ? rail.getBoundingClientRect().right : 0,
+        rowRight:row.getBoundingClientRect().right
+      };
+    })()`),
+  );
+  const expected = [workspace, model, thinkingLevel].filter(Boolean).join(" · ");
+  assert.equal(label.present, true, "the sidebar keeps the session row");
+  assert.equal(
+    label.text,
+    expected,
+    "the sidebar label reflects workspace, model, and thinking level",
+  );
+  assert.equal(label.title, expected, "the native title retains the full label");
+  assert.equal(label.aria, expected, "the accessible label retains the full label");
+  assert.equal(label.whiteSpace, "nowrap", "the sidebar label never wraps");
+  assert.equal(label.overflow, "hidden", "long sidebar labels stay clipped to their row");
+  assert.equal(label.textOverflow, "ellipsis", "long sidebar labels use an ellipsis");
+  assert.ok(Number(label.height) <= Number.parseFloat(String(label.fontSize)) * 1.6);
+  assert.ok(
+    Number(label.scrollWidth) > Number(label.clientWidth),
+    `extreme labels are ellipsized: ${JSON.stringify(label)}`,
+  );
+  assert.ok(Number(label.rowRight) <= Number(label.railRight) + 1);
+}
+
+async function assertMobileDrawerWidth(page: BrowserPage): Promise<void> {
+  const width = record(
+    await page.evaluate(`(()=>{
+      const rail=document.querySelector("#rail");
+      const rect=rail.getBoundingClientRect();
+      return {width:rect.width,right:rect.right,viewportWidth:innerWidth};
+    })()`),
+  );
+  assert.equal(width.viewportWidth, 390);
+  assert.equal(width.width, 360, "the mobile drawer uses its requested 360px maximum");
+  assert.ok(Number(width.right) <= Number(width.viewportWidth));
+
+  await page.call("Emulation.setDeviceMetricsOverride", {
+    width: 320,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  const narrow = record(
+    await page.evaluate(`(()=>{
+      const rect=document.querySelector("#rail").getBoundingClientRect();
+      return {width:rect.width,right:rect.right,viewportWidth:innerWidth,documentWidth:document.documentElement.scrollWidth};
+    })()`),
+  );
+  assert.equal(narrow.viewportWidth, 320);
+  assert.equal(narrow.width, 296, "the drawer leaves 24px of a narrow viewport clear");
+  assert.ok(Number(narrow.right) <= Number(narrow.viewportWidth));
+  assert.ok(Number(narrow.documentWidth) <= Number(narrow.viewportWidth) + 1);
+  await page.call("Emulation.setDeviceMetricsOverride", {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
 }
 
 async function assertQuietProcessPresentation(page: BrowserPage, viewport: string): Promise<void> {
@@ -259,13 +351,34 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
           return range.getBoundingClientRect().left;
         };
         const closedLeft=titleLeft();
-        const marker=getComputedStyle(summary,"::before");
+        const leftRule=getComputedStyle(summary,"::before");
+        const rightRule=getComputedStyle(summary,"::after");
+        const titleRange=document.createRange();titleRange.selectNodeContents(summary);
+        const titleRect=titleRange.getBoundingClientRect();
+        const summaryRect=summary.getBoundingClientRect();
+        const source=details.querySelector(".context-source");
+        const sourceSummary=source?.querySelector(":scope>summary");
+        const nestedClosed=sourceSummary ? getComputedStyle(sourceSummary,"::before").transform : "";
+        const leftClosedTransform=leftRule.transform;
+        const rightClosedTransform=rightRule.transform;
+        if(source) source.open=true;
+        const nestedOpen=sourceSummary ? getComputedStyle(sourceSummary,"::before").transform : "";
+        if(source) source.open=false;
         details.open=true;
+        const leftOpenTransform=getComputedStyle(summary,"::before").transform;
+        const rightOpenTransform=getComputedStyle(summary,"::after").transform;
         const openLeft=titleLeft();
         details.open=false;
         return {
           present:true,closedLeft,openLeft,
-          arrowWidth:marker.width,
+          titleCenter:Math.abs((titleRect.left+titleRect.right)/2-(summaryRect.left+summaryRect.right)/2),
+          leftRuleContent:leftRule.content,
+          leftRuleGrow:leftRule.flexGrow,
+          leftRuleColor:leftRule.backgroundColor,
+          rightRuleGrow:rightRule.flexGrow,
+          rightRuleColor:rightRule.backgroundColor,
+          leftClosedTransform,rightClosedTransform,leftOpenTransform,rightOpenTransform,
+          nestedClosed,nestedOpen,
           background:getComputedStyle(body).backgroundColor,
           divider:getComputedStyle(summary,"::after").backgroundColor
         };
@@ -274,8 +387,42 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.equal(context.present, true, "the existing saved Context remains present");
     assert.equal(context.background, "rgb(238, 232, 221)");
     assert.equal(context.divider, "rgb(221, 213, 200)");
-    assert.equal(context.arrowWidth, "5px");
+    assert.equal(context.leftRuleContent, '""', "Context has no top-level disclosure arrow");
+    assert.equal(context.leftRuleGrow, "1", "Context has a divider on the left of its label");
+    assert.equal(context.rightRuleGrow, "1", "Context has a divider on the right of its label");
+    assert.equal(context.leftRuleColor, context.divider);
+    assert.equal(context.rightRuleColor, context.divider);
+    assert.equal(context.leftClosedTransform, "none");
+    assert.equal(context.rightClosedTransform, "none");
+    assert.equal(context.leftOpenTransform, "none");
+    assert.equal(context.rightOpenTransform, "none");
+    assert.ok(Number(context.titleCenter) <= 1, "the Context label is visually centered");
+    assert.notEqual(context.nestedClosed, context.nestedOpen, "nested source arrows still turn");
     assert.ok(Math.abs(Number(context.closedLeft) - Number(context.openLeft)) < 0.5);
+
+    await page.evaluate('document.querySelector("#conversation .session-details>summary").focus()');
+    assert.equal(
+      await page.evaluate(
+        'document.activeElement===document.querySelector("#conversation .session-details>summary")',
+      ),
+      true,
+      `${viewport} Context summary remains keyboard-focusable`,
+    );
+    const space = { type: "keyDown", key: " ", code: "Space", windowsVirtualKeyCode: 32 };
+    await page.call("Input.dispatchKeyEvent", space);
+    await page.call("Input.dispatchKeyEvent", { ...space, type: "keyUp" });
+    assert.equal(
+      await page.evaluate('document.querySelector("#conversation .session-details").open'),
+      true,
+      `${viewport} Context still opens through native Space activation`,
+    );
+    await page.call("Input.dispatchKeyEvent", space);
+    await page.call("Input.dispatchKeyEvent", { ...space, type: "keyUp" });
+    assert.equal(
+      await page.evaluate('document.querySelector("#conversation .session-details").open'),
+      false,
+      `${viewport} Context still closes through native Space activation`,
+    );
 
     const arrow = record(
       await page.evaluate(`(()=>{
@@ -340,6 +487,53 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.equal(focus.active, true, "Tab moves keyboard focus to the thinking disclosure");
     assert.notEqual(focus.outlineStyle, "none", "keyboard focus has a visible outline");
     assert.notEqual(focus.outlineWidth, "0px", "keyboard focus outline has nonzero width");
+
+    const previewStyles = await readFile(
+      new URL("../examples/web-preview/style.css", import.meta.url),
+      "utf8",
+    );
+    const previewOverrides = previewStyles.replace(/^@import[^;]+;\s*/, "");
+    const capturePresentation = `(()=>{
+      const summary=document.querySelector("#conversation .session-details>summary");
+      const details=summary.parentElement;
+      const range=document.createRange();range.selectNodeContents(summary);
+      const label=range.getBoundingClientRect();
+      const row=summary.getBoundingClientRect();
+      const left=getComputedStyle(summary,"::before");
+      const right=getComputedStyle(summary,"::after");
+      const source=details.querySelector(".context-source>summary");
+      const nested=getComputedStyle(source,"::before");
+      return {
+        header:getComputedStyle(document.querySelector("main>header")).height,
+        tab:getComputedStyle(document.querySelector(".status-tab")).height,
+        icon:getComputedStyle(document.querySelector(".tab-symbol")).width,
+        contextCenter:Math.abs((label.left+label.right)/2-(row.left+row.right)/2),
+        leftContent:left.content,leftGrow:left.flexGrow,leftColor:left.backgroundColor,
+        rightGrow:right.flexGrow,rightColor:right.backgroundColor,
+        contextBackground:getComputedStyle(details.querySelector(".session-details-body")).backgroundColor,
+        nestedWidth:nested.width,nestedTransform:nested.transform
+      };
+    })()`;
+    const productionPresentation = record(await page.evaluate(capturePresentation));
+    await page.evaluate(`(()=>{
+      const style=document.createElement("style");
+      style.id="preview-style-parity-test";
+      style.textContent=${JSON.stringify(previewOverrides)};
+      document.head.append(style);
+      document.querySelector("#app").classList.add("with-distill");
+    })()`);
+    try {
+      assert.deepEqual(
+        record(await page.evaluate(capturePresentation)),
+        productionPresentation,
+        `${viewport} With Distill preview preserves production Context and status sizing`,
+      );
+    } finally {
+      await page.evaluate(`(()=>{
+        document.querySelector("#app").classList.remove("with-distill");
+        document.querySelector("#preview-style-parity-test")?.remove();
+      })()`);
+    }
   } finally {
     await page.evaluate('document.querySelector("#quiet-process-test-fixture")?.remove()');
   }
@@ -896,6 +1090,18 @@ for (const mode of modes) {
     await first.until(
       'document.querySelector("#model-label").textContent.trim()==="dwell-test-image" && !document.querySelector("#attach-image").disabled && document.querySelector("#attach-image").title==="Add images"',
     );
+    const initialThinking = String(
+      await first.evaluate('document.querySelector("#thinking-label").textContent'),
+    )
+      .replace(/^·\s*/, "")
+      .trim();
+    await assertSidebarLabel(
+      first,
+      String(session.id),
+      longPathParts.at(-1) ?? "",
+      String(created.model),
+      initialThinking || undefined,
+    );
     assert.equal(
       record(
         await request("/model-capabilities", {
@@ -1012,6 +1218,18 @@ for (const mode of modes) {
     await first.until(
       `document.querySelector("#model-label").textContent.trim()===${JSON.stringify(ALTERNATE_MODEL)}`,
     );
+    const alternateThinking = String(
+      await first.evaluate('document.querySelector("#thinking-label").textContent'),
+    )
+      .replace(/^·\s*/, "")
+      .trim();
+    await assertSidebarLabel(
+      first,
+      String(session.id),
+      longPathParts.at(-1) ?? "",
+      ALTERNATE_MODEL,
+      alternateThinking || undefined,
+    );
     console.log(
       `PASS ${mode} model switch uses same-origin SSE, pending guard, and refresh persistence`,
     );
@@ -1084,6 +1302,20 @@ for (const mode of modes) {
     await assertQuietProcessPresentation(second, "mobile");
     await second.click("#open-nav");
     assert.ok(await second.evaluate('document.querySelector("#rail").classList.contains("open")'));
+    const mobileSession = record(await request(`/sessions/${String(session.id)}`));
+    const mobileThinking = String(
+      await second.evaluate('document.querySelector("#thinking-label").textContent'),
+    )
+      .replace(/^·\s*/, "")
+      .trim();
+    await assertSidebarLabel(
+      second,
+      String(session.id),
+      longPathParts.at(-1) ?? "",
+      String(mobileSession.model),
+      mobileThinking || undefined,
+    );
+    await assertMobileDrawerWidth(second);
     await second.click("#close-nav");
     assert.ok(
       await second.evaluate(
@@ -1191,6 +1423,13 @@ for (const mode of modes) {
       '!document.querySelector("#model-dialog").open && document.querySelector("#thinking-label").textContent.includes("High")',
     );
     assert.equal(record(await request(`/sessions/${String(session.id)}`)).thinkingLevel, "high");
+    await assertSidebarLabel(
+      second,
+      String(session.id),
+      longPathParts.at(-1) ?? "",
+      "dwell-test-reasoning",
+      "High",
+    );
     assert.equal(
       await second.evaluate('document.querySelector("#message").value'),
       "Keep this image-review draft",
@@ -1283,6 +1522,13 @@ for (const mode of modes) {
     await second.call("Page.reload");
     await second.until(
       'document.querySelector(".sent-image img")?.naturalWidth===64 && document.querySelector("#thinking-label").textContent.includes("High")',
+    );
+    await assertSidebarLabel(
+      second,
+      String(session.id),
+      longPathParts.at(-1) ?? "",
+      "dwell-test-reasoning",
+      "High",
     );
     assert.equal(await second.evaluate('document.querySelectorAll(".image-attachment").length'), 0);
     assert.equal(

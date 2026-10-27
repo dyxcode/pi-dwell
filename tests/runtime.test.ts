@@ -4,7 +4,7 @@ import { once } from "node:events";
 import { access, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { type TestContext, test } from "node:test";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PiProcess } from "../src/runtime/pi-process.ts";
 import { isRecord } from "../src/runtime/pi-rpc.ts";
@@ -75,6 +75,202 @@ async function runtime(
   });
   return { pi, environment, options };
 }
+
+async function setProjectTrustDefault(
+  environment: Awaited<ReturnType<typeof createPiEnvironment>>,
+  defaultProjectTrust: "always" | "never",
+  extra: Record<string, unknown> = {},
+): Promise<void> {
+  const settingsPath = join(environment.agentDir, "settings.json");
+  const settings: unknown = JSON.parse(await readFile(settingsPath, "utf8"));
+  assert.ok(isRecord(settings));
+  await writeFile(
+    settingsPath,
+    `${JSON.stringify({ ...settings, ...extra, defaultProjectTrust }, null, 2)}\n`,
+  );
+}
+
+function resourceExtensionSource(marker: string): string {
+  return `import { appendFile } from "node:fs/promises";
+
+export default function (pi) {
+  pi.on("session_start", async () => {
+    const path = process.env.DWELL_TEST_RESOURCE_LOG;
+    if (path) await appendFile(path, "${marker}\\n", { mode: 0o600 });
+  });
+}
+`;
+}
+
+function resourceSkillSource(name: string, description: string, body: string): string {
+  return `---\nname: ${name}\ndescription: ${description}\n---\n\n${body}\n`;
+}
+
+function resourcePromptSource(description: string, body: string): string {
+  return `---\ndescription: ${description}\n---\n\n${body}\n`;
+}
+
+async function writeFixtureFiles(files: Record<string, string>): Promise<void> {
+  await Promise.all(
+    Object.entries(files).map(async ([path, contents]) => {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, contents);
+    }),
+  );
+}
+
+test("native Pi resource loading discovers trusted global and project resources and refreshes on reopen", async (t) => {
+  const { pi, environment, options } = await runtime(t, undefined, async (env) => {
+    await setProjectTrustDefault(env, "always", {
+      extensions: ["-extensions/dwell-disabled-resource.ts"],
+    });
+    const resourceLog = join(env.root, "resource-starts.txt");
+    const turnLog = join(env.root, "turns.txt");
+    await writeFile(resourceLog, "", { mode: 0o600 });
+    await writeFixtureFiles({
+      [join(env.agentDir, "extensions", "dwell-global-resource.ts")]:
+        resourceExtensionSource("global-resource-v1"),
+      [join(env.agentDir, "extensions", "dwell-disabled-resource.ts")]:
+        resourceExtensionSource("disabled-resource"),
+      [join(env.cwd, ".pi/extensions/dwell-project-resource.ts")]:
+        resourceExtensionSource("project-resource-v1"),
+      [join(env.agentDir, "skills/dwell-global-resource/SKILL.md")]: resourceSkillSource(
+        "dwell-global-resource",
+        "global-resource-skill-description-v1",
+        "global-resource-skill-body-v1",
+      ),
+      [join(env.cwd, ".pi/skills/dwell-project-resource/SKILL.md")]: resourceSkillSource(
+        "dwell-project-resource",
+        "project-resource-skill-description-v1",
+        "project-resource-skill-body-v1",
+      ),
+      [join(env.agentDir, "prompts/global-resource.md")]: resourcePromptSource(
+        "global-resource-prompt",
+        "global-resource-prompt-body-v1",
+      ),
+      [join(env.cwd, ".pi/prompts/project-resource.md")]: resourcePromptSource(
+        "project-resource-prompt",
+        "project-resource-prompt-body-v1",
+      ),
+    });
+    env.env.DWELL_TEST_RESOURCE_LOG = resourceLog;
+    env.env.DWELL_TEST_TURN_LOG = turnLog;
+  });
+
+  assert.deepEqual(
+    (await readFile(environment.env.DWELL_TEST_RESOURCE_LOG ?? "", "utf8"))
+      .split("\n")
+      .filter(Boolean)
+      .sort(),
+    ["global-resource-v1", "project-resource-v1"],
+  );
+
+  // The RPC fixture has no read/bash tool, so Pi omits skill summaries from its system prompt.
+  for (const command of [
+    "/skill:dwell-global-resource",
+    "/skill:dwell-project-resource",
+    "/global-resource",
+    "/project-resource",
+  ])
+    assert.equal((await pi.run(command)).outcome, "completed");
+  const initialTurns = await readFile(environment.env.DWELL_TEST_TURN_LOG ?? "", "utf8");
+  for (const marker of [
+    "global-resource-skill-body-v1",
+    "project-resource-skill-body-v1",
+    "global-resource-prompt-body-v1",
+    "project-resource-prompt-body-v1",
+  ])
+    assert.ok(
+      initialTurns.includes(marker),
+      `${marker} must be sent to the offline fixture provider`,
+    );
+
+  const globalPrompt = join(environment.agentDir, "prompts", "global-resource.md");
+  const globalSkill = join(environment.agentDir, "skills", "dwell-global-resource", "SKILL.md");
+  const globalExtension = join(environment.agentDir, "extensions", "dwell-global-resource.ts");
+  await Promise.all([
+    writeFile(
+      globalPrompt,
+      resourcePromptSource("global-resource-prompt", "global-resource-prompt-body-v2"),
+    ),
+    writeFile(
+      globalSkill,
+      resourceSkillSource(
+        "dwell-global-resource",
+        "global-resource-skill-description-v2",
+        "global-resource-skill-body-v2",
+      ),
+    ),
+    writeFile(globalExtension, resourceExtensionSource("global-resource-v2")),
+  ]);
+
+  assert.equal((await pi.run("/global-resource")).outcome, "completed");
+  const activeTurns = await readFile(environment.env.DWELL_TEST_TURN_LOG ?? "", "utf8");
+  assert.ok(activeTurns.includes("global-resource-prompt-body-v1"));
+  assert.ok(!activeTurns.includes("global-resource-prompt-body-v2"));
+  assert.ok(!activeTurns.includes("global-resource-v2"));
+  assert.ok(
+    !(await readFile(environment.env.DWELL_TEST_RESOURCE_LOG ?? "", "utf8")).includes(
+      "global-resource-v2",
+    ),
+  );
+
+  const initialState = await pi.getState();
+  assert.ok(initialState.sessionFile);
+  await pi.stop();
+  const reopened = await PiProcess.start({ ...options, resumeFile: initialState.sessionFile });
+  t.after(() => reopened.stop());
+  const reopenedResourceLog = await readFile(environment.env.DWELL_TEST_RESOURCE_LOG ?? "", "utf8");
+  assert.ok(reopenedResourceLog.includes("global-resource-v2"));
+  assert.ok(reopenedResourceLog.includes("project-resource-v1"));
+  assert.equal((await reopened.run("/global-resource")).outcome, "completed");
+  assert.equal((await reopened.run("/project-resource")).outcome, "completed");
+  assert.equal((await reopened.run("/skill:dwell-global-resource")).outcome, "completed");
+  const reopenedTurns = await readFile(environment.env.DWELL_TEST_TURN_LOG ?? "", "utf8");
+  assert.ok(reopenedTurns.includes("global-resource-prompt-body-v2"));
+  assert.ok(reopenedTurns.includes("project-resource-prompt-body-v1"));
+  assert.ok(reopenedTurns.includes("global-resource-skill-body-v2"));
+});
+
+test("native Pi project trust excludes project resources when the global default is never", async (t) => {
+  const { pi, environment } = await runtime(t, undefined, async (env) => {
+    await setProjectTrustDefault(env, "never");
+    const resourceLog = join(env.root, "resource-starts.txt");
+    const turnLog = join(env.root, "turns.txt");
+    await writeFile(resourceLog, "", { mode: 0o600 });
+    await writeFixtureFiles({
+      [join(env.agentDir, "extensions/dwell-global-resource.ts")]:
+        resourceExtensionSource("global-resource"),
+      [join(env.cwd, ".pi/extensions/dwell-project-resource.ts")]: resourceExtensionSource(
+        "untrusted-project-resource",
+      ),
+      [join(env.cwd, ".pi/skills/dwell-untrusted-resource/SKILL.md")]: resourceSkillSource(
+        "dwell-untrusted-resource",
+        "untrusted-project-skill-description",
+        "untrusted-project-skill-body",
+      ),
+      [join(env.cwd, ".pi/prompts/untrusted-resource.md")]: resourcePromptSource(
+        "untrusted-project-prompt",
+        "untrusted-project-prompt-body",
+      ),
+    });
+    env.env.DWELL_TEST_RESOURCE_LOG = resourceLog;
+    env.env.DWELL_TEST_TURN_LOG = turnLog;
+  });
+
+  assert.deepEqual(
+    (await readFile(environment.env.DWELL_TEST_RESOURCE_LOG ?? "", "utf8"))
+      .split("\n")
+      .filter(Boolean),
+    ["global-resource"],
+  );
+  assert.equal((await pi.run("/untrusted-resource")).outcome, "completed");
+  assert.equal((await pi.run("/skill:dwell-untrusted-resource")).outcome, "completed");
+  const turns = await readFile(environment.env.DWELL_TEST_TURN_LOG ?? "", "utf8");
+  assert.ok(turns.includes("/untrusted-resource"));
+  assert.ok(turns.includes("/skill:dwell-untrusted-resource"));
+  assert.ok(!turns.includes("untrusted-project-prompt-body"));
+});
 
 test("native context loading includes global and ancestors across a Git root once, in order", async (t) => {
   const markers = [

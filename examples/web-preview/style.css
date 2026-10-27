@@ -24,17 +24,17 @@
 .session-menu button:focus-visible{outline:1px solid var(--teal);outline-offset:0}
 
 /* Distill keeps memory in the rail and all session controls in the header. */
-.with-distill main>header{display:flex;position:relative;overflow:visible;gap:8px;height:52px;min-height:52px;padding:0 16px;border-bottom:1px solid var(--line)}
+.with-distill main>header{display:flex;position:relative;overflow:visible;gap:8px;height:46px;min-height:46px;padding:0 16px;border-bottom:1px solid var(--line)}
 .with-distill #status-list{flex:1;min-width:0;overflow-x:auto}
 #top-session-controls{flex:0 0 36px;align-self:center;height:40px;border:0;background:none;box-shadow:none}
-#top-session-more{width:36px;min-height:40px;font-size:22px}
+#top-session-more{width:36px;min-height:40px;font-size:20px}
 #top-session-menu{width:158px;padding:4px 12px;top:calc(100% + 5px);z-index:5}
 .with-distill #memory-preview{margin-top:4px;padding:0 2px}
 #memory-search{width:100%;min-width:0;min-height:38px;margin:16px 0 10px;padding:8px;border:1px solid var(--line);border-radius:0;background:var(--surface);font:12px var(--sans);color:var(--ink)}
 #memory-preview .memory-note summary{font-family:var(--sans);font-size:12px}
 #conversation-heading[hidden],#session-list[hidden],#top-session-controls[hidden]{display:none}
-@media(min-width:761px){.with-distill #open-nav{display:none}.with-distill #new-mobile{display:block;width:36px;min-height:36px;height:36px;font-size:24px}}
-@media(max-width:760px){.with-distill main>header{height:48px;min-height:48px;padding:0 10px;gap:7px}.with-distill #memory-preview{margin-top:6px}}
+@media(min-width:761px){.with-distill #open-nav{display:none}.with-distill #new-mobile{display:block;width:36px;min-height:36px;height:36px;font-size:20px}}
+@media(max-width:760px){.with-distill main>header{height:44px;min-height:44px;padding:0 10px;gap:7px}.with-distill #memory-preview{margin-top:6px}#top-session-more{font-size:18px}}
 .with-distill #rail #new-session{display:none}
 
 
@@ -54,8 +54,8 @@
 #conversation .tool-run .tool-status{margin-left:auto;padding:0 2px 0 8px;color:#797267;font-size:11px}
 #conversation .tool-run .tool-output{margin:0;padding:0 0 8px;background:none;border:0;color:#797267;font:12px/1.65 var(--mono);white-space:pre;overflow-x:auto;max-height:220px}
 #conversation .tool-run.error .tool-status{color:var(--close-ink,#904d3c)}
-#conversation .session-details summary::before{content:'';display:block;width:5px;height:5px;flex:0 0 5px;margin:0 4px 0 2px;border:solid currentColor;border-width:1px 1px 0 0;box-sizing:border-box;transform:rotate(45deg);transform-origin:center}
-#conversation .session-details[open]>summary::before,#conversation .context-source[open]>summary::before{transform:rotate(135deg)}
+#conversation .context-source>summary::before{content:'';display:block;width:5px;height:5px;flex:0 0 5px;margin:0 4px 0 2px;border:solid currentColor;border-width:1px 1px 0 0;box-sizing:border-box;transform:rotate(45deg);transform-origin:center}
+#conversation .context-source[open]>summary::before{transform:rotate(135deg)}
 #conversation :is(.thinking-preview,.tool-run)>summary{position:relative;text-decoration:none}
 #conversation :is(.thinking-preview,.tool-run)>summary::before{content:'';position:absolute;left:-11px;top:50%;width:5px;height:5px;margin:0;border:solid currentColor;border-width:1px 1px 0 0;transform:translateY(-50%) rotate(45deg);transform-origin:center;box-sizing:border-box}
 #conversation :is(.thinking-preview,.tool-run)[open]>summary::before{transform:translateY(-50%) rotate(135deg)}

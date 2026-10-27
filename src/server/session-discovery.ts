@@ -529,6 +529,7 @@ export async function discoverPiModelCapabilities(
       cwd: workspace.cwd,
       env: discoveryEnvironment(env, workspace),
       sessionDirectory: workspace.sessionDirectory,
+      resourcePolicy: "isolated",
       provider: request.provider,
       model: request.model,
     });

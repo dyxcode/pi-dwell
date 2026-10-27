@@ -74,6 +74,34 @@ test("sessions start without Pi configuration and create/reopen empty identities
   await restored.shutdown();
 });
 
+test("hosted Pi preserves the configured environment instead of forcing offline mode", async (t) => {
+  const environment = await createPiEnvironment();
+  const report = join(environment.root, "inherited-environment.json");
+  const observer = join(environment.root, "observe-environment.mjs");
+  await writeFile(
+    observer,
+    `import { writeFileSync } from "node:fs";
+writeFileSync(${JSON.stringify(report)}, JSON.stringify({ offline: process.env.PI_OFFLINE, agentDir: process.env.PI_CODING_AGENT_DIR }));
+await import(${JSON.stringify(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry"))});`,
+  );
+  const service = await SessionService.create({
+    dataDir: join(environment.root, "dwell"),
+    // This truthy spelling keeps the real Pi fixture offline without allowing Dwell to rewrite it.
+    env: { ...environment.env, PI_OFFLINE: "true" },
+    extensions: [environment.extensionPath],
+  });
+  t.after(async () => {
+    await service.shutdown();
+    await environment.cleanup();
+  });
+  await service.configure({ executable: process.execPath, entryPoint: observer });
+  await service.createSession({ requestId: randomUUID(), directory: environment.cwd });
+  assert.deepEqual(JSON.parse(await readFile(report, "utf8")), {
+    offline: "true",
+    agentDir: environment.agentDir,
+  });
+});
+
 test("a model and thinking-level selection is one idle session mutation and survives reopen", async (t) => {
   const { service, environment, configure, request } = await setup(t);
   await configure();

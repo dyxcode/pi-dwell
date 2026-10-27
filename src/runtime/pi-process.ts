@@ -28,6 +28,8 @@ export interface PiOptions {
   provider?: string;
   model?: string;
   extensions?: readonly string[];
+  /** Hosted sessions use Pi's native resources; model probes opt into isolation. */
+  resourcePolicy?: "native" | "isolated";
   requestTimeoutMs?: number;
   shutdownTimeoutMs?: number;
 }
@@ -303,11 +305,16 @@ export class PiProcess {
       ...(provider !== undefined && model !== undefined
         ? ["--provider", provider, "--model", model]
         : []),
-      "--no-extensions",
-      "--no-skills",
-      "--no-prompt-templates",
-      "--no-themes",
-      "--no-mcp",
+      ...(options.resourcePolicy === "isolated"
+        ? [
+            "--no-extensions",
+            "--no-skills",
+            "--no-prompt-templates",
+            "--no-themes",
+            "--no-mcp",
+            "--no-context-files",
+          ]
+        : []),
     ];
     if (resumeFile) args.push("--session", resumeFile);
     if (options.sessionId) args.push("--session-id", options.sessionId);

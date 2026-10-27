@@ -488,6 +488,9 @@ $("preview-mode").onchange = () => {
 function render() {
   assignSlots();
   syncDraft();
+  currentModel = sessions[selected].model ?? models[0];
+  currentThinking = sessions[selected].thinkingLevel ?? "medium";
+  updateModelLabel();
   document.body.classList.toggle("with-distill", withDistill);
   closeArmed = false;
   $("preview-mode").value = withDistill ? "distill" : "standalone";
@@ -510,7 +513,13 @@ function render() {
     slot.textContent = s.closed ? "" : String(s.tabSlot).padStart(2, "0");
     const title = document.createElement("span");
     title.className = "session-title";
-    title.textContent = s.directory.split("/").filter(Boolean).at(-1) || "/";
+    title.textContent = [
+      s.directory.split("/").filter(Boolean).at(-1) || "/",
+      (s.model ?? models[0]).name,
+      levelNames[s.thinkingLevel ?? "medium"],
+    ].join(" · ");
+    row.title = title.textContent;
+    row.setAttribute("aria-label", title.textContent);
     row.append(slot, title);
     row.onclick = () => {
       s.closed = false;
@@ -668,8 +677,10 @@ function showThinking(model) {
     b.onclick = () => {
       currentModel = model;
       currentThinking = level;
-      updateModelLabel();
+      sessions[selected].model = model;
+      sessions[selected].thinkingLevel = level;
       $("model-dialog").close();
+      render();
     };
     $("model-options").append(b);
   }

@@ -139,7 +139,7 @@ export class SessionService {
   private constructor(catalog: SessionCatalog, dataDir: string, options: SessionServiceOptions) {
     this.#catalog = catalog;
     this.#dataDir = dataDir;
-    this.#env = { ...(options.env ?? process.env), PI_OFFLINE: "1" };
+    this.#env = { ...(options.env ?? process.env) };
     this.#extensions = options.extensions ?? [];
     this.#now = options.now ?? Date.now;
     this.#checkpoint = options.turnCheckpoint;

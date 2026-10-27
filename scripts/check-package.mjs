@@ -31,11 +31,12 @@ try {
   for (const path of paths) {
     assert.ok(
       /^src\/(?:[a-z-]+\/)*[a-z-]+\.ts$/.test(path) ||
-        ["package.json", "README.md", "docs/i18n/README.zh-CN.md"].includes(path),
+        ["package.json", "LICENSE", "README.md", "docs/i18n/README.zh-CN.md"].includes(path),
       `Unexpected package file: ${path}`,
     );
   }
   for (const required of [
+    "LICENSE",
     "src/cli.ts",
     "src/server/http.ts",
     "src/server/access.ts",

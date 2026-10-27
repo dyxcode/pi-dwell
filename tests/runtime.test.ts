@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { access, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { type TestContext, test } from "node:test";
-import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PiProcess } from "../src/runtime/pi-process.ts";
 import { isRecord } from "../src/runtime/pi-rpc.ts";
@@ -467,6 +467,7 @@ test("startRun exposes prompt acceptance separately from settled outcome", async
   });
 
   const run = pi.startRun("slow");
+  assert.deepEqual(pi.activeExecution, { source: "dwell" });
   assert.equal(pi.state, "running");
   await started;
   assert.equal(await run.accepted, "started");
@@ -474,6 +475,94 @@ test("startRun exposes prompt acceptance separately from settled outcome", async
   unsubscribe();
   await pi.abort();
   assert.equal((await run.settled).outcome, "aborted");
+  assert.equal(pi.activeExecution, undefined);
+});
+
+test("an extension can start a new idle execution without losing Pi runtime health", {
+  timeout: 10_000,
+}, async (t) => {
+  const { pi } = await runtime(t, undefined, (environment) => {
+    environment.env.DWELL_TEST_NATIVE_PROMPT = "slow";
+  });
+  const nativeStarted = deferred<string>();
+  const nativeSettled = deferred<{
+    executionId: string;
+    outcome: string;
+    error?: string;
+  }>();
+  pi.subscribeNativeExecution((event) => {
+    if (event.type === "started") nativeStarted.resolve(event.executionId);
+    else nativeSettled.resolve({ executionId: event.executionId, ...event.result });
+  });
+
+  assert.equal((await pi.run("hello")).outcome, "completed");
+  const executionId = await nativeStarted.promise;
+  assert.equal(pi.state, "running");
+  assert.deepEqual(pi.activeExecution, { source: "native", executionId });
+  await assert.rejects(pi.run("competing prompt"), /busy/i);
+  await pi.abort();
+  assert.deepEqual(await nativeSettled.promise, { executionId, outcome: "aborted" });
+  assert.equal(pi.activeExecution, undefined);
+  assert.equal(pi.state, "ready");
+});
+
+test("a native extension execution reports normal completion", { timeout: 10_000 }, async (t) => {
+  const { pi } = await runtime(t, undefined, (environment) => {
+    environment.env.DWELL_TEST_NATIVE_PROMPT = "native complete";
+  });
+  const nativeSettled = deferred<{ executionId: string; outcome: string }>();
+  assert.equal((await pi.run("hello")).outcome, "completed");
+  pi.subscribeNativeExecution((event) => {
+    if (event.type === "settled")
+      nativeSettled.resolve({ executionId: event.executionId, outcome: event.result.outcome });
+  });
+
+  const result = await nativeSettled.promise;
+  assert.equal(result.outcome, "completed");
+  assert.equal(pi.activeExecution, undefined);
+  assert.equal(pi.state, "ready");
+});
+
+test("a native extension provider failure is observed without failing RPC transport", {
+  timeout: 10_000,
+}, async (t) => {
+  const { pi } = await runtime(t, undefined, (environment) => {
+    environment.env.DWELL_TEST_NATIVE_PROMPT = "fail";
+  });
+  const nativeSettled = deferred<{
+    executionId: string;
+    outcome: string;
+    error?: string;
+  }>();
+  pi.subscribeNativeExecution((event) => {
+    if (event.type === "settled")
+      nativeSettled.resolve({ executionId: event.executionId, ...event.result });
+  });
+
+  assert.equal((await pi.run("hello")).outcome, "completed");
+  const result = await nativeSettled.promise;
+  assert.equal(result.outcome, "failed");
+  assert.match(result.error ?? "", /synthetic scripted provider failure/i);
+  assert.equal(pi.activeExecution, undefined);
+  assert.equal(pi.state, "ready");
+});
+
+test("stopping Pi reports a native execution as interrupted", { timeout: 10_000 }, async (t) => {
+  const { pi } = await runtime(t, undefined, (environment) => {
+    environment.env.DWELL_TEST_NATIVE_PROMPT = "slow";
+  });
+  const nativeStarted = deferred<void>();
+  const nativeSettled = deferred<string>();
+  pi.subscribeNativeExecution((event) => {
+    if (event.type === "started") nativeStarted.resolve();
+    else nativeSettled.resolve(event.result.outcome);
+  });
+
+  assert.equal((await pi.run("hello")).outcome, "completed");
+  await nativeStarted.promise;
+  await pi.stop();
+  assert.equal(await nativeSettled.promise, "interrupted");
+  assert.equal(pi.state, "exited");
 });
 
 test("real Pi observers detach without stopping work, busy runs reject, and abort settles", async (t) => {

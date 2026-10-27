@@ -1,15 +1,16 @@
 import { type ChildProcessWithoutNullStreams, execFile, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { validateDataDirectory } from "../local/paths.ts";
+import { type ImageContent, isImageContentArray } from "../shared/images.ts";
 import {
   type RuntimeConfiguration,
-  type SessionModelRequest,
   SESSION_ID,
+  type SessionModelRequest,
 } from "../shared/sessions.ts";
 import { isThinkingLevel, type ThinkingLevel } from "../shared/thinking.ts";
-import { isImageContentArray, type ImageContent } from "../shared/images.ts";
 import { isRecord, PiRpc, type RpcRecord } from "./pi-rpc.ts";
 
 const exec = promisify(execFile);
@@ -47,6 +48,15 @@ export interface RunResult {
   outcome: "completed" | "failed" | "aborted" | "handled";
   error?: string;
 }
+export type NativeExecutionResult = {
+  outcome: "completed" | "failed" | "aborted" | "interrupted";
+  error?: string;
+};
+export type ActiveExecution = { source: "dwell" } | { source: "native"; executionId: string };
+/** Process-local Pi observation; it does not imply a Dwell request or durable turn. */
+export type NativeExecutionEvent =
+  | { type: "started"; executionId: string }
+  | { type: "settled"; executionId: string; result: NativeExecutionResult };
 export type PiEntry = Record<string, unknown> & {
   id: string;
   type: string;
@@ -54,16 +64,25 @@ export type PiEntry = Record<string, unknown> & {
 };
 type Listener = (event: RpcRecord) => void | Promise<void>;
 type StateListener = (state: RuntimeState) => void | Promise<void>;
+type NativeExecutionListener = (event: NativeExecutionEvent) => void | Promise<void>;
 interface Subscription {
   listener: Listener;
   interactive: boolean;
 }
 interface Run {
+  source: "dwell";
   resolve(result: RunResult): void;
   reject(error: Error): void;
   error?: string;
   aborted: boolean;
 }
+interface NativeRun {
+  source: "native";
+  executionId: string;
+  error?: string;
+  aborted: boolean;
+}
+type ActiveRun = Run | NativeRun;
 export type UiResponse = { id: string } & (
   | { cancelled: true }
   | { confirmed: boolean }
@@ -192,12 +211,14 @@ export class PiProcess {
   readonly #rpc: PiRpc;
   readonly #listeners = new Set<Subscription>();
   readonly #stateListeners = new Set<StateListener>();
+  readonly #nativeExecutionListeners = new Set<NativeExecutionListener>();
   readonly #dialogs = new Map<string, { method: string; timer: ReturnType<typeof setTimeout> }>();
   readonly #requestMs: number;
   readonly #shutdownMs: number;
   readonly #closed: Promise<void>;
   #stderr = "";
-  #run: Run | undefined;
+  #run: ActiveRun | undefined;
+  #lastNativeExecution: NativeExecutionEvent | undefined;
   #stopping: Promise<void> | undefined;
   #error: Error | undefined;
 
@@ -233,10 +254,9 @@ export class PiProcess {
           );
         }
         this.#rpc.close();
-        this.#run?.reject(
+        this.#interruptRun(
           new Error("Pi stopped before the run settled; execution outcome may be unknown."),
         );
-        this.#run = undefined;
         this.#clearDialogs();
         if (this.#state === "stopping") this.#setState("exited");
         resolve();
@@ -328,7 +348,12 @@ export class PiProcess {
     const runtime = new PiProcess(child, requestMs, shutdownMs);
     try {
       const state = await runtime.getState();
-      if (state.isStreaming || state.isCompacting || state.pendingMessageCount !== 0)
+      const nativeStartedDuringOpen =
+        runtime.#run?.source === "native" || runtime.#lastNativeExecution?.type === "settled";
+      if (
+        (state.isStreaming || state.isCompacting || state.pendingMessageCount !== 0) &&
+        !nativeStartedDuringOpen
+      )
         throw new Error("Pi did not start idle.");
       if (!state.model)
         throw new Error(
@@ -344,9 +369,12 @@ export class PiProcess {
         (state.model.provider !== provider || state.model.id !== model)
       )
         throw new Error("Pi did not use the requested provider and model.");
-      if (runtime.#state !== "starting")
+      if (
+        runtime.#state !== "starting" &&
+        !(nativeStartedDuringOpen && (runtime.#state === "running" || runtime.#state === "ready"))
+      )
         throw runtime.#error ?? new Error("Pi stopped during startup.");
-      runtime.#setState("ready");
+      if (runtime.#state === "starting") runtime.#setState("ready");
       return runtime;
     } catch (error) {
       await runtime.stop();
@@ -364,6 +392,14 @@ export class PiProcess {
     return this.#stderr;
   }
 
+  get activeExecution(): ActiveExecution | undefined {
+    const run = this.#run;
+    if (!run) return undefined;
+    return run.source === "native"
+      ? { source: "native", executionId: run.executionId }
+      : { source: "dwell" };
+  }
+
   subscribe(listener: Listener, options: { interactive?: boolean } = {}): () => void {
     const subscription = { listener, interactive: options.interactive ?? true };
     this.#listeners.add(subscription);
@@ -377,6 +413,19 @@ export class PiProcess {
     this.#stateListeners.add(listener);
     this.#notifyStateListener(listener, this.#state);
     return () => this.#stateListeners.delete(listener);
+  }
+
+  subscribeNativeExecution(listener: NativeExecutionListener): () => void {
+    this.#nativeExecutionListeners.add(listener);
+    const run = this.#run;
+    if (run?.source === "native")
+      this.#notifyNativeExecutionListener(listener, {
+        type: "started",
+        executionId: run.executionId,
+      });
+    else if (this.#lastNativeExecution?.type === "settled")
+      this.#notifyNativeExecutionListener(listener, structuredClone(this.#lastNativeExecution));
+    return () => this.#nativeExecutionListeners.delete(listener);
   }
 
   async getState(): Promise<SessionState> {
@@ -542,7 +591,12 @@ export class PiProcess {
     void accepted.catch(() => {});
     void settled.catch(() => {});
     // Install run state before sending: Pi can emit events before its prompt response.
-    const run: Run = { resolve: resolveSettled, reject: rejectSettled, aborted: false };
+    const run: Run = {
+      source: "dwell",
+      resolve: resolveSettled,
+      reject: rejectSettled,
+      aborted: false,
+    };
     this.#run = run;
     this.#setState("running");
 
@@ -644,20 +698,28 @@ export class PiProcess {
     this.#error = error;
     this.#setState("failed");
     this.#rpc.close(error);
-    this.#run?.reject(error);
-    this.#run = undefined;
-    this.#clearDialogs();
+    this.#interruptRun(error);
     void this.stop();
   }
 
   #onRecord(record: RpcRecord): void {
     const run = this.#run;
-    if (record.type === "agent_settled") {
-      if (typeof record.aborted !== "boolean" || !run) throw new Error("Unexpected Pi settlement.");
-      this.#finish(run, {
-        outcome: record.aborted || run.aborted ? "aborted" : run.error ? "failed" : "completed",
-        ...(run.error ? { error: run.error } : {}),
-      });
+    if (record.type === "agent_start") {
+      if (!run) this.#beginNativeRun();
+    } else if (record.type === "agent_settled") {
+      if (typeof record.aborted !== "boolean") throw new Error("Invalid Pi settlement.");
+      if (run?.source === "native") {
+        const result: NativeExecutionResult = {
+          outcome: record.aborted || run.aborted ? "aborted" : run.error ? "failed" : "completed",
+          ...(run.error ? { error: run.error } : {}),
+        };
+        this.#finishNativeRun(run, result);
+      } else if (run) {
+        this.#finish(run, {
+          outcome: record.aborted || run.aborted ? "aborted" : run.error ? "failed" : "completed",
+          ...(run.error ? { error: run.error } : {}),
+        });
+      }
     } else if (record.type === "message_end") {
       if (!isRecord(record.message) || typeof record.message.role !== "string")
         throw new Error("Invalid Pi message event.");
@@ -688,6 +750,55 @@ export class PiProcess {
     this.#state = state;
     for (const listener of [...this.#stateListeners]) {
       this.#notifyStateListener(listener, state);
+    }
+  }
+
+  #beginNativeRun(): void {
+    const run: NativeRun = { source: "native", executionId: randomUUID(), aborted: false };
+    this.#run = run;
+    this.#setState("running");
+    this.#publishNativeExecution({ type: "started", executionId: run.executionId });
+  }
+
+  #finishNativeRun(run: NativeRun, result: NativeExecutionResult): void {
+    if (this.#run !== run) return;
+    this.#run = undefined;
+    this.#clearDialogs();
+    if (this.#state === "running") this.#setState("ready");
+    this.#publishNativeExecution({ type: "settled", executionId: run.executionId, result });
+  }
+
+  #interruptRun(error: Error): void {
+    const run = this.#run;
+    if (!run) return;
+    this.#run = undefined;
+    this.#clearDialogs();
+    if (run.source === "dwell") {
+      run.reject(error);
+      return;
+    }
+    this.#publishNativeExecution({
+      type: "settled",
+      executionId: run.executionId,
+      result: { outcome: "interrupted", error: error.message },
+    });
+  }
+
+  #publishNativeExecution(event: NativeExecutionEvent): void {
+    this.#lastNativeExecution = event;
+    for (const listener of [...this.#nativeExecutionListeners])
+      this.#notifyNativeExecutionListener(listener, structuredClone(event));
+  }
+
+  #notifyNativeExecutionListener(
+    listener: NativeExecutionListener,
+    event: NativeExecutionEvent,
+  ): void {
+    try {
+      const result = listener(event);
+      if (result) void result.catch(() => {});
+    } catch {
+      /* Native execution observers do not own Pi execution. */
     }
   }
 

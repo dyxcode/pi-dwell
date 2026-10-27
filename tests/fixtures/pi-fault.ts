@@ -51,6 +51,7 @@ process.stdin.on("data", (chunk: Buffer) => {
         continue;
       }
       if (mode === "stderr") process.stderr.write("private-diagnostic".repeat(100_000));
+      if (mode === "orphan-settled") output({ type: "agent_settled", aborted: false });
       setTimeout(() => output({ ...response, data: state }), mode === "delayed" ? 200 : 0);
     } else if (value.type === "get_messages") {
       const record = Buffer.from(

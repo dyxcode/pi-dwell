@@ -167,7 +167,14 @@ function isCursorFor(value: unknown, sessionId: string): value is string {
 }
 
 function isSession(value: unknown): value is SessionInfo {
-  return isRecord(value) && hasExactKeys(value, SESSION_KEYS) && isSessionInfo(value);
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      ...SESSION_KEYS,
+      ...(Object.hasOwn(value, "nativeExecution") ? ["nativeExecution"] : []),
+    ]) &&
+    isSessionInfo(value)
+  );
 }
 
 function isTurnProjection(value: unknown): value is TurnProjection {

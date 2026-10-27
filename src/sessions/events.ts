@@ -1,8 +1,7 @@
-import { nextMessageKey } from "../runtime/message-identity.ts";
 import { randomUUID } from "node:crypto";
+import { nextMessageKey } from "../runtime/message-identity.ts";
+import type { RpcRecord } from "../runtime/pi-rpc.ts";
 import {
-  STREAM_EVENT_MAX_BYTES,
-  STREAM_SNAPSHOT_MAX_BYTES,
   isStreamFrame,
   type LiveMessage,
   type LiveMessageDelta,
@@ -10,12 +9,13 @@ import {
   type LiveTool,
   type ProjectionLimitScope,
   type SessionSnapshot,
+  STREAM_EVENT_MAX_BYTES,
+  STREAM_SNAPSHOT_MAX_BYTES,
   type StreamFrame,
   type TurnProjection,
 } from "../shared/events.ts";
 import { isSessionInfo, type SessionInfo } from "../shared/sessions.ts";
 import { isTurnInfo, type TurnInfo } from "../shared/turns.ts";
-import type { RpcRecord } from "../runtime/pi-rpc.ts";
 
 export interface SessionEventsOptions {
   maxSessions?: number;
@@ -70,6 +70,8 @@ interface CachedView {
 
 interface LiveState extends LiveProjection {
   messageCounts: Map<string, number>;
+  messageIdentityKnown: boolean;
+  unidentifiedMessages: number;
   toolOwners: Map<string, string>;
   readonly toolIds: Map<string, string>;
   readonly limited: Set<ProjectionLimitScope>;
@@ -205,6 +207,8 @@ function equalJson(left: unknown, right: unknown): boolean {
 function emptyLiveState(): LiveState {
   return {
     messageCounts: new Map(),
+    messageIdentityKnown: true,
+    unidentifiedMessages: 0,
     toolOwners: new Map(),
     message: null,
     tools: [],
@@ -239,6 +243,11 @@ function projectSession(value: SessionInfo): { value: SessionInfo; limited: bool
     value.model === null ? null : boundedJsonString(value.model, MAX_METADATA_VALUE_JSON_BYTES);
   const error =
     value.error === null ? null : boundedJsonString(value.error, MAX_METADATA_ERROR_JSON_BYTES);
+  const nativeExecution = value.nativeExecution;
+  const nativeError =
+    nativeExecution && nativeExecution.error !== null
+      ? boundedJsonString(nativeExecution.error, MAX_METADATA_ERROR_JSON_BYTES)
+      : null;
   return {
     value: {
       id: value.id,
@@ -253,6 +262,17 @@ function projectSession(value: SessionInfo): { value: SessionInfo; limited: bool
       runtimeState: value.runtimeState,
       historyState: value.historyState,
       error: error === null ? null : error.value,
+      ...(Object.hasOwn(value, "nativeExecution")
+        ? {
+            nativeExecution:
+              nativeExecution === null || nativeExecution === undefined
+                ? null
+                : {
+                    ...nativeExecution,
+                    error: nativeError?.value ?? null,
+                  },
+          }
+        : {}),
       activeTurnId: value.activeTurnId,
       latestTurnId: value.latestTurnId,
     },
@@ -260,7 +280,8 @@ function projectSession(value: SessionInfo): { value: SessionInfo; limited: bool
       directory.truncated ||
       provider?.truncated === true ||
       model?.truncated === true ||
-      error?.truncated === true,
+      error?.truncated === true ||
+      nativeError?.truncated === true,
   };
 }
 
@@ -445,7 +466,12 @@ export class SessionEvents {
     }
   }
 
-  beginTurn(sessionId: string, runId: string, messageCounts = new Map<string, number>()): void {
+  beginTurn(
+    sessionId: string,
+    runId: string,
+    messageCounts = new Map<string, number>(),
+    messageIdentityKnown = true,
+  ): void {
     try {
       if (this.#closed || !UUID.test(sessionId) || !UUID.test(runId)) return;
       const stream = this.#getOrCreate(sessionId);
@@ -458,9 +484,53 @@ export class SessionEvents {
       stream.activeRunId = runId;
       stream.live = emptyLiveState();
       stream.live.messageCounts = new Map(messageCounts);
+      stream.live.messageIdentityKnown = messageIdentityKnown;
       this.#touch(stream);
     } catch {
       // Live observation is optional and never owns execution.
+    }
+  }
+
+  beginNativeExecution(
+    sessionId: string,
+    executionId: string,
+    messageCounts?: ReadonlyMap<string, number>,
+  ):
+    | {
+        messageCounts: Map<string, number>;
+        messageIdentityKnown: boolean;
+        unidentifiedMessages: number;
+      }
+    | undefined {
+    try {
+      if (this.#closed || !UUID.test(sessionId) || !UUID.test(executionId)) return undefined;
+      const stream = this.#getOrCreate(sessionId);
+      if (!stream) return undefined;
+      if (stream.activeRunId === executionId)
+        return {
+          messageCounts: new Map(stream.live.messageCounts),
+          messageIdentityKnown: stream.live.messageIdentityKnown,
+          unidentifiedMessages: stream.live.unidentifiedMessages,
+        };
+      const hasActiveRun = stream.activeRunId !== null;
+      const observedCounts =
+        hasActiveRun && stream.live.messageIdentityKnown
+          ? new Map(stream.live.messageCounts)
+          : undefined;
+      stream.activeRunId = executionId;
+      stream.live = emptyLiveState();
+      const baseline = hasActiveRun ? observedCounts : messageCounts;
+      stream.live.messageIdentityKnown = baseline !== undefined;
+      stream.live.messageCounts = new Map(baseline);
+      this.#touch(stream);
+      return {
+        messageCounts: new Map(stream.live.messageCounts),
+        messageIdentityKnown: stream.live.messageIdentityKnown,
+        unidentifiedMessages: stream.live.unidentifiedMessages,
+      };
+    } catch {
+      // Live observation is optional and never owns execution.
+      return undefined;
     }
   }
 
@@ -503,6 +573,30 @@ export class SessionEvents {
     stream.live.messageCounts.clear();
     stream.live.toolOwners.clear();
     this.#touch(stream);
+  }
+
+  endNativeExecution(
+    sessionId: string,
+    executionId: string,
+  ):
+    | {
+        messageCounts: Map<string, number>;
+        messageIdentityKnown: boolean;
+        unidentifiedMessages: number;
+      }
+    | undefined {
+    const stream = this.#streams.get(sessionId);
+    if (!stream || stream.activeRunId !== executionId) return undefined;
+    const result = {
+      messageCounts: new Map(stream.live.messageCounts),
+      messageIdentityKnown: stream.live.messageIdentityKnown,
+      unidentifiedMessages: stream.live.unidentifiedMessages,
+    };
+    stream.activeRunId = null;
+    stream.live.messageCounts.clear();
+    stream.live.toolOwners.clear();
+    this.#touch(stream);
+    return result;
   }
 
   fail(sessionId: string, code: string, message: string): void {
@@ -881,8 +975,11 @@ export class SessionEvents {
       return;
     }
     if (event.message.role !== "assistant") return;
+    const nativeKey = stream.live.messageIdentityKnown
+      ? nextMessageKey(event.message, stream.live.messageCounts)
+      : undefined;
+    if (!nativeKey) stream.live.unidentifiedMessages += 1;
     const text = this.#messageText(event.message);
-    const nativeKey = nextMessageKey(event.message, stream.live.messageCounts);
     stream.live.toolOwners.clear();
     if (nativeKey && Array.isArray(event.message.content)) {
       for (const block of event.message.content.slice(0, MAX_TOOLS)) {

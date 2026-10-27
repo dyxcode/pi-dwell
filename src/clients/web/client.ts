@@ -149,7 +149,12 @@ const tabSlots = new Map<string, number>();
 const openingSessions = new Set<string>();
 let closeArmedSession: string | null = null;
 let preparingCloseSession: string | null = null;
-let closeTarget: { id: string; activeRunId: string | null; attempted: boolean } | null = null;
+let closeTarget: {
+  id: string;
+  activeRunId: string | null;
+  nativeExecutionId: string | null;
+  attempted: boolean;
+} | null = null;
 let closingSession: string | null = null;
 let closePreparationGeneration = 0;
 let closeAttemptGeneration = 0;
@@ -377,7 +382,23 @@ function label(s: SessionInfo): string {
 function runtimeOpen(s: SessionInfo): boolean {
   return s.runtimeState !== "closed";
 }
+function nativeRunning(s: SessionInfo | undefined): string | null {
+  return s?.nativeExecution?.status === "running" ? s.nativeExecution.id : null;
+}
+function sessionBusy(s: SessionInfo | undefined): boolean {
+  return !!s?.activeTurnId || nativeRunning(s) !== null;
+}
 function status(s: SessionInfo): string {
+  if (s.nativeExecution) {
+    const statuses = {
+      running: "Working",
+      completed: "Completed",
+      failed: "Failed",
+      aborted: "Stopped",
+      interrupted: "Interrupted",
+    };
+    return statuses[s.nativeExecution.status];
+  }
   const turn =
     s.id === selected ? (state.activeTurn ?? state.latestTurn ?? turns.get(s.id)) : turns.get(s.id);
   if (s.activeTurnId) return turn?.cancellationRequested ? "Stopping" : "Working";
@@ -573,7 +594,7 @@ function navigation(): void {
     : "";
   chooseModel.title = s?.model ? `${s.provider} / ${s.model}` : "Choose model";
   chooseModel.setAttribute("aria-label", `Choose model, current: ${s?.model ?? "not selected"}`);
-  const busy = !!s?.activeTurnId;
+  const busy = sessionBusy(s);
   chooseModel.disabled =
     !s ||
     !authenticated ||
@@ -765,14 +786,19 @@ async function prepareClose(id: string): Promise<void> {
       isHistoryPage(historyValue) && historyValue.sessionId === id
         ? userMessageSnippet(historyValue.entries)
         : "";
-    closeTarget = { id, activeRunId: latestSession.activeTurnId, attempted: false };
+    closeTarget = {
+      id,
+      activeRunId: latestSession.activeTurnId,
+      nativeExecutionId: nativeRunning(latestSession),
+      attempted: false,
+    };
     closeDirectory.textContent = `${String(tabSlots.get(id) ?? 0).padStart(2, "0")} · ${latestSession.directory}`;
-    closeTitle.textContent = latestSession.activeTurnId ? "Stop and close?" : "Close session?";
+    closeTitle.textContent = sessionBusy(latestSession) ? "Stop and close?" : "Close session?";
     closeCopy.textContent = snippet ? `“${snippet}”` : "";
     closeCopy.hidden = !snippet;
     closeError.textContent = "";
     closeError.hidden = true;
-    confirmClose.textContent = latestSession.activeTurnId ? "Stop and close" : "Close";
+    confirmClose.textContent = sessionBusy(latestSession) ? "Stop and close" : "Close";
     confirmClose.disabled = false;
     cancelClose.disabled = false;
     closeDialog.showModal();
@@ -854,7 +880,28 @@ async function confirmSessionClose(): Promise<void> {
     if (authentication !== authAttempt || !authenticated) return;
     updatedSession(session);
     navigation();
-    if (target.activeRunId !== null) {
+    if (target.nativeExecutionId !== null) {
+      const executionId = target.nativeExecutionId;
+      if (
+        session.activeTurnId ||
+        (nativeRunning(session) && nativeRunning(session) !== executionId)
+      )
+        throw new Error("A new response started. Review and close again.");
+      if (nativeRunning(session) === executionId) {
+        await api(`/api/v1/sessions/${target.id}/native-executions/${executionId}/abort`, {});
+        const deadline = Date.now() + 15_000;
+        for (;;) {
+          if (authentication !== authAttempt || !authenticated) return;
+          session = await sessionSnapshot(target.id);
+          if (!sessionBusy(session)) break;
+          if (session.activeTurnId || nativeRunning(session) !== executionId)
+            throw new Error("A new response started. Review and close again.");
+          if (Date.now() > deadline)
+            throw new Error("Pi is still stopping. Check its status before closing.");
+          await new Promise((resolve) => window.setTimeout(resolve, 150));
+        }
+      }
+    } else if (target.activeRunId !== null) {
       const turn = await turnSnapshot(target.id, target.activeRunId);
       if (authentication !== authAttempt || !authenticated) return;
       session = await sessionSnapshot(target.id);
@@ -879,17 +926,14 @@ async function confirmSessionClose(): Promise<void> {
       const settled = await waitForTurnAndRuntime(target.id, target.activeRunId, authentication);
       if (!settled || authentication !== authAttempt || !authenticated) return;
       session = settled;
-      if (session.activeTurnId !== null)
-        throw new Error("A new response started. Review and close again.");
+      if (sessionBusy(session)) throw new Error("A new response started. Review and close again.");
     } else {
-      if (session.activeTurnId !== null)
-        throw new Error("A response started. Review and close again.");
+      if (sessionBusy(session)) throw new Error("A response started. Review and close again.");
       session = await sessionSnapshot(target.id);
       if (authentication !== authAttempt || !authenticated) return;
       updatedSession(session);
       navigation();
-      if (session.activeTurnId !== null)
-        throw new Error("A response started. Review and close again.");
+      if (sessionBusy(session)) throw new Error("A response started. Review and close again.");
     }
     if (authentication !== authAttempt || !authenticated) return;
     if (session.runtimeState === "closed") {
@@ -1003,7 +1047,9 @@ function renderConversation(): void {
       if (expanded.has(element.dataset.key)) element.open = true;
     }
     const liveVisible =
-      state.liveRunId !== null && state.history?.coveredTurnId !== state.liveRunId;
+      state.liveRunId !== null &&
+      state.history?.coveredTurnId !== state.liveRunId &&
+      state.history?.coveredNativeExecutionId !== state.liveRunId;
     if (liveVisible) {
       const article = node("article", "", "message assistant live"),
         body = node("div", "", "message-body");
@@ -1071,7 +1117,10 @@ function renderConversation(): void {
       }
       if (body.childNodes.length) conversation.append(article);
     }
-    const turn = state.activeTurn ?? state.latestTurn;
+    const native = state.session?.nativeExecution;
+    if (native?.error)
+      conversation.append(node("p", `${native.status}: ${native.error}`, "feedback"));
+    const turn = native ? null : (state.activeTurn ?? state.latestTurn);
     if (turn?.error)
       conversation.append(node("p", `${turn.status}: ${turn.error.message}`, "feedback"));
     const retryMore = historyProblem();
@@ -1095,6 +1144,7 @@ function renderConversation(): void {
       !state.messages.length &&
       !state.tools.length &&
       !state.activeTurn &&
+      !nativeRunning(state.session ?? undefined) &&
       retryMore === null
     )
       conversation.append(node("p", "Start a conversation in this directory.", "empty-copy"));
@@ -1139,6 +1189,11 @@ function resetHistoryRecovery(more?: boolean): void {
   }
 }
 function uncoveredHistoryRun(): string | null {
+  const native = state.session?.nativeExecution;
+  if (native)
+    return native.status === "running" || state.history?.coveredNativeExecutionId === native.id
+      ? null
+      : native.id;
   const turn = state.latestTurn;
   if (state.activeTurn || !turn || ["accepted", "dispatching", "running"].includes(turn.status))
     return null;
@@ -1344,6 +1399,9 @@ async function stream(id: string, epoch: number): Promise<void> {
           if (
             frame.type === "snapshot" ||
             frame.type === "resync" ||
+            (frame.type === "session.updated" &&
+              frame.payload.nativeExecution &&
+              frame.payload.nativeExecution.status !== "running") ||
             (frame.type === "turn.updated" &&
               !["accepted", "dispatching", "running"].includes(frame.payload.status))
           )
@@ -1561,6 +1619,23 @@ async function connect(): Promise<void> {
 async function submit(): Promise<void> {
   const s = activeSession();
   if (!s || sending || changingModel === s.id) return;
+  const nativeId = nativeRunning(s);
+  if (nativeId) {
+    sending = true;
+    navigation();
+    try {
+      const result = await api(`/api/v1/sessions/${s.id}/native-executions/${nativeId}/abort`, {});
+      if (!isSessionInfo(result) || result.id !== s.id)
+        throw new Error("Invalid cancellation response.");
+      updatedSession(result);
+    } catch (error) {
+      showError(error);
+    } finally {
+      sending = false;
+      navigation();
+    }
+    return;
+  }
   if (s.activeTurnId) {
     sending = true;
     navigation();

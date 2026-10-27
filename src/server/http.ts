@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { HOST_PAGE, STYLE } from "../clients/web/page.ts";
-import { prepareDataDirectory } from "../local/files.ts";
 import { BROWSER_ASSETS } from "../clients/web/script.ts";
+import { prepareDataDirectory } from "../local/files.ts";
 import { dataDirectory, type HostMode } from "../local/paths.ts";
 import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
 import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
 import { isRuntimeConfiguration, isSessionModelRequest } from "../shared/sessions.ts";
 import { isModelCapabilitiesRequest } from "../shared/thinking.ts";
 import { isTurnCreateRequest } from "../shared/turns.ts";
-import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
 import { browserCookie, readBrowserOrigin, requestAccess } from "./access.ts";
+import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
 import { createSseConnection, type SseConnection, SseStartError } from "./sse.ts";
 
 export interface HostOptions {
@@ -231,6 +231,8 @@ export async function startHost({
       );
       const modelMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/model$/.exec(path);
       const eventMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/events$/.exec(path);
+      const nativeExecutionMatch =
+        /^\/api\/v1\/sessions\/([a-f0-9-]+)\/native-executions\/([a-f0-9-]+)\/abort$/.exec(path);
       const turnMatch =
         /^\/api\/v1\/sessions\/([a-f0-9-]+)\/turns(?:\/([a-f0-9-]+)(?:\/(result|abort))?)?$/.exec(
           path,
@@ -246,6 +248,7 @@ export async function startHost({
         sessionMatch !== null ||
         historyMatch !== null ||
         eventMatch !== null ||
+        nativeExecutionMatch !== null ||
         turnMatch !== null;
       let method: string | undefined;
       if (sessionRoute) {
@@ -253,6 +256,7 @@ export async function startHost({
           path === "/api/v1/runtime" ||
           path === "/api/v1/model-capabilities" ||
           modelMatch !== null ||
+          nativeExecutionMatch !== null ||
           sessionMatch?.[2] === "open" ||
           sessionMatch?.[2] === "close"
         ) {
@@ -394,6 +398,13 @@ export async function startHost({
             fail(400, "invalid_cursor", "Last-Event-ID must contain one event cursor.");
           openEventStream(request, response, id, cursorHeader, cookieName);
           return;
+        } else if (nativeExecutionMatch) {
+          const id = nativeExecutionMatch[1];
+          const executionId = nativeExecutionMatch[2];
+          if (!id || !executionId) fail(400, "invalid_input", "Invalid native execution ID.");
+          if (Object.keys(body).length !== 0)
+            fail(400, "invalid_input", "This operation expects an empty JSON object.");
+          send(response, 200, await sessions.abortNativeExecution(id, executionId));
         } else if (turnMatch) {
           const id = turnMatch[1];
           if (!id) fail(400, "invalid_input", "Invalid session ID.");

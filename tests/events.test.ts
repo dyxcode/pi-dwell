@@ -700,3 +700,41 @@ test("native message identities distinguish identical occurrences and retain too
   sub.unsubscribe();
   hub.close();
 });
+
+test("native execution starts from active Dwell message counts instead of a stale file baseline", () => {
+  const hub = new SessionEvents();
+  const frames: StreamFrame[] = [];
+  const sub = connect(
+    hub,
+    withTurn(session(), RUN_ID, RUN_ID),
+    turn(),
+    turn(),
+    undefined,
+    (frame) => frames.push(frame),
+  );
+  const savedCounts = new Map([["a".repeat(64), 1]]);
+  hub.beginTurn(SESSION_ID, RUN_ID, savedCounts);
+  const message = {
+    role: "assistant",
+    content: [{ type: "text", text: "Dwell answer also seen before native start" }],
+    timestamp: 2,
+  };
+  hub.observe(SESSION_ID, RUN_ID, makeRecord("message_start", { message }));
+  hub.observe(SESSION_ID, RUN_ID, makeRecord("message_end", { message }));
+  const dwellMessage = frames.find((frame) => frame.type === "message.finished");
+  assert.ok(dwellMessage?.type === "message.finished" && dwellMessage.payload.nativeKey);
+  const digest = dwellMessage.payload.nativeKey.split(":")[0];
+  assert.ok(digest);
+
+  const nativeRunId = "66666666-6666-4666-8666-666666666666";
+  const baseline = hub.beginNativeExecution(SESSION_ID, nativeRunId, savedCounts);
+  assert.equal(baseline?.messageCounts.get(digest), 1);
+  hub.observe(SESSION_ID, nativeRunId, makeRecord("message_start", { message }));
+  hub.observe(SESSION_ID, nativeRunId, makeRecord("message_end", { message }));
+  const finished = frames.filter((frame) => frame.type === "message.finished");
+  const nativeMessage = finished.at(-1);
+  assert.ok(nativeMessage?.type === "message.finished" && nativeMessage.payload.nativeKey);
+  assert.equal(nativeMessage.payload.nativeKey, `${digest}:2`);
+  sub.unsubscribe();
+  hub.close();
+});

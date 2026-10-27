@@ -1,13 +1,17 @@
-import { savedMessageKeys } from "../runtime/message-identity.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { open, readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
 import { prepareDataDirectory } from "../local/files.ts";
 import { hasCode } from "../local/paths.ts";
-import type { ImageContent } from "../shared/images.ts";
-import { HistoryReadError, readSavedHistory } from "../runtime/pi-history.ts";
-import { type PiEntry, PiProcess, verifyPiConfiguration } from "../runtime/pi-process.ts";
+import { savedMessageKeys } from "../runtime/message-identity.ts";
+import { HistoryReadError, readSavedHistory, type SavedHistory } from "../runtime/pi-history.ts";
+import {
+  type NativeExecutionEvent,
+  type PiEntry,
+  PiProcess,
+  verifyPiConfiguration,
+} from "../runtime/pi-process.ts";
 import { isRecord, RpcCommandError } from "../runtime/pi-rpc.ts";
 import {
   discoverPiModelCapabilities,
@@ -18,13 +22,15 @@ import {
 import type { HostDirectoryListing, PiModelOption } from "../shared/discovery.ts";
 import type { StreamFrame } from "../shared/events.ts";
 import type { HistoryPage } from "../shared/history.ts";
+import type { ImageContent } from "../shared/images.ts";
 import {
+  isSessionModelRequest,
+  type NativeExecutionInfo,
   type RuntimeConfiguration,
   SESSION_ID,
   type SessionCreateRequest,
   type SessionInfo,
   type SessionModelRequest,
-  isSessionModelRequest,
 } from "../shared/sessions.ts";
 import {
   isModelCapabilitiesRequest,
@@ -107,6 +113,58 @@ interface ActiveTurn {
   historyMaterialized: boolean;
 }
 
+interface HistoryIdentity {
+  known: boolean;
+  counts: Map<string, number>;
+}
+
+interface NativeExecutionRecord {
+  info: NativeExecutionInfo;
+  /** Full assistant identity counts captured immediately before this execution, when known. */
+  messageBaseline?: Map<string, number>;
+  expectedMessageKeys?: string[];
+  coverageBlocked: boolean;
+  coverageFromFile: boolean;
+  settledLeafId?: string;
+  abort?: Promise<void>;
+}
+
+function isMessageAfterBaseline(key: string, baseline: ReadonlyMap<string, number>): boolean {
+  const separator = key.lastIndexOf(":");
+  if (separator < 0) return false;
+  const digest = key.slice(0, separator);
+  const occurrence = Number(key.slice(separator + 1));
+  return (
+    /^[a-f0-9]{64}$/.test(digest) &&
+    Number.isSafeInteger(occurrence) &&
+    occurrence > (baseline.get(digest) ?? 0)
+  );
+}
+
+function messageKeysAfterBaseline(
+  entries: readonly PiEntry[],
+  baseline: ReadonlyMap<string, number>,
+): string[] | undefined {
+  const keys = [...savedMessageKeys(entries).keys.values()].filter((key) =>
+    isMessageAfterBaseline(key, baseline),
+  );
+  return keys.length <= 1024 ? keys : undefined;
+}
+
+function messageKeyDelta(
+  baseline: ReadonlyMap<string, number>,
+  finalCounts: ReadonlyMap<string, number>,
+): string[] | undefined {
+  const keys: string[] = [];
+  for (const [digest, finalCount] of finalCounts) {
+    const first = (baseline.get(digest) ?? 0) + 1;
+    if (finalCount < first - 1 || finalCount - first + 1 + keys.length > 1024) return undefined;
+    for (let occurrence = first; occurrence <= finalCount; occurrence += 1)
+      keys.push(`${digest}:${occurrence}`);
+  }
+  return keys;
+}
+
 function turnView(turn: StoredTurn): TurnInfo {
   const { payloadIdentity: _identity, ...view } = turn;
   return view;
@@ -114,6 +172,18 @@ function turnView(turn: StoredTurn): TurnInfo {
 
 function active(turn: TurnInfo): boolean {
   return ["accepted", "dispatching", "running"].includes(turn.status);
+}
+
+function truncateUtf8(value: string, maxBytes: number): string {
+  let bytes = 0;
+  let result = "";
+  for (const character of value) {
+    const size = Buffer.byteLength(character, "utf8");
+    if (bytes + size > maxBytes) break;
+    bytes += size;
+    result += character;
+  }
+  return result;
 }
 
 /** Durable session/turn identities and host-owned runtime execution. */
@@ -125,6 +195,8 @@ export class SessionService {
   readonly #now: () => number;
   readonly #runtimes = new Map<string, PiProcess>();
   readonly #runtimeObservers = new Map<string, () => void>();
+  readonly #historyIdentity = new Map<string, HistoryIdentity>();
+  readonly #nativeExecutions = new Map<string, NativeExecutionRecord>();
   readonly #turns = new Map<string, ActiveTurn>();
   readonly #storageFaults = new Set<string>();
   readonly #events = new SessionEvents();
@@ -559,6 +631,9 @@ export class SessionService {
             "Abort active work before closing its runtime.",
           );
         await this.#rememberHistory(stored, runtime);
+        const native = this.#nativeExecutions.get(id);
+        if (native && native.info.status !== "running" && native.messageBaseline)
+          await this.#refreshNativeHistory(id, native.info.id);
         await runtime.stop();
         this.#runtimeObservers.get(id)?.();
         this.#runtimeObservers.delete(id);
@@ -628,6 +703,56 @@ export class SessionService {
         !active(latest) &&
         latest.entryIds.length > 0 &&
         latest.entryIds.every((entryId) => slice.branchIds.has(entryId));
+      const native = this.#nativeExecutions.get(id);
+      if (
+        native &&
+        native.info.status !== "running" &&
+        !native.coverageBlocked &&
+        native.expectedMessageKeys === undefined &&
+        native.messageBaseline &&
+        !slice.history.incompleteTail
+      ) {
+        const expected = messageKeysAfterBaseline(slice.history.entries, native.messageBaseline);
+        if (expected === undefined) native.coverageBlocked = true;
+        else {
+          native.expectedMessageKeys = expected;
+          native.coverageBlocked = expected.length === 0;
+          delete native.messageBaseline;
+        }
+      }
+      const savedMessageKeyEntries = savedMessageKeys(slice.history.entries).keys;
+      const branchMessageKeys = new Set(
+        [...savedMessageKeyEntries]
+          .filter(([entryId]) => slice.branchIds.has(entryId))
+          .map(([, key]) => key),
+      );
+      if (
+        native &&
+        native.info.status !== "running" &&
+        !native.coverageBlocked &&
+        native.expectedMessageKeys !== undefined &&
+        native.expectedMessageKeys.length > 0 &&
+        !slice.history.incompleteTail &&
+        native.expectedMessageKeys.every((key) => branchMessageKeys.has(key)) &&
+        slice.history.leafId !== null
+      ) {
+        native.settledLeafId = slice.history.leafId;
+        delete native.expectedMessageKeys;
+        delete native.messageBaseline;
+      }
+      const coveredNative =
+        !this.#storageFaults.has(id) &&
+        native &&
+        native.info.status !== "running" &&
+        !slice.history.incompleteTail &&
+        native.settledLeafId !== undefined &&
+        slice.branchIds.has(native.settledLeafId);
+      if (
+        native?.info.status !== "running" &&
+        !slice.history.incompleteTail &&
+        this.#runtimeObservers.has(id)
+      )
+        this.#historyIdentity.set(id, this.#identityForHistory(slice.history));
       return {
         sessionId: id,
         status: "available",
@@ -641,6 +766,7 @@ export class SessionService {
         activeTurnId: session.activeTurnId,
         latestTurnId: session.latestTurnId,
         coveredTurnId: covered && latest ? latest.runId : null,
+        ...(coveredNative && native ? { coveredNativeExecutionId: native.info.id } : {}),
       };
     });
   }
@@ -697,6 +823,10 @@ export class SessionService {
       this.#checkStorage(id);
       if (this.#turns.has(id) || this.#catalog.activeTurn(id))
         throw new SessionError(409, "session_busy", "The session is busy with another turn.");
+      const runtime = this.#runtimes.get(id);
+      const native = this.#nativeExecutions.get(id);
+      if (runtime?.activeExecution?.source === "native" || native?.info.status === "running")
+        throw new SessionError(409, "session_busy", "The session is busy with native Pi work.");
       this.#configuration();
       const now = this.#now();
       const turn: StoredTurn = {
@@ -712,6 +842,9 @@ export class SessionService {
         entryIds: [],
       };
       this.#catalog.insertTurn(turn);
+      // A new durable turn becomes the selected live result; the previous native run
+      // remains only in Pi's saved transcript and is never relabeled as this turn.
+      this.#nativeExecutions.delete(id);
       let finish!: () => void;
       const done = new Promise<void>((resolve) => {
         finish = resolve;
@@ -821,6 +954,50 @@ export class SessionService {
     }
   }
 
+  async abortNativeExecution(id: string, executionId: string): Promise<SessionInfo> {
+    this.#admit();
+    this.#stored(id);
+    if (!SESSION_ID.test(executionId))
+      throw new SessionError(400, "invalid_input", "Invalid native execution ID.");
+    const record = this.#nativeExecutions.get(id);
+    if (!record || record.info.id !== executionId)
+      throw new SessionError(
+        409,
+        "native_execution_stale",
+        "This native execution is no longer the current session execution.",
+      );
+    if (record.info.status !== "running") return this.#view(this.#stored(id));
+
+    const runtime = this.#runtimes.get(id);
+    const current = runtime?.activeExecution;
+    if (!runtime || current?.source !== "native" || current.executionId !== executionId) {
+      if (record.info.status !== "running") return this.#view(this.#stored(id));
+      throw new SessionError(
+        409,
+        "native_execution_stale",
+        "This native execution is no longer active in Pi.",
+      );
+    }
+
+    record.abort ??= (async () => {
+      try {
+        await runtime.abort();
+      } catch {
+        try {
+          await runtime.stop();
+        } catch {
+          throw new SessionError(
+            503,
+            "native_abort_failed",
+            "Pi could not stop the native execution reliably.",
+          );
+        }
+      }
+    })();
+    await record.abort;
+    return this.#view(this.#stored(id));
+  }
+
   #storedTurn(id: string, runId: string): StoredTurn {
     this.#stored(id);
     if (!SESSION_ID.test(runId)) throw new SessionError(400, "invalid_input", "Invalid run ID.");
@@ -898,10 +1075,11 @@ export class SessionService {
           "unsupported_image_model",
           "The selected Pi model does not accept image input.",
         );
-      const { before, messageCounts } = await this.#savedEntries(source).then((entries) => ({
-        before: new Set(entries.map((entry) => entry.id)),
-        messageCounts: savedMessageKeys(entries).counts,
-      }));
+      const historyBefore = await this.#savedHistory(source);
+      const savedBefore = historyBefore?.entries ?? [];
+      const identityBefore = this.#identityForHistory(historyBefore);
+      this.#historyIdentity.set(id, identityBefore);
+      const before = new Set(savedBefore.map((entry) => entry.id));
       let turn = this.#storedTurn(id, slot.runId);
       if (!active(turn)) return;
       const stored = this.#stored(id);
@@ -927,15 +1105,15 @@ export class SessionService {
         });
         return;
       }
-      this.#events.beginTurn(id, slot.runId, messageCounts);
+      this.#events.beginTurn(id, slot.runId, identityBefore.counts, identityBefore.known);
       unobserve = runtime.subscribe(
         (event) => {
           this.#events.observe(id, slot.runId, event);
         },
         { interactive: false },
       );
-      slot.dispatched = true;
       const run = runtime.startRun(message, images);
+      slot.dispatched = true;
       const disposition = await run.accepted;
       if (disposition === "handled") {
         await runtime.stop();
@@ -956,9 +1134,10 @@ export class SessionService {
       if (slot.abort) await slot.abort;
       if (slot.abortFailed) throw new Error("Cancellation outcome is uncertain.");
       await this.#rememberHistory(this.#stored(id), runtime);
-      const entries = (await this.#savedEntries(this.#stored(id))).filter(
-        (entry) => !before.has(entry.id),
-      );
+      const historyAfter = await this.#savedHistory(this.#stored(id));
+      const savedAfter = historyAfter?.entries ?? [];
+      this.#historyIdentity.set(id, this.#identityForHistory(historyAfter));
+      const entries = savedAfter.filter((entry) => !before.has(entry.id));
       this.#writeTurn({
         ...this.#storedTurn(id, slot.runId),
         status: result.outcome === "handled" ? "interrupted" : result.outcome,
@@ -1173,6 +1352,7 @@ export class SessionService {
       error: this.#storageFaults.has(stored.id)
         ? "Turn state could not be saved. Repair storage and restart the host."
         : stored.error,
+      nativeExecution: this.#nativeExecutions.get(stored.id)?.info ?? null,
       activeTurnId:
         this.#turns.get(stored.id)?.runId ?? this.#catalog.activeTurn(stored.id)?.runId ?? null,
       latestTurnId: this.#catalog.latestTurn(stored.id)?.runId ?? null,
@@ -1264,20 +1444,178 @@ export class SessionService {
     }
   }
 
-  async #savedEntries(stored: StoredSession): Promise<PiEntry[]> {
+  async #savedHistory(stored: StoredSession): Promise<SavedHistory | undefined> {
     const file = await this.#history(stored);
     if (!file) {
       if (stored.historyExpected)
         throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
-      return [];
+      return undefined;
     }
-    return (
-      await readSavedHistory({
-        file,
-        piSessionId: stored.piSessionId,
-        directory: stored.directory,
-      })
-    ).entries;
+    return readSavedHistory({
+      file,
+      piSessionId: stored.piSessionId,
+      directory: stored.directory,
+    });
+  }
+
+  #identityForEntries(entries: readonly PiEntry[]): HistoryIdentity {
+    const { counts } = savedMessageKeys(entries);
+    return { known: true, counts };
+  }
+
+  #identityForHistory(history: SavedHistory | undefined): HistoryIdentity {
+    if (!history) return { known: true, counts: new Map() };
+    if (history.incompleteTail) return { known: false, counts: new Map() };
+    return this.#identityForEntries(history.entries);
+  }
+
+  async #captureHistoryIdentity(stored: StoredSession): Promise<HistoryIdentity> {
+    try {
+      return this.#identityForHistory(await this.#savedHistory(stored));
+    } catch {
+      // Without a complete saved baseline, native messages stay unmatched in the client.
+      return { known: false, counts: new Map() };
+    }
+  }
+
+  #observeRuntime(sessionId: string, runtime: PiProcess): void {
+    const unobserveState = runtime.subscribeState(() => {
+      this.#publishState(sessionId);
+    });
+    let nativeWasActiveOnAttach = runtime.activeExecution?.source === "native";
+    const unobserveNative = runtime.subscribeNativeExecution((event) => {
+      this.#nativeExecutionEvent(
+        sessionId,
+        event,
+        nativeWasActiveOnAttach && event.type === "started",
+      );
+      if (event.type === "started") nativeWasActiveOnAttach = false;
+    });
+    const unobserveRecords = runtime.subscribe(
+      (event) => {
+        const execution = runtime.activeExecution;
+        if (execution?.source === "native")
+          this.#events.observe(sessionId, execution.executionId, event);
+      },
+      { interactive: false },
+    );
+    this.#runtimeObservers.set(sessionId, () => {
+      unobserveRecords();
+      unobserveNative();
+      unobserveState();
+      if (this.#runtimes.get(sessionId) === runtime) this.#historyIdentity.delete(sessionId);
+      const native = this.#nativeExecutions.get(sessionId);
+      if (native?.info.status !== "running" && native?.messageBaseline) {
+        native.coverageBlocked = true;
+        delete native.messageBaseline;
+      }
+    });
+  }
+
+  #nativeExecutionEvent(sessionId: string, event: NativeExecutionEvent, startedLate = false): void {
+    if (event.type === "started") {
+      const current = this.#nativeExecutions.get(sessionId);
+      if (current?.info.id === event.executionId && current.info.status === "running") return;
+      const identity = this.#historyIdentity.get(sessionId);
+      const record: NativeExecutionRecord = {
+        info: { id: event.executionId, status: "running", error: null },
+        coverageBlocked: !identity?.known,
+        coverageFromFile: startedLate,
+        ...(identity?.known ? { messageBaseline: new Map(identity.counts) } : {}),
+      };
+      this.#nativeExecutions.set(sessionId, record);
+      const observedBaseline = this.#events.beginNativeExecution(
+        sessionId,
+        event.executionId,
+        identity?.known ? identity.counts : undefined,
+      );
+      if (observedBaseline) {
+        if (observedBaseline.messageIdentityKnown) {
+          record.messageBaseline = observedBaseline.messageCounts;
+          record.coverageBlocked = false;
+        } else {
+          delete record.messageBaseline;
+          record.coverageBlocked = true;
+        }
+      } else if (this.#turns.has(sessionId)) {
+        delete record.messageBaseline;
+        record.coverageBlocked = true;
+      }
+      this.#publishState(sessionId);
+      return;
+    }
+
+    let record = this.#nativeExecutions.get(sessionId);
+    if (!record || record.info.id !== event.executionId) {
+      const identity = this.#historyIdentity.get(sessionId);
+      record = {
+        info: { id: event.executionId, status: "running", error: null },
+        coverageBlocked: !identity?.known,
+        coverageFromFile: true,
+        ...(identity?.known ? { messageBaseline: new Map(identity.counts) } : {}),
+      };
+      this.#nativeExecutions.set(sessionId, record);
+    }
+    if (record.info.status !== "running") return;
+
+    const error = event.result.error;
+    record.info = {
+      id: event.executionId,
+      status: event.result.outcome,
+      error: error === undefined ? null : truncateUtf8(error, 2048),
+    };
+    this.#publishState(sessionId);
+    const liveBaseline = this.#events.endNativeExecution(sessionId, event.executionId);
+    if (liveBaseline && !record.coverageFromFile) {
+      if (
+        !record.messageBaseline ||
+        !liveBaseline.messageIdentityKnown ||
+        liveBaseline.unidentifiedMessages > 0
+      ) {
+        record.coverageBlocked = true;
+        delete record.messageBaseline;
+      } else {
+        const expected = messageKeyDelta(record.messageBaseline, liveBaseline.messageCounts);
+        if (expected === undefined || expected.length === 0) record.coverageBlocked = true;
+        else record.expectedMessageKeys = expected;
+        record.coverageFromFile = false;
+        delete record.messageBaseline;
+      }
+    }
+    if (liveBaseline?.messageIdentityKnown) {
+      this.#historyIdentity.set(sessionId, {
+        known: true,
+        counts: liveBaseline.messageCounts,
+      });
+    }
+    const refresh = this.#refreshNativeHistory(sessionId, event.executionId);
+    this.#reads.add(refresh);
+    void refresh.then(
+      () => this.#reads.delete(refresh),
+      () => this.#reads.delete(refresh),
+    );
+  }
+
+  async #refreshNativeHistory(sessionId: string, executionId: string): Promise<void> {
+    const history = await this.#savedHistory(this.#stored(sessionId));
+    const record = this.#nativeExecutions.get(sessionId);
+    if (record?.info.id !== executionId || record.info.status === "running") return;
+    if (!this.#runtimeObservers.has(sessionId)) return;
+    if (
+      history &&
+      !history.incompleteTail &&
+      !record.coverageBlocked &&
+      record.expectedMessageKeys === undefined &&
+      record.messageBaseline
+    ) {
+      const expected = messageKeysAfterBaseline(history.entries, record.messageBaseline);
+      if (expected === undefined || expected.length === 0) record.coverageBlocked = true;
+      else record.expectedMessageKeys = expected;
+      record.coverageFromFile = false;
+      delete record.messageBaseline;
+    }
+    if (history && !history.incompleteTail)
+      this.#historyIdentity.set(sessionId, this.#identityForHistory(history));
   }
 
   async #open(stored: StoredSession): Promise<SessionInfo> {
@@ -1306,6 +1644,7 @@ export class SessionService {
       this.#publishState(stored.id);
       throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
     }
+    this.#historyIdentity.set(stored.id, await this.#captureHistoryIdentity(stored));
     let runtime: PiProcess;
     try {
       runtime = await PiProcess.start({
@@ -1326,6 +1665,8 @@ export class SessionService {
         "Pi session startup failed. Check the saved executable, provider, and model.",
       );
     }
+    this.#runtimes.set(stored.id, runtime);
+    this.#observeRuntime(stored.id, runtime);
     try {
       let state = await runtime.getState();
       if (
@@ -1340,7 +1681,11 @@ export class SessionService {
           "runtime_mismatch",
           "Pi did not use the requested session and model selection.",
         );
-      if (stored.thinkingLevel !== null && state.thinkingLevel !== stored.thinkingLevel) {
+      if (
+        stored.thinkingLevel !== null &&
+        state.thinkingLevel !== stored.thinkingLevel &&
+        runtime.activeExecution?.source !== "native"
+      ) {
         await runtime.setThinkingLevel(stored.thinkingLevel);
         state = await runtime.getState();
       }
@@ -1364,17 +1709,13 @@ export class SessionService {
         historyExpected: stored.historyExpected || resumeFile !== undefined,
       };
       this.#catalog.update(ready);
-      this.#runtimes.set(stored.id, runtime);
-      this.#runtimeObservers.set(
-        stored.id,
-        runtime.subscribeState(() => {
-          this.#publishState(stored.id);
-        }),
-      );
       this.#publishState(stored.id);
       return this.#view(ready);
     } catch (error) {
       await runtime.stop();
+      this.#runtimeObservers.get(stored.id)?.();
+      this.#runtimeObservers.delete(stored.id);
+      this.#runtimes.delete(stored.id);
       throw error;
     }
   }

@@ -42,6 +42,13 @@ test("readiness waits for a response and JSONL preserves fragmented Unicode and 
   assert.equal((await pi.run("hello")).outcome, "completed");
 });
 
+test("an unmatched settlement observation does not fail the Pi RPC connection", async (t) => {
+  const pi = await PiProcess.start(await options(t, "orphan-settled"));
+  t.after(() => pi.stop());
+  assert.equal(pi.state, "ready");
+  assert.equal((await pi.getState()).sessionId, "synthetic-session");
+});
+
 test("a known Pi command rejection is typed and leaves the runtime ready", async (t) => {
   const pi = await PiProcess.start(await options(t, "reject-prompt"));
   t.after(() => pi.stop());

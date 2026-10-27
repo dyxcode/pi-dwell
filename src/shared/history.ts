@@ -53,6 +53,8 @@ export interface HistoryPage {
   latestTurnId: string | null;
   /** Latest terminal Dwell turn whose recorded entries all exist on this saved branch. */
   coveredTurnId: string | null;
+  /** Latest terminal native Pi execution proven present on this saved branch. */
+  coveredNativeExecutionId?: string;
   /** Instructions proven to have been part of Pi's saved system context. */
   contextSources?: ContextSource[];
   /** True when the saved instruction preview was cut to fit its display limits. */
@@ -180,7 +182,7 @@ export function isHistoryPage(value: unknown): value is HistoryPage {
     [...fields, "contextSources"],
     [...fields, "contextSourcesTruncated"],
     [...fields, "contextSources", "contextSourcesTruncated"],
-  ];
+  ].flatMap((candidate) => [candidate, [...candidate, "coveredNativeExecutionId"]]);
   if (
     !record(value) ||
     !optionalFields.some((candidate) => exact(value, candidate)) ||
@@ -206,7 +208,10 @@ export function isHistoryPage(value: unknown): value is HistoryPage {
     typeof value.incompleteTail !== "boolean" ||
     !optionalUuid(value.activeTurnId) ||
     !optionalUuid(value.latestTurnId) ||
-    !optionalUuid(value.coveredTurnId)
+    !optionalUuid(value.coveredTurnId) ||
+    (value.coveredNativeExecutionId !== undefined &&
+      (typeof value.coveredNativeExecutionId !== "string" ||
+        !SESSION_ID.test(value.coveredNativeExecutionId)))
   )
     return false;
   if (
@@ -215,7 +220,8 @@ export function isHistoryPage(value: unknown): value is HistoryPage {
       value.revision !== null ||
       value.leafId !== null ||
       value.nextCursor !== null ||
-      value.coveredTurnId !== null)
+      value.coveredTurnId !== null ||
+      value.coveredNativeExecutionId !== undefined)
   )
     return false;
   if (value.status === "available" && value.revision === null) return false;

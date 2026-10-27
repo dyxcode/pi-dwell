@@ -293,7 +293,10 @@ function coveredLiveRun(
   liveRunId: string | null,
   activeTurn: TurnProjection | null,
   latestTurn: TurnProjection | null,
+  nativeExecution?: SessionInfo["nativeExecution"],
 ): boolean {
+  if (nativeExecution && nativeExecution.id === liveRunId)
+    return nativeExecution.status !== "running" && history?.coveredNativeExecutionId === liveRunId;
   return (
     history !== null &&
     liveRunId !== null &&
@@ -305,7 +308,15 @@ function coveredLiveRun(
 }
 
 function applyCoveredHistory(state: ConversationState): ConversationState {
-  if (!coveredLiveRun(state.history, state.liveRunId, state.activeTurn, state.latestTurn))
+  if (
+    !coveredLiveRun(
+      state.history,
+      state.liveRunId,
+      state.activeTurn,
+      state.latestTurn,
+      state.session?.nativeExecution,
+    )
+  )
     return state;
   return {
     ...state,
@@ -398,9 +409,19 @@ function snapshotState(
   const payload = frame.payload;
   const history =
     previousState.history?.sessionId === frame.sessionId ? previousState.history : null;
-  const liveRunId = payload.activeTurn?.runId ?? payload.latestTurn?.runId ?? null;
+  const liveRunId =
+    payload.session.nativeExecution?.id ??
+    payload.activeTurn?.runId ??
+    payload.latestTurn?.runId ??
+    null;
   const sameRun = previousState.liveRunId === liveRunId;
-  const covered = coveredLiveRun(history, liveRunId, payload.activeTurn, payload.latestTurn);
+  const covered = coveredLiveRun(
+    history,
+    liveRunId,
+    payload.activeTurn,
+    payload.latestTurn,
+    payload.session.nativeExecution,
+  );
   let messages = !covered && sameSession && sameRun ? previousState.messages.map(copyMessage) : [];
   let messageDropped = false;
   if (!covered && payload.live.message) {
@@ -578,9 +599,17 @@ export function reduceFrame(state: ConversationState, frame: StreamFrame): Conve
   };
 
   switch (frame.type) {
-    case "session.updated":
-      next = { ...next, session: { ...frame.payload } };
-      break;
+    case "session.updated": {
+      const native = frame.payload.nativeExecution;
+      const newRun = native && next.liveRunId !== native.id;
+      next = {
+        ...next,
+        session: { ...frame.payload },
+        ...(native ? { liveRunId: native.id, activeTurn: null } : {}),
+        ...(newRun ? { messages: [], tools: [], liveTruncated: false, liveIncomplete: gap } : {}),
+      };
+      return applyCoveredHistory(next);
+    }
     case "turn.updated": {
       const newRun = next.liveRunId !== frame.payload.runId;
       next = {

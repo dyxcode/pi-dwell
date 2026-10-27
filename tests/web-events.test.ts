@@ -891,3 +891,51 @@ test("saved native identities take over live content while repeated text stays d
     [MESSAGE_ID, TOOL_ID, SECOND_MESSAGE_ID],
   );
 });
+
+test("native execution observation is separate from Dwell turns and waits for saved coverage", () => {
+  let state = emptyConversationState(SESSION_ID);
+  const running = session(SESSION_ID, {
+    nativeExecution: { id: RUN_ID, status: "running", error: null },
+  });
+  state = reduceFrame(state, {
+    type: "session.updated",
+    sessionId: SESSION_ID,
+    runId: null,
+    cursor: cursor(1),
+    payload: running,
+  });
+  assert.equal(state.liveRunId, RUN_ID);
+  assert.equal(state.activeTurn, null);
+  state = reduceFrame(
+    state,
+    messageFrame("message.started", 2, {
+      id: MESSAGE_ID,
+      text: "Native reply",
+      finished: false,
+      truncated: false,
+    }),
+  );
+  state = reduceFrame(state, {
+    type: "session.updated",
+    sessionId: SESSION_ID,
+    runId: null,
+    cursor: cursor(3),
+    payload: { ...running, nativeExecution: { id: RUN_ID, status: "completed", error: null } },
+  });
+  assert.equal(state.messages.length, 1);
+  const page: HistoryPage = {
+    sessionId: SESSION_ID,
+    status: "available",
+    revision: "a".repeat(64),
+    leafId: "native",
+    entries: [],
+    nextCursor: null,
+    incompleteTail: false,
+    activeTurnId: null,
+    latestTurnId: null,
+    coveredTurnId: null,
+  };
+  state = reconcileHistory(state, { ...page, coveredNativeExecutionId: RUN_ID });
+  assert.equal(state.messages.length, 0);
+  assert.equal(state.latestTurn, null);
+});

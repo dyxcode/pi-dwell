@@ -20,6 +20,13 @@ export interface SessionModelRequest {
   thinkingLevel?: ThinkingLevel;
 }
 
+export interface NativeExecutionInfo {
+  /** Ephemeral Pi execution identity; it does not identify a Dwell request or durable turn. */
+  id: string;
+  status: "running" | "completed" | "failed" | "aborted" | "interrupted";
+  error: string | null;
+}
+
 export interface SessionInfo {
   id: string;
   directory: string;
@@ -33,6 +40,8 @@ export interface SessionInfo {
   runtimeState: "closed" | "opening" | "ready" | "failed" | "closing";
   historyState: "empty" | "available" | "unavailable";
   error: string | null;
+  /** Current or most recent native Pi extension execution; absent on older protocol fixtures. */
+  nativeExecution?: NativeExecutionInfo | null;
   activeTurnId: string | null;
   latestTurnId: string | null;
 }
@@ -87,6 +96,9 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
     ["empty", "available", "unavailable"].includes(value.historyState) &&
     "error" in value &&
     (value.error === null || typeof value.error === "string") &&
+    (!Object.hasOwn(value, "nativeExecution") ||
+      ("nativeExecution" in value &&
+        (value.nativeExecution === null || isNativeExecutionInfo(value.nativeExecution)))) &&
     "activeTurnId" in value &&
     (value.activeTurnId === null ||
       (typeof value.activeTurnId === "string" && SESSION_ID.test(value.activeTurnId))) &&
@@ -95,6 +107,24 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
       (typeof value.latestTurnId === "string" && SESSION_ID.test(value.latestTurnId))) &&
     (value.status !== "ready" ||
       (typeof value.provider === "string" && typeof value.model === "string"))
+  );
+}
+
+function isNativeExecutionInfo(value: unknown): value is NativeExecutionInfo {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const fields = ["id", "status", "error"];
+  return (
+    Object.keys(value).length === fields.length &&
+    fields.every((field) => Object.hasOwn(value, field)) &&
+    "id" in value &&
+    typeof value.id === "string" &&
+    SESSION_ID.test(value.id) &&
+    "status" in value &&
+    typeof value.status === "string" &&
+    ["running", "completed", "failed", "aborted", "interrupted"].includes(value.status) &&
+    "error" in value &&
+    (value.error === null ||
+      (typeof value.error === "string" && new TextEncoder().encode(value.error).byteLength <= 2048))
   );
 }
 

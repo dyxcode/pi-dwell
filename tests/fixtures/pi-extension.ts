@@ -315,6 +315,13 @@ function scriptedStream(
 }
 
 export default function registerDwellFixture(pi: ExtensionAPI): void {
+  let nativePromptSent = false;
+  pi.on("agent_settled", () => {
+    const prompt = process.env.DWELL_TEST_NATIVE_PROMPT;
+    if (prompt === undefined || nativePromptSent) return;
+    nativePromptSent = true;
+    pi.sendUserMessage(prompt);
+  });
   pi.on("before_agent_start", async (event) => {
     const report = process.env.DWELL_TEST_SYSTEM_PROMPT;
     if (report) await writeFile(report, event.systemPrompt, { mode: 0o600 });
@@ -325,6 +332,8 @@ export default function registerDwellFixture(pi: ExtensionAPI): void {
   pi.on("session_start", async () => {
     const log = process.env.DWELL_TEST_START_LOG;
     if (log) await appendFile(log, `${process.pid}\n`, { mode: 0o600 });
+    const nativePrompt = process.env.DWELL_TEST_NATIVE_ON_START;
+    if (nativePrompt) pi.sendUserMessage(nativePrompt);
   });
   pi.registerProvider(PROVIDER, {
     name: "Dwell Offline Fixture",

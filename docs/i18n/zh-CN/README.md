@@ -1,6 +1,6 @@
 # Pi Dwell
 
-[English](../../README.md)
+[English](../../../README.md)
 
 **让 Pi 有一个持续驻留的地方。**
 
@@ -21,6 +21,12 @@ Pi Dwell 希望让 Pi 成为一个可以从不同设备随时回到的个人 age
 ### 建立自己的使用环境
 
 选择 Pi 驻留的位置和使用的能力。将对话、定时工作和 Pi extensions 组合成适合自己的个人环境，随着需求逐步扩展。
+
+## 文档
+
+[完整文档](handbook/README.md)包含快速上手、功能指南、教程、示例、API 与错误参考、架构与源码详解，以及开发与测试说明。
+
+[Implementation 实现手册](handbook/implementation/README.md)用文字解释 workflows 与 function behavior，并提供可点击的 source/test citations。
 
 ## 安装
 

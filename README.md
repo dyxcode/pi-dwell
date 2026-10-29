@@ -1,6 +1,6 @@
 # Pi Dwell
 
-[简体中文](docs/i18n/README.zh-CN.md)
+[简体中文](docs/i18n/zh-CN/README.md)
 
 **A persistent home for Pi.**
 
@@ -21,6 +21,12 @@ Let the host carry on with tasks while you step away. Come back to see what fini
 ### Make it your own
 
 Choose where Pi lives and which capabilities it uses. Bring conversations, scheduled work, and Pi extensions into a personal environment that grows with your needs.
+
+## Documentation
+
+Read the [documentation](docs/handbook/README.md) for Quick Start, Guide, Tutorials, Examples, API and error references, architecture, code walkthroughs, and development.
+
+The [Implementation handbook](docs/handbook/implementation/README.md) explains workflows and function behavior in prose, with clickable source and test citations.
 
 ## Installation
 

@@ -16,7 +16,9 @@
   "files": [
     "src",
     "README.md",
-    "docs/i18n/README.zh-CN.md"
+    "docs/i18n/zh-CN/README.md",
+    "docs/handbook",
+    "docs/i18n/zh-CN/handbook"
   ],
   "scripts": {
     "start": "node src/cli.ts serve",
@@ -27,10 +29,11 @@
     "format": "biome format --write",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm test",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run check:docs && npm test",
     "check:package": "node scripts/check-package.mjs",
     "check:pi": "node scripts/check-pi.ts",
-    "check:web": "node scripts/check-web.ts"
+    "check:web": "node scripts/check-web.ts",
+    "check:docs": "node scripts/check-docs.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2",

@@ -16,7 +16,7 @@ CLI 解析 administrative command，并通过 HTTP client 调用 host。它读�
 <a id="command-dispatch"></a>
 ## CLI dispatch 与 foreground host
 
-[runCli](../../../../../src/clients/cli/main.ts#L9) 先解析命令，不会先读取 state。Help 会打印 command surface 然后退出。Service command 直接交给 runServiceCommand。其他命令会选择 production/development data path，再通过 CLI HTTP client dispatch status、pairing、browser revocation 或 runtime configuration。Status 和 configuration 输出经过校验的 JSON；pairing 输出短 code 与 expiry；revoke 输出确认信息，不会打印长期 bearer credential。
+[runCli](../../../../../src/clients/cli/main.ts#L9) 先解析命令，不会先读取 state。Help 会打印 command surface 然后退出。Service command 直接交给 runServiceCommand。其他命令会选择 production/development data path，再通过 CLI HTTP client dispatch status、pairing、browser revocation 或 Pi executable 配置。Status 和 configuration 输出经过校验的 JSON；pairing 输出短 code 与 expiry；revoke 输出确认信息，不会打印长期 bearer credential。
 
 只有 serve 分支会动态 import startHost，让 administrative subcommand 不必加载 server 和 SQLite。它在等待启动前安装 SIGINT 和 SIGTERM handlers。嵌套 shutdown callback 会记住 host 对象尚未可用时收到的 signal；启动完成后关闭 host 一次；报告 shutdown failure；并在 close 完成后移除两个 handler。Listener 冲突会转换成可操作的错误信息，其中指出固定 port 和 production/development 冲突。[src/cli.ts](../../../../../src/cli.ts#L3) 是顶层 module：它把 process arguments 交给 runCli；command rejected 时打印一条带 prefix 的 error，并将 exit status 设为 1。
 
@@ -27,7 +27,7 @@ CLI 解析 administrative command，并通过 HTTP client 调用 host。它读�
 
 Timeout message 会明确说明 host 可能已经完成操作，因此调用方应先检查 state 再重试。Network error 会写出 local address 和启动命令。401 会解释 production/development credential 不匹配。即使 HTTP status 成功，response 仍必须含有可解析的 JSON；非 JSON、格式不正确的 public error 和不兼容的 success data 会分别报告。[errorMessage](../../../../../src/clients/cli/status.ts#L86) 只会提取 public error.message 中非空字符串。
 
-Typed wrapper 将每条 command 的预期 response 限定为具体形状。[readHostStatus](../../../../../src/clients/cli/status.ts#L101) 校验 HostStatus。[createPairing](../../../../../src/clients/cli/status.ts#L107) 校验八位 pairing alphabet 和 safe integer expiry。[revokeBrowsers](../../../../../src/clients/cli/status.ts#L126) 要求 response 是 object 且 `ok` 为 true。[configurationOptions](../../../../../src/clients/cli/runtime.ts#L6) 将 configuration request timeout 至少提高到 60 秒，因为 executable verification 可能比 status 耗时更长。[configureRuntime](../../../../../src/clients/cli/runtime.ts#L13) 发送 POST，并用 shared RuntimeConfiguration validator 校验 response。
+Typed wrapper 将每条 command 的预期 response 限定为具体形状。[readHostStatus](../../../../../src/clients/cli/status.ts#L101) 校验 HostStatus。[createPairing](../../../../../src/clients/cli/status.ts#L107) 校验八位 pairing alphabet 和 safe integer expiry。[revokeBrowsers](../../../../../src/clients/cli/status.ts#L126) 要求 response 是 object 且 `ok` 为 true。[configurationOptions](../../../../../src/clients/cli/runtime.ts#L6) 将 Pi executable configuration request timeout 至少提高到 60 秒，因为 executable verification 可能比 status 耗时更长。[configureRuntime](../../../../../src/clients/cli/runtime.ts#L13) 发送 Pi executable configuration 的 POST，并用 shared RuntimeConfiguration validator 校验 response。
 
 <a id="data-directory-policy"></a>
 ## Data directory 选择与隔离

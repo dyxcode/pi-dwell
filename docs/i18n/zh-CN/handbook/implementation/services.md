@@ -68,7 +68,7 @@ Generator group 将 serialization 与 install 分开。[plistEscape](../../../..
 
 [removeRegistration](../../../../../src/service/service.ts#L866) 在 unlink 前立即重读内容，只会删除 current 或精确已知的 legacy registration。[install](../../../../../src/service/service.ts#L877) 校验生成内容、创建安全目录、写入或升级 owned file，然后 reload Linux。若 reload 失败，会保留已保存的 registration 并提示重试 install。Install 不会 start/restart process，也不会 enable autostart；Linux 报告实际 autostart 和 lingering state；macOS 将 login autostart 报告为 disabled，但不报告 registration 当前是否已加载。
 
-[uninstall](../../../../../src/service/service.ts#L904) 会先 stop 并等待。Linux 随后再次确认 registration ownership，再 disable autostart，然后删除 registration 并 reload manager。每个失败都会说明已完成到哪一步，并尽可能保留后续 state。它会保留 Dwell data directory，也不会改动 user lingering。[runtimeStatus](../../../../../src/service/service.ts#L939) 区分未加载、已停止、failed、activating、deactivating、其他 not-ready 状态、ready，以及 process running 但 host not-ready；Readiness failure 会作为状态描述，不会变成 command exception。[status](../../../../../src/service/service.ts#L974) 合并 runtime 结果、Linux boot status 和 legacy-upgrade 提示。
+[uninstall](../../../../../src/service/service.ts#L904) 会先 stop 并等待。Linux 随后再次确认 registration ownership，再 disable autostart，然后删除 registration 并 reload manager。每个失败都会说明已完成到哪一步，并尽可能保留后续 state。它会保留 Dwell data directory，也不会改动 user lingering。[runtimeStatus](../../../../../src/service/service.ts#L939) 报告 launchd/systemd service state 和 authenticated Dwell host readiness：未加载、已停止、failed、activating、deactivating、其他 not-ready 状态、ready，或 process running 但 host not-ready。Readiness failure 会写入 status text，不会使 command 失败。[status](../../../../../src/service/service.ts#L974) 合并 service status、Linux boot settings 和 legacy-upgrade 提示。
 
 <a id="service-test-evidence"></a>
 ## Test evidence

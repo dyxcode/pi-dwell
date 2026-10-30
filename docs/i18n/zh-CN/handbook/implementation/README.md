@@ -22,7 +22,7 @@
 | [一条 message](workflow-message.md) | Browser request → admission → durable intent → RPC → settlement → saved result，以及各 interruption points |
 | [Observation 与 reconnect](workflow-observation.md) | Subscription → live projection → saved branch → reconciliation → reconnect/resync |
 
-第一次阅读时，先完整走完 message workflow，再进入单个模块章节。始终区分 overview 中的四类 state owners：SQLite、Pi JSONL、host memory 与 browser state。
+第一次阅读时，先完整走完 message workflow，再进入单个模块章节。Overview 区分 Pi 及其 session files，与 Dwell 的进程管理、请求记录和 browser client。
 
 <a id="modules"></a>
 
@@ -37,11 +37,11 @@
 | [Directory 与 model discovery](discovery.md) | Directory listing、isolated probes 与 capability extraction |
 | [Shared data 与 validation](validators.md) | Field checks、identities、image decoding 与 event/history contracts |
 | [Catalog 与 durable records](catalog.md) | Schema validation、migrations、transactions 与 turn transitions |
-| [Session coordination](sessions.md) | Admission、runtime ownership、dispatch、cancellation 与 recovery |
+| [Session coordination](sessions.md) | Pi process 管理、请求接受、dispatch、cancellation 与 recovery |
 | [Pi process 与 execution](runtime.md) | Launch、readiness、prompt disposition、native execution 与 stop |
 | [JSONL RPC transport](rpc.md) | Correlation、buffering、deadlines 与 transport failure |
-| [Native history 与 projection](history.md) | Branch reading、scan budgets、identity、cursors 与 images |
-| [Host event projection](events.md) | Visible messages/tools、replay、limits 与 subscriptions |
+| [读取 Pi session files](history.md) | Branch reading、scan budgets、identity、cursors 与 images |
+| [Session events](events.md) | Visible messages/tools、replay、limits 与 subscriptions |
 | [Browser coordination](browser-controller.md) | Session views、async generations、pending requests 与 model selection |
 | [Browser event state](browser-events.md) | SSE decoding、reducer state 与 live/saved reconciliation |
 | [Rendering 与 assets](browser-rendering.md) | Markdown、DOM reuse、conversation grouping、HTML/CSS 与 asset serving |

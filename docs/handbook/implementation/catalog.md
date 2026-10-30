@@ -6,7 +6,7 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/catalog.md)
 
 [Implementation index](README.md) · [Session service](sessions.md) · [Session/storage overview](../sessions-storage.md)
 
-`SessionCatalog` is the SQLite boundary for durable Pi configuration, Dwell session metadata, and turn outcomes. It never stores the conversation transcript: Pi's native JSONL session file remains authoritative for saved content. The catalog validates both values going into SQLite and values coming back from it, and treats unexpected schema or semantic state as corruption instead of trying to repair it silently.
+`SessionCatalog` stores Dwell's Pi executable/entry-point configuration, session metadata, and turn outcomes in SQLite. It validates records on writes and reads, and rejects unexpected schema or semantic state as catalog corruption. Pi's JSONL session file holds saved conversation entries.
 
 <a id="catalog-records-and-validation"></a>
 
@@ -44,11 +44,11 @@ Migrations preserve rows by renaming and rebuilding tables inside one surroundin
 
 ## Configuration and session-row operations
 
-[`configuration`](../../../src/storage/catalog.ts#L586) returns `undefined` when no row exists, otherwise decodes the executable and nullable entry point into the public runtime configuration shape. [`configure`](../../../src/storage/catalog.ts#L596) runs `assertRuntimeConfiguration` and upserts singleton row 1, clearing an old entry point when the new configuration omits it.
+[`configuration`](../../../src/storage/catalog.ts#L586) returns `undefined` when no row exists, otherwise decodes the executable and nullable entry point into the public Pi executable configuration. [`configure`](../../../src/storage/catalog.ts#L596) runs `assertRuntimeConfiguration` and upserts singleton row 1, clearing an old entry point when the new configuration omits it.
 
 [`list`](../../../src/storage/catalog.ts#L605) returns all decoded sessions ordered by creation time then ID. [`get`](../../../src/storage/catalog.ts#L612) fetches one by primary key; [`findRequest`](../../../src/storage/catalog.ts#L619) resolves the globally unique create request ID. [`insert`](../../../src/storage/catalog.ts#L626) validates then inserts all 14 fields, encoding the history boolean as 0/1. [`update`](../../../src/storage/catalog.ts#L650) validates and replaces all mutable/stored fields by session ID; if exactly one row was not changed, it reports a missing session. Catalog methods do not hide SQLite constraint errors such as a duplicate request ID.
 
-[`interruptCreating`](../../../src/storage/catalog.ts#L677) checks its timestamp and marks all persisted `creating` rows `interrupted` with a restart explanation. Service startup calls it before recreating runtimes; the row does not identify whether Pi had started.
+[`interruptCreating`](../../../src/storage/catalog.ts#L677) checks its timestamp and marks all persisted `creating` rows `interrupted` with a restart explanation. Service startup calls it before starting Pi processes; the row cannot establish whether a Pi child started.
 
 <a id="catalog-turn-operations"></a>
 
@@ -62,6 +62,6 @@ Migrations preserve rows by renaming and rebuilding tables inside one surroundin
 
 [`markTurnDispatching`](../../../src/storage/catalog.ts#L781) requires a `dispatching` turn, a matching session, and `historyExpected: true`. It executes the session update and turn update in one `BEGIN IMMEDIATE` transaction; a failure rolls both back. This is the durable boundary immediately before Pi may receive the prompt. It means the host can distinguish known-not-sent `accepted` work from a potentially side-effecting dispatched turn after a crash.
 
-[`interruptTurns`](../../../src/storage/catalog.ts#L804) validates the recovery timestamp and makes all active turns terminal `interrupted`, using the greater of old and recovery timestamps. An `accepted` turn gets `not_dispatched` and an explanation that the prompt was not sent; `dispatching` or `running` gets `outcome_unknown`, because the external runtime may already have acted. It never retries those turns. [`close`](../../../src/storage/catalog.ts#L814) closes only an open SQLite handle and is safe to call after prior closure.
+[`interruptTurns`](../../../src/storage/catalog.ts#L804) validates the recovery timestamp and makes all active turns terminal `interrupted`, using the greater of old and recovery timestamps. An `accepted` turn gets `not_dispatched` and an explanation that the prompt was not sent; `dispatching` or `running` gets `outcome_unknown`, because Pi may already have received or processed the prompt. It never retries those turns. [`close`](../../../src/storage/catalog.ts#L814) closes only an open SQLite handle and is safe to call after prior closure.
 
 Related behavior is exercised by [catalog tests](../../../tests/catalog.test.ts), [turn/catalog tests](../../../tests/turn-catalog.test.ts), and [session restart tests](../../../tests/sessions.test.ts).

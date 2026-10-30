@@ -1,4 +1,4 @@
-# Understand the running system
+# How Dwell hosts Pi
 
 English | [简体中文](../../i18n/zh-CN/handbook/implementation/overview.md)
 
@@ -6,57 +6,70 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/overview.md)
 
 <a id="reading-model"></a>
 
-## A map of responsibility
+## System structure
 
-Dwell is a host process around an external Pi coding-agent runtime. The CLI starts or administers the host; a browser sends authenticated HTTP commands and observes SSE. `SessionService` coordinates runtime ownership and records durable metadata. Pi performs model/tool work and writes its native conversation files. Browser rendering is a projection of those records and live events.
+The CLI starts or administers the Dwell host. The host runs Pi in child processes and exchanges commands and events through RPC. Browser clients send authenticated HTTP requests to the host and receive updates through SSE.
 
-Follow the [message workflow](workflow-message.md) for one complete vertical path, then read the relevant module pages in the [implementation index](README.md).
+Follow the [message workflow](workflow-message.md) for a complete request, then use the [implementation index](README.md) to explore individual modules.
 
-Source / verification: [`startHost`](../../../src/server/http.ts#L102) · [`SessionService`](../../../src/sessions/service.ts#L205) · [`PiProcess`](../../../src/runtime/pi-process.ts#L215)
-
-<a id="processes"></a>
-
-## Processes and lifetimes
-
-The host owns its HTTP listener, authentication service, catalog connection, session coordination, live event buffers and supervised Pi children. A child corresponds to an open hosted Pi session; a browser tab does not own that child. Multiple browser connections can observe the same host state. Closing a browser stops observation, while closing a session releases its runtime and preserves saved state.
-
-Process state and durable session state differ. A catalog row can be ready while its runtime is closed. After a host restart, runtimes are opened lazily and interrupted prompts remain interrupted. A service manager can restart Dwell; current execution state comes from the new host process. The implemented HTTP API reports task scheduling unavailable.
-
-Source / verification: [`SessionService.#view`](../../../src/sessions/service.ts#L1514) · [`SessionService.#open`](../../../src/sessions/service.ts#L1912) · [`isHostStatus`](../../../src/shared/protocol.ts#L14)
+Source / verification: [`runCli`](../../../src/clients/cli/main.ts#L9) · [`startHost`](../../../src/server/http.ts#L102) · [`PiProcess`](../../../src/runtime/pi-process.ts#L215)
 
 <a id="state"></a>
 
-## Four kinds of state
+## Components and responsibilities
 
-| State | Authority | What it can establish |
-| --- | --- | --- |
-| Catalog and turn ledger | Dwell SQLite | Session/request identities, configuration, lifecycle, cancellation intent and recorded outcomes |
-| Conversation and branches | Pi JSONL | Saved messages, tools, branch ancestry and context evidence |
-| Runtime and live event projection | Current host process | What is currently running and what observers can replay within bounded memory |
-| Drafts and presentation | Browser | Unsent input, attachment drafts, selected views and local interaction state |
+| System | Component | Responsibility | Data and state |
+| --- | --- | --- | --- |
+| Dwell host | [HTTP server](http.md) | Validate and route requests; serve HTTP responses and SSE streams | Listener, connections and stream writers |
+| Dwell host | [Authentication service](authentication.md) | Authenticate CLI requests, pair browsers and revoke access | Credentials, browser-session records, pending pairing codes and rate limits |
+| Dwell host | [Session service](sessions.md) | Start and stop Pi processes, accept requests and track execution | Pi process handles, pending operations and execution status in host memory |
+| Dwell host | [Session catalog](catalog.md) | Store Pi configuration, Dwell session records and submitted turns | SQLite records containing session mappings, request IDs, outcomes and Pi entry references |
+| Dwell host | [Session events](events.md) | Convert Pi output into client events and retain bounded replay | Live message/tool state, event cursors and replay buffers in host memory |
+| Pi | [Pi](runtime.md) | Run the agent loop, model calls, tools and extensions; save conversations | Context in the Pi process and native JSONL session files |
+| Browser | [Web client](browser-controller.md) | Submit user input and render Pi messages, tool results and progress | Drafts, attachment previews, selection and displayed content |
 
-A ledger row stores references to saved entries, not a copy of their text or images. A completed outcome and readable result content are separate facts. SSE is bounded observation, not a transcript archive. Browser state cannot declare a turn completed or roll back a tool effect.
+Source / verification: [`LocalAuth`](../../../src/server/auth.ts#L87) · [`SessionService`](../../../src/sessions/service.ts#L205) · [`SessionCatalog`](../../../src/storage/catalog.ts#L541) · [`SessionEvents`](../../../src/sessions/events.ts#L370) · [Web client](../../../src/clients/web/client.ts)
 
-The SQLite transaction that records dispatch intent cannot atomically include an external process or Pi JSONL append. Dwell therefore records interruption and unknown outcome after a crash. Native Pi extensions can execute work outside a Dwell turn; those executions retain their own ephemeral identities.
+<a id="processes"></a>
 
-Source / verification: [`SessionCatalog.markTurnDispatching`](../../../src/storage/catalog.ts#L781) · [`SessionService.getTurnResult`](../../../src/sessions/service.ts#L964) · [`SessionService.#observeRuntime`](../../../src/sessions/service.ts#L1686)
+## Pi sessions and processes
+
+For each session it hosts, Dwell stores a catalog record linking its own session ID to a Pi session ID, project directory and session file when one exists. To resume the session, the host verifies the recorded directory and file, then starts Pi with that file. If an expected session file is missing, the request fails with `history_unavailable`.
+
+The host runs Pi in independent subprocesses, retaining the Pi CLI's startup flow, process environment and resource-loading mechanisms for extension compatibility. `PiProcess` wraps the child process and its RPC connection. The [Pi process chapter](runtime.md) explains executable configuration, version checks, startup and stopping.
+
+At startup, Dwell reads the catalog and starts Pi processes on demand. The [lifecycle workflow](workflow-lifecycle.md) follows session creation, resumption and shutdown through the relevant functions.
+
+Source / verification: [`SessionService.createSession`](../../../src/sessions/service.ts#L506) · [`SessionService.#open`](../../../src/sessions/service.ts#L1912) · [`PiProcess.start`](../../../src/runtime/pi-process.ts#L274)
 
 <a id="boundaries"></a>
 
-## Inputs cross validation and ownership boundaries
+## Request flow and recovery
 
-A browser input first crosses local interaction rules, then transport, HTTP admission, shared runtime validation, service ownership checks, catalog constraints and the Pi protocol. Each layer checks a distinct condition: JSON shape, authorization, session existence, idle ownership, dispatch and execution outcome.
+When the browser submits a message, the host checks authentication, request fields and whether the session can accept work. It records the request ID and a hash of the payload for deduplication, then sends the prompt through Pi RPC. Retrying the same request ID and payload returns the existing turn. Exact routes, fields and limits are listed in [Reference](../reference.md) and [contracts](../contracts.md).
 
-The host delegates provider calls and the agent loop to the full Pi runtime. Installed Pi version 1.4.0 is an explicit compatibility boundary. Session resources come from Pi's native loading rules; isolated probes use separate restrictions. Exact route/field/limit lookup remains in [Reference](../reference.md) and [contracts](../contracts.md); module explanations show where those rules are applied.
+The host records `dispatching` in SQLite before sending the prompt. The database write and Pi execution are separate operations: after a crash, Dwell may be unable to determine whether Pi received the prompt or completed a tool action. Restart recovery marks unfinished turns interrupted and does not resend their prompts.
 
-Source / verification: [`startHost`](../../../src/server/http.ts#L102) · [`isTurnCreateRequest`](../../../src/shared/turns.ts#L85) · [`verifyPiConfiguration`](../../../src/runtime/pi-process.ts#L172)
+During execution, Dwell converts Pi events into bounded SSE updates. It reads saved messages and tool results from Pi's JSONL files, and records their entry IDs against the Dwell turn. The browser matches those entries to live output to avoid displaying the same content twice. A completed turn can return `result_unavailable` if its referenced saved content has been removed. The [observation workflow](workflow-observation.md) explains history reads, matching and reconnect behavior.
+
+Pi extensions can start work without a submitted Dwell request. Dwell tracks that work using a separate native execution ID so it can report progress and target cancellation without attributing it to another request.
+
+Source / verification: [`SessionService.submitTurn`](../../../src/sessions/service.ts#L882) · [`SessionCatalog.markTurnDispatching`](../../../src/storage/catalog.ts#L781) · [`SessionService.getTurnResult`](../../../src/sessions/service.ts#L964) · [`SessionService.#observeRuntime`](../../../src/sessions/service.ts#L1686)
 
 <a id="terms"></a>
 
-## Identities and related terms
+## Identifiers used by Dwell
 
-A Dwell session ID identifies host metadata; a Pi session ID identifies native conversation identity. A request ID deduplicates submission; a runId identifies a recorded Dwell turn; native execution IDs identify observed Pi work without a corresponding request. A history revision identifies saved content for pagination, while an SSE cursor identifies position within a host event epoch. A model context is the input Pi currently uses; saved history is the persisted branch shown to the user.
+| Identifier | Use |
+| --- | --- |
+| Dwell session ID | Look up Dwell's catalog record and address the session through HTTP |
+| Pi session ID | Identify the Pi conversation associated with that record |
+| Request ID | Detect a retried submission |
+| `runId` | Identify the Dwell turn recorded for an accepted request |
+| Native execution ID | Track Pi work initiated without a Dwell request |
+| History revision | Keep pagination tied to the saved content being read |
+| SSE cursor | Track event position within the current host event epoch |
 
-The [Glossary](../glossary.md) provides the shorter lookup form.
+The [Glossary](../glossary.md) defines related terms.
 
 Source / verification: [src/shared/sessions.ts](../../../src/shared/sessions.ts) · [src/shared/turns.ts](../../../src/shared/turns.ts) · [src/shared/history.ts](../../../src/shared/history.ts) · [src/shared/events.ts](../../../src/shared/events.ts)

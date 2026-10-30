@@ -6,7 +6,7 @@
 
 [实现文档索引](README.md) · [Session service](sessions.md) · [Events 概览](../sessions-storage.md#live-events-and-bounded-replay)
 
-`SessionEvents` 是 process-local、容量受限的 projection layer。它将已验证的 durable session/turn view 与 Pi live message/tool activity 组合，供 browser observation 使用。它不持久化 event，也不拥有 execution。重新连接时收到 snapshot 或保留中的 replay；saved conversation content 仍由 Pi native history reader 提供。
+`SessionEvents` 是 Dwell host process 内的有界 event hub。它将已验证的 Dwell session/turn view 与 Pi process 中选定的 live message 和 tool activity 组合起来，供 browser subscription 使用。`SessionService` 负责 durable mutation 和 Pi-process execution；该 hub 提供 snapshot、保留的 replay 与 live projection。已保存的对话 entries 从 Pi JSONL session file 读取。
 
 <a id="event-shapes-and-helper-functions"></a>
 
@@ -26,8 +26,8 @@
 | [`equalJson`](../../../../../src/sessions/events.ts#L217) | 通过序列化比较已验证的 projection。 |
 | [`blockDelta`](../../../../../src/sessions/events.ts#L221) | Thinking-block update 携带 delta text；普通 text 则放在 message-level text field。 |
 | [`emptyLiveState`](../../../../../src/sessions/events.ts#L229) | 初始化空 message/tool state、identity count、ownership map、truncation flag 和一次性 error/limit 标记。 |
-| [`parseCursor`](../../../../../src/sessions/events.ts#L246) | 要求格式为 `<session UUID>:<epoch UUID>:<safe sequence>`，并拒绝属于其他 session 的 cursor。 |
-| [`projectSession`](../../../../../src/sessions/events.ts#L260) | 选择 public session 字段，并在发送前截断 directory、provider、model 与 error metadata；任一字段被截断都会标记 metadata limited。 |
+| [`parseCursor`](../../../../../src/sessions/events.ts#L246) | 要求格式为 `<Dwell session UUID>:<epoch UUID>:<safe sequence>`，并拒绝属于其他 Dwell session 的 cursor。 |
+| [`projectSession`](../../../../../src/sessions/events.ts#L260) | 选择 public session 字段，并在发送前截断 directory、provider、model、session error 与 native-execution error metadata；任一字段被截断都会标记 metadata limited。 |
 | [`projectTurn`](../../../../../src/sessions/events.ts#L312) | 转换为 `TurnProjection`：对外提供 entry count，不暴露 entry ID，并限制 error code/message。 |
 | [`extractText`](../../../../../src/sessions/events.ts#L338) | 直接读取 string result，或拼接 record `content` array 中的 text block。 |
 | [`clippedToolInput` 和 `clippedToolText`](../../../../../src/sessions/events.ts#L349) | 序列化并限制 tool arguments，或从 result 提取并限制可见文本。 |
@@ -48,7 +48,7 @@
 
 [`publishTurn`](../../../../../src/sessions/events.ts#L429) 要求 session、active turn 和 latest turn 相互一致。首次调用会填入三个 projection。后续调用发现 latest run identity 改变且不等于当前 active run 时，会清除旧 live state；随后更新 session/turn cache、报告截断，并只对变化的 session/latest-turn view 发 event。Observer error 不能 rollback ledger update 或 Pi execution。
 
-[`#validView`](../../../../../src/sessions/events.ts#L683) 验证每个提供的 `TurnInfo` 属于该 session，且其 ID 与 `SessionInfo` 中的对应 ID 匹配，包括 null 情况。[`#getOrCreate`](../../../../../src/sessions/events.ts#L703) 返回并 touch 已存在的 stream；若容量已满，只能驱逐没有 active run、没有 subscriber 的 least-recently-used stream。新 stream 获得随机 epoch、从零开始的 sequence、空 replay 和空 live state。[`#touch`](../../../../../src/sessions/events.ts#L735) 增加进程级 recency tick。[`#removeSubscriber`](../../../../../src/sessions/events.ts#L739) 幂等地移除 subscriber，只递减一次全局计数，并更新 recency。
+[`#validView`](../../../../../src/sessions/events.ts#L683) 验证每个提供的 `TurnInfo` 属于该 session，且其 ID 与 `SessionInfo` 中的对应 ID 匹配，包括 null 情况。[`#getOrCreate`](../../../../../src/sessions/events.ts#L703) 返回并 touch 已存在的 stream；若容量已满，只能驱逐没有 active run、没有 subscriber 的 least-recently-used stream。新 stream 获得随机 epoch、从零开始的 sequence、空 replay 和空 live state。[`#touch`](../../../../../src/sessions/events.ts#L735) 推进 event hub 的 recency tick。[`#removeSubscriber`](../../../../../src/sessions/events.ts#L739) 幂等地移除 subscriber，只递减一次 hub 级 subscriber count，并更新 recency。
 
 [`#reconcileView`](../../../../../src/sessions/events.ts#L746) 在新连接时将 cache 同步到当前 durable view；如果 session 或 latest turn 改变，也会给已有 subscriber 发更新。Latest-turn identity 改变时同样按规则清除旧 live state。[`#publishViewLimits`](../../../../../src/sessions/events.ts#L802) 针对 session 或任一 turn 的 metadata clipping 发送 limit notice。
 

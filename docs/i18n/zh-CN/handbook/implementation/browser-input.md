@@ -3,7 +3,7 @@
 
 [English](../../../../handbook/implementation/browser-input.md) | 简体中文
 
-本章说明浏览器中短期存在的 input state：按 session 保存的 image drafts、异步文件接收、textarea/viewport 尺寸、scroll anchoring，以及受限的长按 Backspace。`Attachments` 只在当前 page 内持有图片 draft bytes 和 preview object URLs。提交时图片内容随 turn request 一起发送；已保存记录仍由 Pi native history 持有。发送与 model-capability 判断见 [Browser controller](browser-controller.md)，已保存图片的展示见 [Browser rendering](browser-rendering.md)。
+本章介绍当前 page 内的 image drafts 与输入处理：按 session 进行的异步文件接收、textarea/viewport 尺寸、scroll anchoring，以及受限的长按 Backspace。`Attachments` 在当前 browser page 中保存图片 bytes 和 preview object URLs。提交时图片内容随 turn request 一起发送；已保存记录由 Pi native history 保存。发送与 model-capability 判断见 [Browser controller](browser-controller.md)，已保存图片的展示见 [Browser rendering](browser-rendering.md)。
 
 <a id="attachment-ownership-callbacks"></a>
 ## Attachment ownership 与 callbacks
@@ -23,7 +23,7 @@
 
 私有 [`Attachments.#render`](../../../../../src/clients/web/attachments.ts#L154) 会用文本按钮重建当前 session 的 tray。多个通用 clipboard 图片会添加编号。Preview button 将当前 object URL 和标签交给 preview callback。一般发送工作进行时 remove button 会禁用；点击后按生成 ID 过滤项目、撤销 URL、重绘 tray，并通知 controller。图片 bytes 会留在 draft payload 中，直到 turn 成功或显式清空；编辑 draft 时不会单独上传。
 
-Controller 在 [`client.ts`](../../../../../src/clients/web/client.ts#L191) 中创建 `Attachments`，传入 `change: () => navigation()`、`error: showError`、`preview: showImage`。它根据 authentication、runtime readiness、运行中的工作、model capability 检查和当前 model 的 `supportsImages` 决定是否允许 intake。Capability 未知或检查失败时不接收新图片；已有附件仍可移除。提交前如果已确认当前 model 不支持图片，controller 会再次拒绝发送。图片 picker 的固定 accept list 定义于 [`page.ts`](../../../../../src/clients/web/page.ts#L73)。
+Controller 在 [`client.ts`](../../../../../src/clients/web/client.ts#L191) 中创建 `Attachments`，传入 `change: () => navigation()`、`error: showError`、`preview: showImage`。它根据 authentication、Pi process 是否 ready、运行中的工作、model capability 检查和当前 model 的 `supportsImages` 决定是否允许 intake。Capability 未知或检查失败时不接收新图片；已有附件仍可移除。提交前如果已确认当前 model 不支持图片，controller 会再次拒绝发送。图片 picker 的固定 accept list 定义于 [`page.ts`](../../../../../src/clients/web/page.ts#L73)。
 
 <a id="composer-sizing-and-viewport-adaptation"></a>
 ## Composer 尺寸与 viewport 适配
@@ -46,4 +46,4 @@ Nested [`setupComposer.onKeyDown`](../../../../../src/clients/web/input.ts#L148)
 <a id="cleanup-current-test-boundary"></a>
 ## 清理与测试
 
-返回的 [`setupComposer.dispose`](../../../../../src/clients/web/input.ts#L277) 会标记 setup 已 disposed，清除 hold，断开 observer，移除所有已注册 listeners，取消等待中的 viewport frame，并恢复 body 与 textarea 原始 inline styles。Page lifecycle 使用 `pagehide`/`pageshow` 暂停或恢复 network observation；每次唤醒时不会重建 document-level composer。Browser shell 和 asset exposure 见 [web tests](../../../../../tests/web.test.ts#L6)；shared image payload 限制见 [image tests](../../../../../tests/images.test.ts#L100)。
+返回的 [`setupComposer.dispose`](../../../../../src/clients/web/input.ts#L277) 会标记 setup 已 disposed，清除 hold，断开 observer，移除所有已注册 listeners，取消等待中的 viewport frame，并恢复 body 与 textarea 原始 inline styles。在 back-forward-cache 的 `pagehide`/`pageshow` 周期中，composer setup 保持监听器连接，由 client 暂停或恢复 network observation。Browser shell 和 asset exposure 见 [web tests](../../../../../tests/web.test.ts#L6)；shared image payload 限制见 [image tests](../../../../../tests/images.test.ts#L100)。

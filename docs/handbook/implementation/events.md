@@ -6,7 +6,7 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/events.md)
 
 [Implementation index](README.md) · [Session service](sessions.md) · [Events overview](../sessions-storage.md#live-events-and-bounded-replay)
 
-`SessionEvents` is a process-local, bounded projection layer. It combines validated durable session/turn views with selected Pi live messages and tool activity for browser observation. It does not persist events or own execution. A reconnect receives a snapshot or retained replay; saved conversation content still comes from the native Pi history reader.
+`SessionEvents` is a bounded event hub local to the Dwell host process. It combines validated Dwell session/turn views with selected live messages and tool activity from Pi processes for browser subscriptions. `SessionService` owns durable mutations and Pi-process execution; this hub provides snapshots, retained replay, and live projections. Saved conversation entries are read from Pi's JSONL session files.
 
 <a id="event-shapes-and-helper-functions"></a>
 
@@ -26,8 +26,8 @@ The module helpers implement bounded wire values and Pi-record projection:
 | [`equalJson`](../../../src/sessions/events.ts#L217) | Compares already-validated projections by serialized value. |
 | [`blockDelta`](../../../src/sessions/events.ts#L221) | Includes delta text in thinking-block updates; ordinary text is carried in the message-level text field. |
 | [`emptyLiveState`](../../../src/sessions/events.ts#L229) | Initializes empty message/tool state, identity counts, ownership maps, truncation flags, and one-shot error/limit tracking. |
-| [`parseCursor`](../../../src/sessions/events.ts#L246) | Requires `<session UUID>:<epoch UUID>:<safe sequence>` and rejects cursors from another session. |
-| [`projectSession`](../../../src/sessions/events.ts#L260) | Selects public session fields and clips directory, provider, model, and error metadata before streaming; clipping any of these fields marks metadata as limited. |
+| [`parseCursor`](../../../src/sessions/events.ts#L246) | Requires `<Dwell session UUID>:<epoch UUID>:<safe sequence>` and rejects cursors from another Dwell session. |
+| [`projectSession`](../../../src/sessions/events.ts#L260) | Selects public session fields and clips directory, provider, model, session-error, and native-execution-error metadata before sending; any clipped field marks metadata as limited. |
 | [`projectTurn`](../../../src/sessions/events.ts#L312) | Converts a stored turn to `TurnProjection`: it exposes entry count rather than entry IDs and bounds error code/message. |
 | [`extractText`](../../../src/sessions/events.ts#L338) | Reads a string result directly or joins text blocks from a record's `content` array. |
 | [`clippedToolInput` and `clippedToolText`](../../../src/sessions/events.ts#L349) | Serialize/cap tool arguments, or extract/cap visible text from a result. |
@@ -48,7 +48,7 @@ The fixed limits bound the number of tracked streams, replay events/bytes, subsc
 
 [`publishTurn`](../../../src/sessions/events.ts#L429) requires a consistent session/active/latest view. It seeds all three projections on first use. On subsequent updates it clears previous live state when the latest run identity changes and does not match the currently active run, stores the latest session and turn projections, reports clipping, and emits only changed session/latest-turn views. An event-observer failure cannot roll back a ledger update or Pi execution.
 
-[`#validView`](../../../src/sessions/events.ts#L683) checks each provided `TurnInfo` belongs to this session and matches the corresponding IDs in `SessionInfo`, including the null cases. [`#getOrCreate`](../../../src/sessions/events.ts#L703) returns and touches an existing stream or, at capacity, evicts the least-recently-used stream only when it has no active run and no subscribers. A new stream receives a random epoch, zero sequence, empty replay, and empty live state. [`#touch`](../../../src/sessions/events.ts#L735) advances the process-wide recency tick. [`#removeSubscriber`](../../../src/sessions/events.ts#L739) is idempotent, decrements the global count once, and refreshes recency.
+[`#validView`](../../../src/sessions/events.ts#L683) checks each provided `TurnInfo` belongs to this session and matches the corresponding IDs in `SessionInfo`, including the null cases. [`#getOrCreate`](../../../src/sessions/events.ts#L703) returns and touches an existing stream or, at capacity, evicts the least-recently-used stream only when it has no active run and no subscribers. A new stream receives a random epoch, zero sequence, empty replay, and empty live state. [`#touch`](../../../src/sessions/events.ts#L735) advances the event hub's recency tick. [`#removeSubscriber`](../../../src/sessions/events.ts#L739) is idempotent, decrements the hub-wide subscriber count once, and refreshes recency.
 
 [`#reconcileView`](../../../src/sessions/events.ts#L746) brings a stream's cached view up to date during a new connection, emitting changed session/latest-turn frames so existing subscribers also catch up. It applies the same live-state reset rule when the latest turn changes. [`#publishViewLimits`](../../../src/sessions/events.ts#L802) reports metadata truncation for the session or either turn, using the configured metadata scopes.
 

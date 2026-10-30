@@ -34,7 +34,7 @@ Directory browsing 为 session 创建返回 canonical host-directory metadata。
 
 [runModelList](../../../../../src/server/session-discovery.ts#L293) 使用配置中的 executable 和可选 entry point 调用 execFile。它请求 offline model listing，并关闭 session loading、extensions、MCP、skills、prompt templates、themes 和 context files。Child 使用 temporary cwd 与 isolated environment，timeout 为 15 秒且超时后发送 SIGKILL，输出上限为 1 MiB。这里不会拼接或执行 shell command。
 
-[discoverPiModels](../../../../../src/server/session-discovery.ts#L434) 先创建 workspace，再读取 host profile path；随后验证配置的 Pi version，并复制 allowlisted files。若配置的 entry point 是 Pi 的 rpc-entry.js，函数会改用同目录的 cli.js 作为 model-list entry point，因为 model listing 属于 CLI command；保存下来的 runtime configuration 仍保留 RPC entry point。随后解析 child output、捕获经过消毒的 typed failure，并始终移除 workspace。Cleanup failure 优先于 probe result 或此前发生的 error。Unsupported Pi version 会得到专门错误；process stderr 和本地配置内容不会返回给调用方。没有得到 parsed result 也会显式报错。
+[discoverPiModels](../../../../../src/server/session-discovery.ts#L434) 先创建 workspace，再读取 host profile path；随后验证配置的 Pi version，并复制 allowlisted files。若配置的 entry point 是 Pi 的 rpc-entry.js，函数会改用同目录的 cli.js 作为 model-list entry point，因为 model listing 属于 CLI command；保存的 Pi 配置仍保留已配置的 RPC entry point。随后解析 child output、捕获经过消毒的 typed failure，并始终移除 workspace。Cleanup failure 优先于 probe result 或此前发生的 error。Unsupported Pi version 会得到专门错误；process stderr 和本地配置内容不会返回给调用方。没有得到 parsed result 也会显式报错。
 
 <a id="model-list-parser"></a>
 ## Model table parsing 与 validation
@@ -48,7 +48,7 @@ Parser helpers 共用一个固定的六列 contract。[modelColumnPositions](../
 
 [discoverPiModelCapabilities](../../../../../src/server/session-discovery.ts#L503) 在创建 temporary state 前先校验 provider/model request。它验证 Pi、复制 allowlisted host configuration，并使用 workspace cwd、session directory、environment 和 isolated resource policy 启动 PiProcess。随后读取 Pi state，确认实际选择的 provider 和 model 与请求完全一致。Thinking levels 和 image support 会在同一个 process 上并发查询，因此两者描述的是同一项 effective model selection。
 
-该函数把 process 与 version failure 转换为安全的 public error。Pi 启动后的所有路径都会先尝试停止 Pi，再移除 workspace。Stop 或 workspace removal 失败时返回 discovery_cleanup_failed，包括已经得到结果或另一个 error 的情况。临时 runtime 不会注册进 host session catalog。
+该函数把 process 与 version failure 转换为安全的 public error。Pi 启动后的所有路径都会先尝试停止 Pi，再移除 workspace。Stop 或 workspace removal 失败时返回 discovery_cleanup_failed，包括已经得到结果或另一个 error 的情况。这个 isolated Pi process 只用于 capability discovery，不会加入 host 的 Dwell session catalog。
 
 <a id="discovery-test-evidence"></a>
 ## Test evidence

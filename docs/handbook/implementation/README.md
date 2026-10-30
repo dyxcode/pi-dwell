@@ -22,7 +22,7 @@ Use [Reference](../reference.md) for exact public interfaces and [contracts](../
 | [One message](workflow-message.md) | Browser request → admission → durable intent → RPC → settlement → saved result, including interruption points |
 | [Observation and reconnect](workflow-observation.md) | Subscription → live projection → saved branch → reconciliation → reconnect/resync |
 
-For a first reading, finish the message workflow before opening individual module chapters. Keep the four state owners from the overview in mind: SQLite, Pi JSONL, host memory and browser state.
+For a first reading, finish the message workflow before opening individual module chapters. The overview distinguishes Pi and its session files from Dwell's process management, request records and browser client.
 
 <a id="modules"></a>
 
@@ -37,11 +37,11 @@ For a first reading, finish the message workflow before opening individual modul
 | [Directory and model discovery](discovery.md) | Directory listing, isolated probes and capability extraction |
 | [Shared data and validation](validators.md) | Field checks, identities, image decoding and event/history contracts |
 | [Catalog and durable records](catalog.md) | Schema validation, migrations, transactions and turn transitions |
-| [Session coordination](sessions.md) | Admission, runtime ownership, dispatch, cancellation and recovery |
+| [Session coordination](sessions.md) | Pi process management, request acceptance, dispatch, cancellation and recovery |
 | [Pi process and execution](runtime.md) | Launch, readiness, prompt disposition, native execution and stop |
 | [JSONL RPC transport](rpc.md) | Correlation, buffering, deadlines and transport failure |
-| [Native history and projection](history.md) | Branch reading, scan budgets, identity, cursors and images |
-| [Host event projection](events.md) | Visible messages/tools, replay, limits and subscriptions |
+| [Reading Pi session files](history.md) | Branch reading, scan budgets, identity, cursors and images |
+| [Session events](events.md) | Visible messages/tools, replay, limits and subscriptions |
 | [Browser coordination](browser-controller.md) | Session views, async generations, pending requests and model selection |
 | [Browser event state](browser-events.md) | SSE decoding, reducer state and live/saved reconciliation |
 | [Rendering and assets](browser-rendering.md) | Markdown, DOM reuse, conversation grouping, HTML/CSS and asset serving |

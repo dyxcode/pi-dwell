@@ -6,7 +6,7 @@
 
 [实现文档索引](README.md) · [Session service](sessions.md) · [Session/storage 概览](../sessions-storage.md)
 
-`SessionCatalog` 是 SQLite 边界，保存 Pi runtime 配置、Dwell session metadata 和 turn outcome。它不保存 conversation transcript：已保存内容仍以 Pi native JSONL session file 为准。Catalog 对写入前的值和读取出来的值都做验证；遇到意外 schema 或语义状态时，会报告损坏，而不是静默修复。
+`SessionCatalog` 在 SQLite 中保存 Dwell 配置的 Pi executable/entry point、session metadata 和 turn outcome。它在写入和读取时验证 records，并将意外 schema 或语义状态报告为 catalog corruption。已保存的对话 entries 位于 Pi 的 JSONL session file。
 
 <a id="catalog-records-and-validation"></a>
 
@@ -44,11 +44,11 @@ SQLite decoder 不做宽松类型转换。[`integerFromDatabase`](../../../../..
 
 ## 配置与 session row 操作
 
-[`configuration`](../../../../../src/storage/catalog.ts#L586) 在没有 row 时返回 `undefined`；否则解码 executable 和 nullable entry point，生成 public runtime configuration。[`configure`](../../../../../src/storage/catalog.ts#L596) 先通过 `assertRuntimeConfiguration` 验证，再 upsert singleton row 1；如果新配置省略 entry point，就会清除旧值。
+[`configuration`](../../../../../src/storage/catalog.ts#L586) 在没有 row 时返回 `undefined`；否则解码 executable 和 nullable entry point，生成 public Pi executable configuration。[`configure`](../../../../../src/storage/catalog.ts#L596) 先通过 `assertRuntimeConfiguration` 验证，再 upsert singleton row 1；如果新配置省略 entry point，就会清除旧值。
 
 [`list`](../../../../../src/storage/catalog.ts#L605) 返回全部 session，并按创建时间、再按 ID 排序。[`get`](../../../../../src/storage/catalog.ts#L612) 按 primary key 查询；[`findRequest`](../../../../../src/storage/catalog.ts#L619) 按全局唯一 create-request ID 查询。[`insert`](../../../../../src/storage/catalog.ts#L626) 先验证后插入全部 14 个字段，并将 history boolean 编码为 0/1。[`update`](../../../../../src/storage/catalog.ts#L650) 验证后按 session ID 更新完整 row；如果恰好没有改动一行，则报告 session 不存在。Catalog method 不会掩盖重复 request ID 等 SQLite constraint error。
 
-[`interruptCreating`](../../../../../src/storage/catalog.ts#L677) 校验时间戳后，将所有 `creating` row 设为 `interrupted` 并写入 host restart 说明。Service startup 会在重建 runtime 前调用它；row 本身不能表明 Pi child 是否已经启动。
+[`interruptCreating`](../../../../../src/storage/catalog.ts#L677) 校验时间戳后，将所有 `creating` row 设为 `interrupted` 并写入 host restart 说明。Service startup 会在启动 Pi processes 前调用它；该 row 无法判断 Pi child 是否已启动。
 
 <a id="catalog-turn-operations"></a>
 
@@ -62,6 +62,6 @@ SQLite decoder 不做宽松类型转换。[`integerFromDatabase`](../../../../..
 
 [`markTurnDispatching`](../../../../../src/storage/catalog.ts#L781) 要求 turn status 为 `dispatching`，session ID 匹配且 `historyExpected: true`。它在 `BEGIN IMMEDIATE` transaction 中先更新 session 再更新 turn；任一失败都会 rollback 两者。这是 prompt 可能交给 Pi 之前的 durable boundary。因此 host restart 后能区分确定未发送的 `accepted` work 和可能已有副作用的 dispatched turn。
 
-[`interruptTurns`](../../../../../src/storage/catalog.ts#L804) 校验 recovery timestamp，并将全部 active turn 设为 terminal `interrupted`；时间使用原值与 recovery time 的较大者。`accepted` turn 记录 `not_dispatched`，说明 prompt 未发送；`dispatching` 或 `running` 记录 `outcome_unknown`，因为外部 runtime 可能已经执行。恢复逻辑绝不自动 retry。[`close`](../../../../../src/storage/catalog.ts#L814) 仅关闭仍打开的 SQLite handle，重复调用安全。
+[`interruptTurns`](../../../../../src/storage/catalog.ts#L804) 校验 recovery timestamp，并将全部 active turn 设为 terminal `interrupted`；时间使用原值与 recovery time 的较大者。`accepted` turn 记录 `not_dispatched`，说明 prompt 未发送；`dispatching` 或 `running` 记录 `outcome_unknown`，因为 Pi 可能已收到或处理 prompt。恢复逻辑绝不自动 retry。[`close`](../../../../../src/storage/catalog.ts#L814) 仅关闭仍打开的 SQLite handle，重复调用安全。
 
 相关行为见 [catalog tests](../../../../../tests/catalog.test.ts)、[turn/catalog tests](../../../../../tests/turn-catalog.test.ts) 和 [session restart tests](../../../../../tests/sessions.test.ts)。

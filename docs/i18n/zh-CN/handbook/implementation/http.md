@@ -24,17 +24,17 @@ Loopback HTTP host 负责 request validation、route dispatch 和 response clean
 
 嵌套的 [handle](../../../../../src/server/http.ts#L167) 在进入 request pipeline 前设置 response 安全 headers。它先拒绝重复的 Host、Origin、Authorization、Cookie、Dwell binding/request marker 和 Last-Event-ID headers；再选择 configured authority，拒绝 cross-origin Origin 和 HTTPS lane 上的 bearer credential；随后检查 host 生命周期和 URL 长度。Query parsing 仅支持 directory path 或 saved-history cursor。精确的 Host 与 proxy-header 规则见 [authority selection](authentication.md#authority-and-cookies)。
 
-Handler 识别已知 route family 并确定所需 method。未知路由返回 404；method 错误的已知路由返回 405 和 Allow header。受保护路由会先完成身份验证，再解析 body 或调用 service。GET 拒绝 transfer-encoded 或非空 body。Runtime configuration 仅限 CLI；browser POST 会再次校验 Origin/request marker。每个路由随后执行专属的 shape check，再调用 session service。具体 branch 如下。
+Handler 识别已知 route family 并确定所需 method。未知路由返回 404；method 错误的已知路由返回 405 和 Allow header。受保护路由会先完成身份验证，再解析 body 或调用 service。GET 拒绝 transfer-encoded 或非空 body。Pi executable 配置仅限 CLI；browser POST 会再次校验 Origin/request marker。每个路由随后执行专属的 shape check，再调用 session service。具体 branch 如下。
 
 <a id="route-dispatch"></a>
 ### Route-specific branch
 
 | Route family | Dispatch 与 boundary |
 | --- | --- |
-| Runtime configuration | POST 仅允许本地 CLI。对象必须通过 runtime configuration validator，且只能含 executable 与可选 entryPoint；随后 sessions.configure 返回已保存配置。 |
+| Pi executable 配置 | `POST /api/v1/runtime` 仅允许本地 CLI。`RuntimeConfiguration` object 只包含 `executable` 和可选 `entryPoint`；`sessions.configure` 会验证并保存 Pi 配置。 |
 | Directory 与 global model discovery | GET /directories 接受一个非空 path query；省略时使用 host home。GET /models 将 isolated global model list 放入 models object。POST /model-capabilities 在 discovery 前校验 provider/model pair。 |
-| Session catalog 与 lifecycle | GET /sessions 返回 catalog。POST 只接受 requestId、directory，以及成对出现的 provider/model。Ready 结果返回 201；failed creation 返回 503；interrupted creation 返回 409。单个 session 的 GET 返回已保存 metadata；open 和 close 是 body 为空 object 的 POST，context 则是 GET，且可能打开 runtime。 |
-| Session model operations | GET /sessions/:id/models 返回当前 runtime registry。POST /model-capabilities 校验 provider/model pair；POST /model 会先用 shared session-model validator 校验 provider、model 和可选的 thinkingLevel，再改变 effective selection。 |
+| Session catalog 与 lifecycle | GET /sessions 返回 catalog。POST 只接受 requestId、directory，以及成对出现的 provider/model。Ready 结果返回 201；failed creation 返回 503；interrupted creation 返回 409。单个 session 的 GET 返回已保存 metadata；open 和 close 是 body 为空 object 的 POST。Context 是 GET；它从 Pi process 读取，并在必要时先打开或恢复 Pi session。 |
+| Session model operations | GET /sessions/:id/models 返回当前打开的 Pi process 提供的 models。POST /model-capabilities 校验 provider/model pair；POST /model 会先用 shared session-model validator 校验 provider、model 和可选的 thinkingLevel，再将这些 settings 应用于 Pi session。 |
 | Saved history | GET /history 只接受一个 cursor query。Image route 要求 safe integer index，对 entry ID 执行 percent-decode，并以 MIME type、length 和 inline disposition 返回选中的 saved bytes；不接受 client path。 |
 | Event observation | GET /events 接受一个 Last-Event-ID header。Session service 会校验 session/cursor，并在 HTTP writer 提交 SSE headers 前返回 initial subscription snapshot，因此 unknown session 或 invalid cursor 仍可返回 JSON error。 |
 | Turn 与 native execution operations | 不带 run ID 的 POST /turns 校验完整 turn request，并单独将 message text 限制为 8 KiB UTF-8；新 admission 返回 202，request-key retry 返回 200。GET /turns/:run 返回 metadata；GET /result 解析 history-backed result；POST /abort 要求空 object。Native-execution abort 也使用空 object POST。 |

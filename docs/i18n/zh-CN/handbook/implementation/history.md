@@ -4,9 +4,9 @@
 
 [English](../../../../handbook/implementation/history.md) | 简体中文
 
-[实现文档索引](README.md) · [Session service](sessions.md) · [Runtime 概览](../runtime.md)
+[实现文档索引](README.md) · [Session service](sessions.md) · [Dwell/Pi integration 概览](../runtime.md)
 
-History 跨越四个职责不同的 module。`pi-history.ts` 安全读取 Pi native JSONL 并固定 revision；`sessions/history.ts` 选择 active branch 并转换为有界 client page；`message-identity.ts` 在 saved/live view 之间匹配完整 assistant message；`pi-history-budget.ts` 限制并发文件扫描。Catalog 保存 native entry ID reference，而不是 transcript 副本。
+History 处理由四个 module 协作。`pi-history.ts` 读取并验证 Pi native JSONL session file，固定 byte-prefix revision；`sessions/history.ts` 沿 Pi session 的 active branch 生成有界 client page；`message-identity.ts` 在 saved/live view 间匹配完整 assistant message；`pi-history-budget.ts` 限制并发文件扫描。
 
 <a id="native-jsonl-snapshot-and-validation"></a>
 
@@ -22,7 +22,7 @@ History 跨越四个职责不同的 module。`pi-history.ts` 安全读取 Pi nat
 
 [`readSavedHistorySnapshot`](../../../../../src/runtime/pi-history.ts#L270) 使用 `O_NOFOLLOW | O_NONBLOCK` 打开文件；读取前检查 owner、hard link 和 file identity，再决定 byte boundary。未 pin 的读取以首次观察到的文件大小为准，期间普通 append 不会扩展本次 snapshot。Cursor read 使用记录的 prefix 长度；若文件变短则认定已变化。读取后再次 stat；如果 metadata 改变，会从同一 boundary 重读，要求内容一致且 identity 稳定，随后再次校验 path identity。Revision 只基于完整 newline-terminated bytes。Pinned prefix 必须落在完整行 boundary 且 revision 仍匹配后才能解析。末尾未完成的一行会忽略并设置 `incompleteTail`；损坏的完整行则报错。底层文件错误统一转换为 `HistoryReadError`，file handle 在 `finally` 关闭。
 
-[`readSavedHistory`](../../../../../src/runtime/pi-history.ts#L336) 验证可选 prefix，在共享 history budget 下执行扫描，并把 queue overflow 转为 `history_busy`。这样 scan admission 与文件解析分离，同时保证所有调用都服从同一进程级上限。
+[`readSavedHistory`](../../../../../src/runtime/pi-history.ts#L336) 验证可选 prefix，在共享 history budget 下执行扫描，并把 queue overflow 转为 `history_busy`。这样 scan admission 与文件解析分离，同时让所有调用受同一个 Dwell host-process 级上限约束。
 
 <a id="history-scan-budget"></a>
 
@@ -30,13 +30,13 @@ History 跨越四个职责不同的 module。`pi-history.ts` 安全读取 Pi nat
 
 [`HistoryReadBudgetError` 和 `abortError`](../../../../../src/runtime/pi-history-budget.ts#L4) 分别表示 queue 已满以及在等待期间取消。私有 `HistoryReadBudget` 有两个 active permit 和八个 FIFO waiter。[`HistoryReadBudget.run`](../../../../../src/runtime/pi-history-budget.ts#L27) 会立即拒绝已 abort 的 queued request；若有空闲 permit 且没有排队者，则立即启动；否则第九个 waiter 会被拒绝，其他请求进入队列。已经 admitted 的 operation 不会在文件读取中途被取消。`cancelQueuedOnly` 允许 shutdown 前已接受的 public read 在有空闲 permit 时启动，即使 signal 已 abort，但仍禁止它新加入等待队列。嵌套 `start` callback 运行 operation，并在成功或失败后释放 permit；`onAbort` callback 从队列移除对应 waiter、detach signal listener 并拒绝 Promise。
 
-[`HistoryReadBudget.#release`](../../../../../src/runtime/pi-history-budget.ts#L73) 递减 active count，循环清掉队首已取消的 waiter，再 admission 下一个仍有效的 waiter 并移除其 abort listener。Module singleton 通过 [`runWithHistoryReadBudget`](../../../../../src/runtime/pi-history-budget.ts#L95) 暴露，因此 service turn、history page、result retrieval 和 image read 共享一个 queue。这是 process-local concurrency limit，不是跨进程磁盘锁。
+[`HistoryReadBudget.#release`](../../../../../src/runtime/pi-history-budget.ts#L73) 递减 active count，循环清掉队首已取消的 waiter，再 admission 下一个仍有效的 waiter 并移除其 abort listener。Module singleton 通过 [`runWithHistoryReadBudget`](../../../../../src/runtime/pi-history-budget.ts#L95) 暴露，因此 service turn、history page、result retrieval 和 image read 共享一个 queue。这个并发上限只在单个 Dwell host process 内生效，不是跨进程磁盘锁。
 
 <a id="history-page-cursors-and-branch"></a>
 
 ## Signed cursor 与 active-branch pagination
 
-[`HistorySlice` 和 `HistoryPages`](../../../../../src/sessions/history.ts#L326) 定义 page 结果。Class 只保留随机生成的内存 HMAC key，不缓存 transcript，也不需要数据库表。因此 cursor 只能在签发它的进程中验证，host restart 后会过期。
+[`HistorySlice` 和 `HistoryPages`](../../../../../src/sessions/history.ts#L326) 定义 page 结果。`HistoryPages` 持有随机生成的内存 HMAC key，因此 cursor 只能由签发它的 Dwell host process 验证，并会在该 host restart 后过期。
 
 [`HistoryPages.#cursor`](../../../../../src/sessions/history.ts#L339) 限制 cursor 长度并要求两个 base64url 部分。它计算 HMAC-SHA256，先检查 signature 长度再进行 constant-time comparison，解析 JSON 后要求 session ID 一致、byte boundary 为正安全整数、revision 为 SHA-256、`before` index 为正安全整数。Malformed、伪造、foreign 或过期 prefix 都会变成 `invalid_cursor`。[`HistoryPages.#encode`](../../../../../src/sessions/history.ts#L375) 将已验证 payload 序列化后签名。
 

@@ -4,9 +4,9 @@
 
 English | [简体中文](../../i18n/zh-CN/handbook/implementation/history.md)
 
-[Implementation index](README.md) · [Session service](sessions.md) · [Runtime overview](../runtime.md)
+[Implementation index](README.md) · [Session service](sessions.md) · [Dwell/Pi integration overview](../runtime.md)
 
-History crosses four modules with distinct jobs. `pi-history.ts` reads Pi's native JSONL safely and pins revisions; `sessions/history.ts` selects the active branch and turns native entries into bounded client pages; `message-identity.ts` matches complete assistant messages across saved and live views; `pi-history-budget.ts` limits concurrent file scans. The catalog stores references to native entry IDs, not a duplicate transcript.
+History handling spans four modules. `pi-history.ts` reads and validates Pi's native JSONL session file and pins byte-prefix revisions; `sessions/history.ts` follows the active branch and projects bounded client pages; `message-identity.ts` matches complete assistant messages across saved and live views; `pi-history-budget.ts` limits concurrent file scans.
 
 <a id="native-jsonl-snapshot-and-validation"></a>
 
@@ -22,7 +22,7 @@ The error constructors keep failure categories stable: [`changed`, `invalid`, `u
 
 [`readSavedHistorySnapshot`](../../../src/runtime/pi-history.ts#L270) opens with `O_NOFOLLOW | O_NONBLOCK`, checks ownership/link/file identity before reading, and determines the byte boundary. An unpinned read uses the initially observed file size; ordinary appends after that point do not extend the snapshot. A cursor read uses its recorded prefix length and rejects if the file is shorter. The implementation stats after reading; if metadata changed, it reads the same boundary a second time and requires identical bytes and stable identity, then checks the path identity again. It calculates the revision from complete newline-terminated bytes only. For a pinned prefix, the requested boundary must be complete and its revision must still match. Only then are records parsed. An unfinished final line is omitted and marked `incompleteTail`; malformed complete lines are errors. All raw file errors are normalized to `HistoryReadError`, and the handle is closed in `finally`.
 
-[`readSavedHistory`](../../../src/runtime/pi-history.ts#L336) validates an optional prefix, runs the scan under the shared history budget, and translates queue overflow to `history_busy`. This separates scan admission from file parsing and keeps every caller under the same process-wide limit.
+[`readSavedHistory`](../../../src/runtime/pi-history.ts#L336) validates an optional prefix, runs the scan under the shared history budget, and translates queue overflow to `history_busy`. This separates scan admission from file parsing and keeps every caller under the same Dwell host-process limit.
 
 <a id="history-scan-budget"></a>
 
@@ -30,13 +30,13 @@ The error constructors keep failure categories stable: [`changed`, `invalid`, `u
 
 [`HistoryReadBudgetError` and `abortError`](../../../src/runtime/pi-history-budget.ts#L4) identify queue saturation and cancellation while waiting. The private `HistoryReadBudget` has two active permits and eight FIFO waiters. [`HistoryReadBudget.run`](../../../src/runtime/pi-history-budget.ts#L27) rejects an already-aborted queued request, starts immediately when a permit is free and no one is queued, otherwise rejects a ninth waiter or enqueues it. An admitted operation is not interrupted mid-file read. `cancelQueuedOnly` permits a public read admitted before shutdown to take a free permit even if its signal is now aborted, but still prevents it from entering the wait queue. The nested `start` callback runs the operation and releases the permit after either resolution or rejection; `onAbort` removes the exact queued waiter, detaches its listener, and rejects it.
 
-[`HistoryReadBudget.#release`](../../../src/runtime/pi-history-budget.ts#L73) decrements the active count, repeatedly removes cancelled head waiters, then admits the next live waiter and removes its abort listener. The module's singleton is wrapped by [`runWithHistoryReadBudget`](../../../src/runtime/pi-history-budget.ts#L95), so file reads from service turns, history pages, result retrieval, and images share one queue. It is a per-process concurrency bound, not a disk-wide lock.
+[`HistoryReadBudget.#release`](../../../src/runtime/pi-history-budget.ts#L73) decrements the active count, repeatedly removes cancelled head waiters, then admits the next live waiter and removes its abort listener. The module's singleton is wrapped by [`runWithHistoryReadBudget`](../../../src/runtime/pi-history-budget.ts#L95), so file reads from service turns, history pages, result retrieval, and images share one queue. This concurrency limit is local to a Dwell host process, not a disk-wide lock.
 
 <a id="history-page-cursors-and-branch"></a>
 
 ## Signed cursors and active-branch pagination
 
-[`HistorySlice` and `HistoryPages`](../../../src/sessions/history.ts#L326) define page output. The class keeps only a random in-memory HMAC key; it does not retain transcript contents or require a database table. A cursor is consequently verifiable only in the process that created it and expires when the host restarts.
+[`HistorySlice` and `HistoryPages`](../../../src/sessions/history.ts#L326) define page output. `HistoryPages` keeps a random in-memory HMAC key, so a cursor is verifiable only in the Dwell host process that issued it and expires when that host restarts.
 
 [`HistoryPages.#cursor`](../../../src/sessions/history.ts#L339) bounds cursor length and requires two base64url parts. It computes the expected HMAC-SHA256, checks equal signature length before constant-time comparison, decodes JSON, and requires the same session ID, a positive safe byte boundary, a SHA-256 revision, and a positive safe `before` index. Malformed, forged, foreign, or expired prefixes become `invalid_cursor`. [`HistoryPages.#encode`](../../../src/sessions/history.ts#L375) serializes the validated payload and signs its base64url text.
 

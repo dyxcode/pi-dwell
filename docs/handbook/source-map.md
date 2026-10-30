@@ -1249,10 +1249,10 @@ Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts]
 | [`SessionService.#executeTurn`](../../src/sessions/service.ts#L1139) | Method | slot, message, images | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
 | [`SessionService.#completeHandledTurn`](../../src/sessions/service.ts#L1326) | Method | sessionId, runId, runtime, before, historyWasExpected | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
 | [`SessionService.shutdown`](../../src/sessions/service.ts#L1377) | Method |  | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#configuration`](../../src/sessions/service.ts#L1446) | Method |  | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#configuration`](../../src/sessions/service.ts#L1446) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
 | [`SessionService.#admit`](../../src/sessions/service.ts#L1457) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#mutate`](../../src/sessions/service.ts#L1462) | Method | operation | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#read`](../../src/sessions/service.ts#L1476) | Method | operation | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#mutate`](../../src/sessions/service.ts#L1462) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#read`](../../src/sessions/service.ts#L1476) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
 | [`SessionService.#stored`](../../src/sessions/service.ts#L1506) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
 | [`SessionService.#view`](../../src/sessions/service.ts#L1514) | Method | stored | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
 | [`SessionService.#directory`](../../src/sessions/service.ts#L1553) | Method | path | [Read explanation](implementation/sessions.md#sessions-create-open-close) |

@@ -6,9 +6,9 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/workflow-obser
 
 <a id="subscribe"></a>
 
-## Subscribe without taking ownership
+## Subscribe to session events
 
-Selecting a session starts an authenticated event connection and independent history reads. The server installs a subscription around a current snapshot and bounded replay, and the client validates each frame before applying it. An observer cannot acquire the right to cancel execution merely by disconnecting. Extension UI requests also do not become approved because a passive observer received them.
+Selecting a session starts an authenticated event connection and independent history reads. The server installs a subscription around a current snapshot and bounded replay, and the client validates each frame before applying it.
 
 The SSE writer frames JSON with event IDs, sends heartbeat comments, respects output backpressure and closes slow or revoked connections. The browser reducer tracks session, epoch and sequence. Stale or duplicate frames must not replay visible changes. A frame belonging to a different active run can advance the cursor while its live payload is discarded, preserving stream position without changing the visible projection. A selection generation prevents an old asynchronous connection from writing into the new selection.
 
@@ -16,11 +16,11 @@ Source / verification: [`SessionService.subscribeEvents`](../../../src/sessions/
 
 <a id="projection"></a>
 
-## Build a bounded live projection
+## Build live message and tool state
 
-Pi records are projected into session/turn updates, message blocks and tool progress. The event hub clips bounded visible strings and tool collections, records truncation and limits replay retention. Thinking text and ordinary text retain their content order, while private provider signatures are not projected. Live tool identity includes ownership so two assistant messages reusing a tool call ID do not collapse into one.
+`SessionEvents` converts Pi events into session/turn updates, message blocks and tool progress. It keeps bounded message and tool state, records truncation and limits replay retention. Thinking text and ordinary text retain their content order, while private provider signatures are not projected. Live tool identity includes ownership so two assistant messages reusing a tool call ID do not collapse into one.
 
-The client applies valid deltas to its local projection and batches rendering on animation frames. Keyed DOM reconciliation retains compatible nodes, open disclosures, selection and image callbacks. A growing message can update its visible content without rebuilding the entire conversation. The projection stays in memory; saved history supplies durable content.
+The client applies valid deltas to its message/tool state and batches rendering on animation frames. Keyed DOM reconciliation retains compatible nodes, open disclosures, selection and image callbacks. A growing message can update its visible content without rebuilding the entire conversation.
 
 Source / verification: [src/sessions/events.ts](../../../src/sessions/events.ts) · [src/clients/web/conversation.ts](../../../src/clients/web/conversation.ts) · [src/clients/web/dom.ts](../../../src/clients/web/dom.ts) · [tests/conversation.test.ts](../../../tests/conversation.test.ts) · [tests/web-events.test.ts](../../../tests/web-events.test.ts)
 
@@ -50,7 +50,7 @@ Source / verification: [`renderConversation`](../../../src/clients/web/client.ts
 
 ## Reconnect, resync and browser wake-up
 
-The server supports reconnect with a last-known event cursor. If a caller supplies one and the server retains its epoch and sequence range, it can replay bounded events. The current browser clears its cursor after stream failure and on wake-up, so those recovery paths request a fresh snapshot and reload history rather than relying on replay. A stale/ahead cursor, a new epoch or a replay limit produces resync, which asks the client to rebuild its observation from fresh state. Saved history is fetched separately; a new snapshot is not the entire transcript.
+The server supports reconnect with a last-known event cursor. If a caller supplies one and the server retains its epoch and sequence range, it can replay bounded events. The current browser clears its cursor after stream failure and on wake-up, so those recovery paths request a fresh snapshot and reload history rather than relying on replay. A stale/ahead cursor, a new epoch or a replay limit produces resync, which asks the client to rebuild its observation from fresh state. The browser fetches saved history separately.
 
 Page wake-up and refresh restore connectivity and selected-session views without replaying a prompt. Authentication failure returns the browser to pairing; a network outage preserves recoverable local state and retries observation. Late responses are checked against selection/generation so switching sessions does not display another session's history. The distinction between retrying observation and submitting new work is the key invariant across refresh, reconnect and host restart.
 

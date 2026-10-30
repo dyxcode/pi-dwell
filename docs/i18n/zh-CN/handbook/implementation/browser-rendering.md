@@ -3,12 +3,12 @@
 
 [English](../../../../handbook/implementation/browser-rendering.md) | 简体中文
 
-本章沿着浏览器的输出路径，说明 HTML shell、固定的 browser module 集合、安全的 Markdown 转换、saved/live conversation projection，以及 DOM 更新方式。Controller 与 network lifecycle 见 [Browser controller](browser-controller.md)；SSE framing 与 state reduction 见 [Browser events](browser-events.md)。这些模块负责渲染 host 提供的 projection，不执行 Pi，也不决定哪个 transcript branch 是权威版本。
+本章说明浏览器如何呈现 Pi session：HTML shell、固定的 browser module 集合、安全的 Markdown 转换、Pi history pages 与当前 SSE observations，以及 DOM 更新方式。Controller 与 network lifecycle 见 [Browser controller](browser-controller.md)；SSE framing 与 state reduction 见 [Browser events](browser-events.md)。Host 提供已保存的 history branch；renderer 将该 page 与有界的当前 observations 组合后显示。
 
 <a id="page-shell-styles-browser-assets"></a>
 ## Page shell、样式与 browser assets
 
-[`HOST_PAGE`](../../../../../src/clients/web/page.ts#L1) 是 host 返回的英文 HTML shell。它包含 pairing gate、隐藏的 application shell、navigation 与 open-session status strip、conversation/history 区域、composer，以及用于关闭 session、创建 session、选择 model、查看 host 信息和预览图片的 native dialog。稳定的 element ID 构成它与 `client.ts` 的启动契约：`el()` 会检查必需元素是否存在、DOM class 是否正确，然后才绑定 listeners。语义化 label、live status region、键盘 focus 目标、受限的八字符 pairing pattern、同源外部 script/stylesheet 和 native `dialog` 都在 shell 中定义，而不是由 renderer 临时生成。
+[`HOST_PAGE`](../../../../../src/clients/web/page.ts#L1) 是 host 返回的英文 HTML shell。它包含 pairing gate、隐藏的 application shell、navigation 与 open-session status strip、conversation/history 区域、composer，以及用于关闭 session、创建 session、选择 model、查看 host 信息和预览图片的 native dialog。稳定的 element ID 构成它与 `client.ts` 的启动契约：`el()` 会检查必需元素是否存在、DOM class 是否正确，然后才绑定 listeners。Shell 定义了语义化 label、live status region、键盘 focus 目标、受限的八字符 pairing pattern、同源 script/stylesheet references 和 native `dialog`。
 
 [`STYLE`](../../../../../src/clients/web/page.ts#L138) 与 HTML 放在同一 module 中，由 host 一并提供。CSS variables 定义 paper/surface 配色、字体栈和状态颜色；layout rules 组成 desktop 双栏 shell、有界宽度的 conversation、message 间距、composer、disclosure 和 dialog。后续规则组继续调整 conversation group、tool/thinking disclosure、image chip、session status tab、history recovery message 和 command preview。在 760 px 及以下，sidebar 转为默认 inert 的 drawer，dialog 转为 bottom sheet，conversation 与 composer 收紧以适配 touch。更窄或更矮的 viewport 也有额外约束。`focus-visible` outline、screen-reader-only label、安全区 padding、`dvh` 和 reduced-motion 规则服务于键盘与移动端使用。`page.ts` 的运行时值是 HTML/CSS 常量，不包含 callable declaration；CSS class 契约由 controller 和 renderer 使用。
 

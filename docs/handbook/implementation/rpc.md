@@ -4,9 +4,9 @@
 
 English | [简体中文](../../i18n/zh-CN/handbook/implementation/rpc.md)
 
-[Implementation index](README.md) · [Pi runtime](runtime.md) · [System flow](../system.md)
+[Implementation index](README.md) · [Pi process](runtime.md) · [System flow](../system.md)
 
-`PiRpc` is the small JSONL transport between Dwell and a Pi child. It correlates command responses, forwards asynchronous records, and bounds reads, writes, pending work, and deadlines. It does not own the process, interpret session state, or decide when a run is complete; [`PiProcess`](runtime.md#runtime-startup-and-session-handshake) owns those responsibilities.
+`PiRpc` frames JSONL records over a Pi child process's stdin and stdout. It correlates command responses, forwards asynchronous Pi records, and bounds reads, writes, pending requests, and deadlines. [`PiProcess`](runtime.md#runtime-startup-and-session-handshake) owns the child lifecycle and combines these responses with Pi events to settle Dwell runs.
 
 <a id="rpc-errors-and-record-narrowing"></a>
 
@@ -20,7 +20,7 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/rpc.md)
 
 [`PiRpc.constructor`](../../../src/runtime/pi-rpc.ts#L44) receives the child's writable stdin, readable stdout, request timeout, record callback, and fatal-failure callback. It attaches input/output error handlers, streams decoded output into `#read`, and treats an output end with buffered non-newline text as a truncated JSONL record. `StringDecoder` preserves split UTF-8 sequences across chunks.
 
-[`PiRpc.request`](../../../src/runtime/pi-rpc.ts#L66) rejects immediately after closure and caps correlated requests at 32 pending. It allocates monotonically increasing `dwell-N` IDs, starts a timeout, stores the expected command and promise handlers, then queues a JSONL command record. A timeout fails the entire transport because Dwell cannot safely infer whether the external command ran. Write errors follow the same fatal path.
+[`PiRpc.request`](../../../src/runtime/pi-rpc.ts#L66) rejects immediately after closure and caps correlated requests at 32 pending. It allocates monotonically increasing `dwell-N` IDs, starts a timeout, stores the expected command and promise handlers, then queues a JSONL command record. A timeout fails the entire transport because Dwell cannot distinguish a command Pi has not processed from one Pi processed whose response is delayed or lost. Write errors follow the same fatal path.
 
 [`PiRpc.write`](../../../src/runtime/pi-rpc.ts#L82) serializes one record plus newline, rejects a single line over 8 MiB or a queued total over 16 MiB, and appends the write to a promise chain. It waits for Node's write callback before sending the next line, so backpressure and ordering are respected. The queued-byte count is reduced in `finally`; the chain itself catches rejection so a failed write does not leave the queue tail permanently rejected.
 

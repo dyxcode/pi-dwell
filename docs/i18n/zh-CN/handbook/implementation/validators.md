@@ -18,7 +18,7 @@ Source / verification：[src/shared/sessions.ts](../../../../../src/shared/sessi
 
 ## Session identity 与 model requests
 
-`isRuntimeConfiguration` 要求非空 executable，以及存在时非空的 entry point。它不检查 absolute path 或 executable compatibility；service/runtime 在启动前承担这些检查。
+`isRuntimeConfiguration` 要求非空 executable，以及存在时非空的 entry point。它不检查 absolute path 或 executable compatibility；session service 与 Pi process adapter 在启动前承担这些检查。
 
 `isSessionInfo` 检查两个 UUID、directory、成对可空的 provider/model、可空且受支持的 thinking level、safe-integer timestamps、lifecycle/runtime/history enums、error，以及 active/latest turn references。`ready` session 必须有 provider 和 model。该 guard 允许额外 top-level fields。可选 native execution 交给 `isNativeExecutionInfo`：它要求准确的 id/status/error keys、UUID、允许的 running/terminal state，以及最多 2,048 UTF-8 bytes 的 error。Ephemeral native execution ID 不代表 durable turn request。
 
@@ -56,7 +56,7 @@ Source / verification：[`isImageContent`](../../../../../src/shared/images.ts#L
 
 `thinking.ts` 中，`isObject` 排除 null/arrays；`isThinkingLevel` 接受七个定义值之一。`isModelCapabilitiesRequest` 只允许 provider/model 并检查长度。`isModelCapabilitiesResponse` 要求准确的四个 fields、boolean image capability，以及非空、不重复、最多七项的已知 thinking values。Runtime registry 决定某个 model 实际支持哪些 levels。
 
-`discovery.ts` 的 `isObject` 承担同类结构检查。`isAbsolutePath` 识别 POSIX root、Windows drive 和 UNC spelling，不访问 filesystem。`isModelOption` 检查 provider/id 长度及可选 boolean supportsImages。`isHostDirectoryListing` 要求 absolute path、可空 absolute parent、最多 500 个有名称的 absolute directory entries，以及 truncated flag；它不能证明路径存在或仍可访问。`isAvailableModelsResponse` 最多接受 10,000 models；`isSessionModelsResponse` 还检查 session UUID，并要求每个 option 都有 image support 和非空、不重复的 thinking levels。Session service/runtime 检查 caller 是否可以选择 model。
+`discovery.ts` 的 `isObject` 承担同类结构检查。`isAbsolutePath` 识别 POSIX root、Windows drive 和 UNC spelling，不访问 filesystem。`isModelOption` 检查 provider/id 长度及可选 boolean supportsImages。`isHostDirectoryListing` 要求 absolute path、可空 absolute parent、最多 500 个有名称的 absolute directory entries，以及 truncated flag；它不能证明路径存在或仍可访问。`isAvailableModelsResponse` 最多接受 10,000 models；`isSessionModelsResponse` 还检查 session UUID，并要求每个 option 都有 image support 和非空、不重复的 thinking levels。Session service 检查当前是否允许切换 model，再交给 Pi 应用选择。
 
 Source / verification：[`isModelCapabilitiesResponse`](../../../../../src/shared/thinking.ts#L38) · [`isSessionModelsResponse`](../../../../../src/shared/discovery.ts#L36) · [tests/pi-models.test.ts](../../../../../tests/pi-models.test.ts) · [tests/session-discovery.test.ts](../../../../../tests/session-discovery.test.ts)
 
@@ -64,11 +64,11 @@ Source / verification：[`isModelCapabilitiesResponse`](../../../../../src/share
 
 ## 验证 saved-history projections
 
-`record`、`text`、`optionalText`、`optionalUuid`、`exact` 是基础 gates：检查非 array records、非空有界 strings、nullable versions 与准确 own keys。`text` 按 JavaScript string length 计数；`contextSource` 对 instruction content 单独按 UTF-8 bytes 检查，两种单位不能混用。
+`record`、`text`、`optionalText`、`optionalUuid`、`exact` 是基础 gates：检查非 array records、非空有界 strings、nullable versions 与准确 own keys。`text` 按 JavaScript string length（UTF-16 code units）计数；`contextSource` 对 instruction content 单独按 UTF-8 bytes 检查，两种单位不能混用。
 
-`block` 要求通用 type/text/callId/name，只有 image blocks 才带 imageIndex/mimeType。Text 的 string length 上限为 64 KiB，image index 必须为非负 safe integer，MIME type 必须在 allowlist 内。`entry` 检查 metadata、允许的 roles、最多 64 blocks、可空 tool/parent/target references 和可选 boolean error。可选 nativeKey/toolOwnerKey 必须为 64-hex digest 加正的 occurrence count，用来区分重复 native content 与 scoped tool ownership，仅比较显示 text 不够。
+`block` 要求通用 type/text/callId/name，只有 image blocks 才带 imageIndex/mimeType。Text 上限为 65,536 UTF-16 code units，image index 必须为非负 safe integer，MIME type 必须在 allowlist 内。`entry` 检查 metadata、允许的 roles、最多 64 blocks、可空 tool/parent/target references 和可选 boolean error。可选 nativeKey/toolOwnerKey 必须为 64-hex digest 加正的 occurrence count，用来区分重复 native content 与 scoped tool ownership，仅比较显示 text 不够。
 
-`contextSource` 要求准确的 path/content/truncated、bounded path 与最多 32 KiB instruction content。`isHistoryPage` 检查可选字段组合、UUIDs、revision digest、cursor length、最多 100 entries 和 32 instruction sources。`contextSourcesTruncated` 必须伴随 contextSources。非 available page 不得携带 entries、revision、leaf、cursor 或 covered result identities；available page 必须有 revision。最后，整页 serialized JSON 必须不超过 256 KiB。返回 true 确认 display contract；Pi model context 单独从 runtime 读取。
+`contextSource` 要求准确的 path/content/truncated、bounded path 与最多 32 KiB instruction content。`isHistoryPage` 检查可选字段组合、UUIDs、revision digest、cursor length、最多 100 entries 和 32 instruction sources。`contextSourcesTruncated` 必须伴随 contextSources。非 available page 不得携带 entries、revision、leaf、cursor 或 covered result identities；available page 必须有 revision。最后，整页 serialized JSON 必须不超过 256 KiB。
 
 Source / verification：[`isHistoryPage`](../../../../../src/shared/history.ts#L167) · [tests/history-http.test.ts](../../../../../tests/history-http.test.ts) · [tests/history-context.test.ts](../../../../../tests/history-context.test.ts)
 

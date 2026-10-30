@@ -4,9 +4,9 @@
 
 [English](../../../../handbook/implementation/rpc.md) | 简体中文
 
-[实现文档索引](README.md) · [Pi runtime](runtime.md) · [系统流程](../system.md)
+[实现文档索引](README.md) · [Pi process](runtime.md) · [系统流程](../system.md)
 
-`PiRpc` 是 Dwell 与 Pi child 之间的小型 JSONL transport。它关联 command response、转发异步 record，并限制 read/write、pending request 和 deadline。它不拥有 process、不解释 session state，也不判断 run 何时完成；这些职责属于 [`PiProcess`](runtime.md#runtime-startup-and-session-handshake)。
+`PiRpc` 通过 Pi child process 的 stdin/stdout 传输 JSONL record。它关联 command response、转发 Pi 异步 record，并限制 read/write、pending request 和 deadline。[`PiProcess`](runtime.md#runtime-startup-and-session-handshake) 负责 child lifecycle，并结合这些 response 与 Pi event 判断 Dwell run 的结果。
 
 <a id="rpc-errors-and-record-narrowing"></a>
 
@@ -20,7 +20,7 @@
 
 [`PiRpc.constructor`](../../../../../src/runtime/pi-rpc.ts#L44) 接收 child stdin/stdout、request timeout、record callback 和 fatal-failure callback。它监听 input/output error，将 output chunk 交给 `#read` 解码；如果 output end 时还剩没有 newline 的 buffer，则作为不完整 JSONL record 处理。`StringDecoder` 会跨 chunk 保留拆开的 UTF-8 sequence。
 
-[`PiRpc.request`](../../../../../src/runtime/pi-rpc.ts#L66) 在 transport 关闭后立即拒绝，并最多允许 32 个 correlated pending request。它递增分配 `dwell-N` ID、启动 timeout、保存预期 command 和 Promise handler，再将 JSONL command record 加入写队列。Timeout 会 fail 整条 transport，因为 Dwell 无法安全判断外部 command 是否已执行。写入错误也走同一 fatal path。
+[`PiRpc.request`](../../../../../src/runtime/pi-rpc.ts#L66) 在 transport 关闭后立即拒绝，并最多允许 32 个 correlated pending request。它递增分配 `dwell-N` ID、启动 timeout、保存预期 command 和 Promise handler，再将 JSONL command record 加入写队列。Timeout 会 fail 整条 transport；Dwell 无法区分 Pi 尚未处理、已处理但响应延迟，或 response 丢失。写入错误也走同一 fatal path。
 
 [`PiRpc.write`](../../../../../src/runtime/pi-rpc.ts#L82) 将 record 序列化并追加 newline；单行超过 8 MiB，或队列总量超过 16 MiB 时拒绝。合法写入按 promise chain 串行，等待 Node write callback 后才发送下一行，因此保持顺序并服从 backpressure。Queued-byte count 在 `finally` 减少；queue tail 会捕获 rejection，避免一次失败永久污染后续队列。
 

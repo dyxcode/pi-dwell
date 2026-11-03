@@ -12,7 +12,7 @@
 
 SSE writer 将 JSON 包成带 event IDs 的 frames，发送 heartbeat comments、遵守 output backpressure，并关闭 slow/revoked connections。Browser reducer 跟踪 session、epoch、sequence；过期或重复 frames 不能重复应用 visible changes。属于不同 active run 的 frame 可以推进 cursor，同时丢弃其 live payload，保持 stream position 而不改变 visible projection。Selection generation 防止旧 asynchronous connection 写入新的 selection。
 
-Source / verification：[`SessionService.subscribeEvents`](../../../../../src/sessions/service.ts#L497) · [src/server/sse.ts](../../../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
+Source / verification：[`SessionService.subscribeEvents`](../../../../../src/sessions/service.ts#L502) · [src/server/sse.ts](../../../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
 
 <a id="projection"></a>
 
@@ -44,7 +44,7 @@ Settlement 后，client 可能仍需读取 history。它保留 uncovered live wo
 
 History 删除或无法确认 result 时，展示 unavailable/partial evidence，并保留已记录的 durable outcome。
 
-Source / verification：[`renderConversation`](../../../../../src/clients/web/client.ts#L1165) · [`loadHistory`](../../../../../src/clients/web/client.ts#L1391) · [`SessionService.getHistory`](../../../../../src/sessions/service.ts#L804) · [tests/session-events.test.ts](../../../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
+Source / verification：[`renderConversation`](../../../../../src/clients/web/client.ts#L1165) · [`loadHistory`](../../../../../src/clients/web/client.ts#L1391) · [`SessionService.getHistory`](../../../../../src/sessions/service.ts#L815) · [tests/session-events.test.ts](../../../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
 
 <a id="reconnect"></a>
 

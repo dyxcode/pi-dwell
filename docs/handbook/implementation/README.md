@@ -38,6 +38,7 @@ For a first reading, finish the message workflow before opening individual modul
 | [Shared data and validation](validators.md) | Field checks, identities, image decoding and event/history contracts |
 | [Catalog and durable records](catalog.md) | Schema validation, migrations, transactions and turn transitions |
 | [Session coordination](sessions.md) | Pi process management, request acceptance, dispatch, cancellation and recovery |
+| [Local storage integrations](storage-integrations.md) | Optional module configuration, source read leases and Pi process reservations |
 | [Pi process and execution](runtime.md) | Launch, readiness, prompt disposition, native execution and stop |
 | [JSONL RPC transport](rpc.md) | Correlation, buffering, deadlines and transport failure |
 | [Reading Pi session files](history.md) | Branch reading, scan budgets, identity, cursors and images |

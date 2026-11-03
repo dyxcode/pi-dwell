@@ -14,7 +14,7 @@ Entry point 将 arguments 交给 `runCli`，`parseCommand` 选择 foreground ser
 
 Session service startup 打开并验证 catalog、reconcile interrupted records，并按需启动 Pi process。Listener ready 表示服务可访问。Provider credentials 在 model calls 中使用，saved sessions 在 reopen 时检查。
 
-Source / verification：[`runCli`](../../../../../src/clients/cli/main.ts#L9) · [`startHost`](../../../../../src/server/http.ts#L106) · [`SessionService.create`](../../../../../src/sessions/service.ts#L254) · [tests/host.test.ts](../../../../../tests/host.test.ts)
+Source / verification：[`runCli`](../../../../../src/clients/cli/main.ts#L9) · [`startHost`](../../../../../src/server/http.ts#L108) · [`SessionService.create`](../../../../../src/sessions/service.ts#L259) · [tests/host.test.ts](../../../../../tests/host.test.ts)
 
 <a id="pairing"></a>
 
@@ -36,7 +36,7 @@ Browser directory picker 列出 host 上的 directories。Creation 提交 reques
 
 新的 Pi session 可以使用 Pi 配置的 defaults。一旦存在 native history，reopen 使用其 identity 与实际 model/thinking state，不将新 session 的显式 model flags 反复强加到 resumed transcript。Pi process 章节解释 readiness verification 与 startup resource discovery。
 
-Source / verification：[`SessionService.createSession`](../../../../../src/sessions/service.ts#L561) · [`SessionService.#open`](../../../../../src/sessions/service.ts#L2031) · [tests/sessions.test.ts](../../../../../tests/sessions.test.ts) · [tests/session-models.test.ts](../../../../../tests/session-models.test.ts)
+Source / verification：[`SessionService.createSession`](../../../../../src/sessions/service.ts#L566) · [`SessionService.#open`](../../../../../src/sessions/service.ts#L2048) · [tests/sessions.test.ts](../../../../../tests/sessions.test.ts) · [tests/session-models.test.ts](../../../../../tests/session-models.test.ts)
 
 <a id="model"></a>
 
@@ -46,7 +46,7 @@ Model picker 从选中 live session 的 registry 获取 models，因此 extensio
 
 Image drafts 保留在 browser memory，并关联所属 session。Intake 检查 file size/type、读取 canonical content，draft 删除或清空时释放 preview resources。Turn admission 再验证 JSON-safe images，execution 检查 selected model 的 image support。Saved images 保存在 Pi native JSONL，通过 authenticated entry/index references 提供读取。
 
-Source / verification：[`SessionService.setSessionModel`](../../../../../src/sessions/service.ts#L645) · [`changeModel`](../../../../../src/clients/web/client.ts#L2104) · [src/clients/web/attachments.ts](../../../../../src/clients/web/attachments.ts) · [tests/session-models.test.ts](../../../../../tests/session-models.test.ts) · [tests/images-http.test.ts](../../../../../tests/images-http.test.ts)
+Source / verification：[`SessionService.setSessionModel`](../../../../../src/sessions/service.ts#L650) · [`changeModel`](../../../../../src/clients/web/client.ts#L2104) · [src/clients/web/attachments.ts](../../../../../src/clients/web/attachments.ts) · [tests/session-models.test.ts](../../../../../tests/session-models.test.ts) · [tests/images-http.test.ts](../../../../../tests/images-http.test.ts)
 
 <a id="close"></a>
 
@@ -56,7 +56,7 @@ Stop 针对 active durable turn 或特定 native execution；close session 则�
 
 Reopen 根据记录的 session identity 与 file 启动 Pi。已知 history 缺失或无效时产生 unavailable/error，不创建一个表面 identity 相同的替代空对话。读取 saved history 不需要 Pi process，但读取当前 model context 可能启动 Pi。
 
-Source / verification：[`SessionService.closeSession`](../../../../../src/sessions/service.ts#L756) · [`SessionService.getContext`](../../../../../src/sessions/service.ts#L792) · [`prepareClose`](../../../../../src/clients/web/client.ts#L875) · [`confirmSessionClose`](../../../../../src/clients/web/client.ts#L1005) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
+Source / verification：[`SessionService.closeSession`](../../../../../src/sessions/service.ts#L761) · [`SessionService.getContext`](../../../../../src/sessions/service.ts#L803) · [`prepareClose`](../../../../../src/clients/web/client.ts#L875) · [`confirmSessionClose`](../../../../../src/clients/web/client.ts#L1005) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
 
 <a id="shutdown"></a>
 
@@ -66,4 +66,4 @@ Host 的 repeated close calls 共享一个 promise。它关闭 streams、拒绝�
 
 Catalog 保持打开，直到 tracked turn finalization、reads 和 discovery/refresh operations settled。Restart 将未完成 durable work reconcile 为 interrupted，不再次调用。
 
-Source / verification：[`startHost`](../../../../../src/server/http.ts#L106) · [`SessionService.shutdown`](../../../../../src/sessions/service.ts#L1455) · [`PiProcess.stop`](../../../../../src/runtime/pi-process.ts#L682) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/host.test.ts](../../../../../tests/host.test.ts)
+Source / verification：[`startHost`](../../../../../src/server/http.ts#L108) · [`SessionService.shutdown`](../../../../../src/sessions/service.ts#L1466) · [`PiProcess.stop`](../../../../../src/runtime/pi-process.ts#L689) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/host.test.ts](../../../../../tests/host.test.ts)

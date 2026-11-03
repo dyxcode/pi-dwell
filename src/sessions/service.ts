@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
+import type { DistillStorage } from "../integrations/distill.ts";
+import { type OpeningSource, SessionSourceAccess, SourceAccessError } from "./source-access.ts";
 import { realpath, stat } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { prepareDataDirectory } from "../local/files.ts";
@@ -66,6 +68,7 @@ export class SessionError extends Error {
 }
 
 export interface SessionServiceOptions {
+  distill?: DistillStorage;
   dataDir: string;
   /** Explicit embedding/test environment and resources; public clients cannot set them. */
   env?: NodeJS.ProcessEnv;
@@ -227,6 +230,7 @@ export class SessionService {
   readonly #events = new SessionEvents();
   readonly #historyPages = new HistoryPages();
   readonly #sessionFiles: SessionFiles;
+  readonly #sourceAccess: SessionSourceAccess;
   readonly #historyCheckSequences = new Map<string, number>();
   readonly #reads = new Set<Promise<unknown>>();
   readonly #nativeRefreshes = new Set<Promise<void>>();
@@ -244,6 +248,7 @@ export class SessionService {
     this.#catalog = catalog;
     this.#dataDir = dataDir;
     this.#sessionFiles = new SessionFiles(dataDir);
+    this.#sourceAccess = new SessionSourceAccess(options.distill);
     this.#env = { ...(options.env ?? process.env) };
     this.#extensions = options.extensions ?? [];
     this.#now = options.now ?? Date.now;
@@ -259,11 +264,11 @@ export class SessionService {
       catalog.listTurns(); // Validate durable turn identities before recovery.
       catalog.interruptCreating((options.now ?? Date.now)());
       catalog.interruptTurns((options.now ?? Date.now)());
+      return new SessionService(catalog, dataDir, options);
     } catch (error) {
       catalog.close();
       throw error;
     }
-    return new SessionService(catalog, dataDir, options);
   }
 
   get runtimeCount(): number {
@@ -770,21 +775,27 @@ export class SessionService {
             "session_busy",
             "Abort active work before closing its runtime.",
           );
-        const history = await this.#rememberHistory(stored, runtime);
-        const native = this.#nativeExecutions.get(id);
-        if (
-          history.state === "readable" &&
-          native &&
-          native.info.status !== "running" &&
-          native.messageBaseline
-        )
-          await this.#refreshNativeHistory(id, native.info.id, history.value);
-        await runtime.stop();
-        this.#runtimeObservers.get(id)?.();
-        this.#runtimeObservers.delete(id);
-        this.#runtimes.delete(id);
-      }
-      this.#publishState(id);
+        try {
+          const history = await this.#rememberHistory(stored, runtime);
+          const native = this.#nativeExecutions.get(id);
+          if (
+            history.state === "readable" &&
+            native &&
+            native.info.status !== "running" &&
+            native.messageBaseline
+          )
+            await this.#refreshNativeHistory(id, native.info.id, history.value);
+        } catch (error) {
+          if (!(error instanceof SessionError)) throw error;
+          // File observations remain available after this optional refresh fails.
+        } finally {
+          await runtime.stop();
+          this.#runtimeObservers.get(id)?.();
+          this.#runtimeObservers.delete(id);
+          this.#runtimes.delete(id);
+          this.#publishState(id);
+        }
+      } else this.#publishState(id);
       return this.#view(this.#stored(id));
     });
   }
@@ -1515,7 +1526,11 @@ export class SessionService {
         ...this.#modelCapabilityDiscoveries.values(),
         ...this.#sessionModelReads.values(),
       ]);
-      this.#catalog.close();
+      try {
+        await this.#sourceAccess.drain();
+      } finally {
+        this.#catalog.close();
+      }
       if (failed) throw new Error("Session shutdown could not save all runtime metadata.");
     })();
     return this.#shutdown;
@@ -1700,10 +1715,12 @@ export class SessionService {
     }
 
     try {
-      const value = await read(file);
+      const value = await this.#sourceAccess.read(stored, file, () => read(file));
       await this.#recordHistoryCheck(stored, sequence, "readable", file);
       return { file, value, state: "readable" };
     } catch (error) {
+      if (error instanceof SourceAccessError)
+        throw new SessionError(503, "source_busy", error.message);
       let state = this.#historyCheckState(error);
       if (error instanceof HistoryReadError && error.code === "history_unavailable") {
         try {
@@ -2049,120 +2066,133 @@ export class SessionService {
         "directory_changed",
         "The saved project directory now resolves to a different location.",
       );
-    const history = await this.#checkHistory(
-      stored,
-      (file) =>
-        readSavedHistory({
-          file,
-          piSessionId: stored.piSessionId,
-          directory: stored.directory,
-          signal: options.signal ?? this.#shutdownController.signal,
-          cancelQueuedOnly: options.signal === undefined,
-        }),
-      false,
-    );
-    if (history.state === "missing")
-      throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
-    const resumeFile = history.state === "readable" ? history.file : undefined;
-    const historyIdentity = this.#identityForHistory(
-      history.state === "readable" ? history.value : undefined,
-    );
-    if (options.signal?.aborted) throw options.signal.reason;
-    let runtime: PiProcess;
+    let opening: OpeningSource | undefined;
     try {
-      runtime = await PiProcess.start({
-        ...configuration,
-        cwd: directory,
-        env: this.#env,
-        sessionDirectory: join(this.#dataDir, "sessions", stored.id),
-        ...(resumeFile ? { resumeFile } : { sessionId: stored.piSessionId }),
-        ...(resumeFile === undefined && stored.provider !== null && stored.model !== null
-          ? { provider: stored.provider, model: stored.model }
-          : {}),
-        extensions: this.#extensions,
-      });
-    } catch {
-      throw new SessionError(
-        503,
-        "runtime_unavailable",
-        "Pi session startup failed. Check the saved executable, provider, and model.",
-      );
+      opening = this.#sourceAccess.begin(stored);
+    } catch (error) {
+      if (error instanceof SourceAccessError)
+        throw new SessionError(503, "source_busy", error.message);
+      throw error;
     }
-    this.#runtimes.set(stored.id, runtime);
-    this.#historyIdentity.set(stored.id, historyIdentity);
-    this.#observeRuntime(stored.id, runtime);
     try {
-      let state = await runtime.getState();
-      if (
-        state.sessionId !== stored.piSessionId ||
-        !state.model ||
-        (resumeFile === undefined &&
-          ((stored.provider !== null && state.model.provider !== stored.provider) ||
-            (stored.model !== null && state.model.id !== stored.model))) ||
-        !state.sessionFile
-      )
-        throw new SessionError(
-          503,
-          "runtime_mismatch",
-          "Pi did not use the requested session and model selection.",
-        );
-      let sessionFile: string;
+      const history = await this.#checkHistory(
+        stored,
+        (file) =>
+          readSavedHistory({
+            file,
+            piSessionId: stored.piSessionId,
+            directory: stored.directory,
+            signal: options.signal ?? this.#shutdownController.signal,
+            cancelQueuedOnly: options.signal === undefined,
+          }),
+        false,
+      );
+      if (history.state === "missing")
+        throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+      const resumeFile = history.state === "readable" ? history.file : undefined;
+      const historyIdentity = this.#identityForHistory(
+        history.state === "readable" ? history.value : undefined,
+      );
+      if (options.signal?.aborted) throw options.signal.reason;
+      let runtime: PiProcess;
       try {
-        sessionFile =
-          (await this.#sessionFiles.resolve({ ...stored, piSessionFile: state.sessionFile })) ??
-          state.sessionFile;
+        runtime = await PiProcess.start({
+          ...configuration,
+          cwd: directory,
+          env: this.#env,
+          sessionDirectory: join(this.#dataDir, "sessions", stored.id),
+          ...(resumeFile ? { resumeFile } : { sessionId: stored.piSessionId }),
+          ...(resumeFile === undefined && stored.provider !== null && stored.model !== null
+            ? { provider: stored.provider, model: stored.model }
+            : {}),
+          extensions: this.#extensions,
+          ...(opening ? { onSpawn: opening.onSpawn } : {}),
+        });
       } catch {
         throw new SessionError(
           503,
-          "runtime_mismatch",
-          "Pi did not use a session file inside this Dwell session.",
+          "runtime_unavailable",
+          "Pi session startup failed. Check the saved executable, provider, and model.",
         );
       }
-      if (resumeFile !== undefined && sessionFile !== resumeFile)
-        throw new SessionError(
-          503,
-          "runtime_mismatch",
-          "Pi did not reopen the validated saved session file.",
-        );
-      if (
-        resumeFile === undefined &&
-        stored.thinkingLevel !== null &&
-        state.thinkingLevel !== stored.thinkingLevel &&
-        runtime.activeExecution?.source !== "native"
-      ) {
-        await runtime.setThinkingLevel(stored.thinkingLevel);
-        state = await runtime.getState();
+      this.#runtimes.set(stored.id, runtime);
+      this.#historyIdentity.set(stored.id, historyIdentity);
+      this.#observeRuntime(stored.id, runtime);
+      try {
+        let state = await runtime.getState();
+        if (
+          state.sessionId !== stored.piSessionId ||
+          !state.model ||
+          (resumeFile === undefined &&
+            ((stored.provider !== null && state.model.provider !== stored.provider) ||
+              (stored.model !== null && state.model.id !== stored.model))) ||
+          !state.sessionFile
+        )
+          throw new SessionError(
+            503,
+            "runtime_mismatch",
+            "Pi did not use the requested session and model selection.",
+          );
+        let sessionFile: string;
+        try {
+          sessionFile =
+            (await this.#sessionFiles.resolve({ ...stored, piSessionFile: state.sessionFile })) ??
+            state.sessionFile;
+        } catch {
+          throw new SessionError(
+            503,
+            "runtime_mismatch",
+            "Pi did not use a session file inside this Dwell session.",
+          );
+        }
+        if (resumeFile !== undefined && sessionFile !== resumeFile)
+          throw new SessionError(
+            503,
+            "runtime_mismatch",
+            "Pi did not reopen the validated saved session file.",
+          );
+        if (
+          resumeFile === undefined &&
+          stored.thinkingLevel !== null &&
+          state.thinkingLevel !== stored.thinkingLevel &&
+          runtime.activeExecution?.source !== "native"
+        ) {
+          await runtime.setThinkingLevel(stored.thinkingLevel);
+          state = await runtime.getState();
+        }
+        if (
+          !state.model ||
+          state.sessionId !== stored.piSessionId ||
+          !state.sessionFile ||
+          (resumeFile === undefined &&
+            ((stored.provider !== null && state.model.provider !== stored.provider) ||
+              (stored.model !== null && state.model.id !== stored.model)))
+        )
+          throw new SessionError(503, "runtime_mismatch", "Pi did not restore the saved session.");
+        const latest = this.#stored(stored.id);
+        const ready: StoredSession = {
+          ...latest,
+          provider: state.model.provider,
+          model: state.model.id,
+          thinkingLevel: state.thinkingLevel,
+          status: "ready",
+          updatedAt: this.#now(),
+          error: null,
+          piSessionFile: sessionFile,
+          historyExpected: latest.historyExpected,
+        };
+        this.#catalog.update(ready);
+        this.#publishState(stored.id);
+        return this.#view(ready);
+      } catch (error) {
+        await runtime.stop();
+        this.#runtimeObservers.get(stored.id)?.();
+        this.#runtimeObservers.delete(stored.id);
+        this.#runtimes.delete(stored.id);
+        throw error;
       }
-      if (
-        !state.model ||
-        state.sessionId !== stored.piSessionId ||
-        !state.sessionFile ||
-        (resumeFile === undefined &&
-          ((stored.provider !== null && state.model.provider !== stored.provider) ||
-            (stored.model !== null && state.model.id !== stored.model)))
-      )
-        throw new SessionError(503, "runtime_mismatch", "Pi did not restore the saved session.");
-      const latest = this.#stored(stored.id);
-      const ready: StoredSession = {
-        ...latest,
-        provider: state.model.provider,
-        model: state.model.id,
-        thinkingLevel: state.thinkingLevel,
-        status: "ready",
-        updatedAt: this.#now(),
-        error: null,
-        piSessionFile: sessionFile,
-        historyExpected: latest.historyExpected,
-      };
-      this.#catalog.update(ready);
-      this.#publishState(stored.id);
-      return this.#view(ready);
-    } catch (error) {
-      await runtime.stop();
-      this.#runtimeObservers.get(stored.id)?.();
-      this.#runtimeObservers.delete(stored.id);
-      this.#runtimes.delete(stored.id);
-      throw error;
+    } finally {
+      opening?.abandon();
     }
   }
 

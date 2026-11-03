@@ -95,3 +95,5 @@ English pages in `docs/handbook/` have matching Simplified Chinese pages in `doc
 The source and test atlases are snapshots of current declarations and test names. Refresh affected entries and line anchors whenever code moves, and verify coverage against the files under `src/` and `tests/`. A source line anchor is a navigation aid; the source at the current revision remains authoritative.
 
 Run `npm run check:docs` to validate both handbook file sets, local links and anchors, source line positions, and callable-to-explanation coverage. The [implementation coverage page](implementation/coverage.md) explains the maintenance contract; [tooling](implementation/tooling.md) explains the checker.
+
+Actual Distill integration tests use `DWELL_TEST_DISTILL_MODULE=/absolute/path/to/pi-distill/dist/host-storage.js npm run check` after building that API. Without this variable the cross-product cases are explicitly skipped; standalone checks still run. Fixtures use temporary synthetic databases and Pi sessions.

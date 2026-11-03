@@ -25,6 +25,7 @@ const handbookFiles = [
   "docs/handbook/implementation/runtime.md",
   "docs/handbook/implementation/services.md",
   "docs/handbook/implementation/sessions.md",
+  "docs/handbook/implementation/storage-integrations.md",
   "docs/handbook/implementation/tooling.md",
   "docs/handbook/implementation/validators.md",
   "docs/handbook/implementation/workflow-lifecycle.md",

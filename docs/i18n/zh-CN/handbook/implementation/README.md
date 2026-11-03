@@ -38,6 +38,7 @@
 | [Shared data 与 validation](validators.md) | Field checks、identities、image decoding 与 event/history contracts |
 | [Catalog 与 durable records](catalog.md) | Schema validation、migrations、transactions 与 turn transitions |
 | [Session coordination](sessions.md) | Pi process 管理、请求接受、dispatch、cancellation 与 recovery |
+| [Local storage integrations](storage-integrations.md) | Optional module configuration、source read lease 与 Pi process reservation |
 | [Pi process 与 execution](runtime.md) | Launch、readiness、prompt disposition、native execution 与 stop |
 | [JSONL RPC transport](rpc.md) | Correlation、buffering、deadlines 与 transport failure |
 | [读取 Pi session files](history.md) | Branch reading、scan budgets、identity、cursors 与 images |

@@ -33,6 +33,8 @@ export interface PiOptions {
   extensions?: readonly string[];
   /** Hosted sessions use Pi's native resources; model probes opt into isolation. */
   resourcePolicy?: "native" | "isolated";
+  /** Called synchronously after spawn and before readiness; throwing aborts startup. */
+  onSpawn?: (pid: number, closed: Promise<void>) => void;
   requestTimeoutMs?: number;
   shutdownTimeoutMs?: number;
 }
@@ -354,6 +356,11 @@ export class PiProcess {
     });
     const runtime = new PiProcess(child, requestMs, shutdownMs);
     try {
+      if (options.onSpawn) {
+        const pid = runtime.pid;
+        if (pid === undefined) throw new Error("Pi did not expose its process ID.");
+        options.onSpawn(pid, runtime.#closed);
+      }
       const state = await runtime.getState();
       const nativeStartedDuringOpen =
         runtime.#run?.source === "native" || runtime.#lastNativeExecution?.type === "settled";

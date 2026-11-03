@@ -527,3 +527,49 @@ Fixture/helper module; inspect its exported setup or subprocess behavior in the 
 - [the conversation page loads only same-origin external code and styles](../../tests/web.test.ts#L6)
 - [native browser compilation exposes a fixed set of credential-safe modules](../../tests/web.test.ts#L16)
 - [creation asks only for a directory and model selection sits above the composer](../../tests/web.test.ts#L44)
+
+
+## tests/integrations.test.ts
+
+[Read tests](../../tests/integrations.test.ts)
+
+- optional integrations use explicit local modules and storage paths
+
+
+## tests/integrations-host.test.ts
+
+[Read tests](../../tests/integrations-host.test.ts)
+
+- host loads configured Distill and closes children before its adapter
+- invalid configured integration fails host startup explicitly
+
+
+## tests/distill-adapter.test.ts
+
+[Read tests](../../tests/distill-adapter.test.ts)
+
+- the built Distill API coordinates Dwell reads and durable child use
+
+
+## tests/distill-sessions.test.ts
+
+[Read tests](../../tests/distill-sessions.test.ts)
+
+- configured Distill use follows fresh Pi startup, close and reopen
+
+
+## tests/runtime-spawn.test.ts
+
+[Read tests](../../tests/runtime-spawn.test.ts)
+
+- onSpawn receives the live Pi PID and its close promise resolves after stop
+- an onSpawn failure rejects startup after stopping and closing the child
+
+
+## tests/session-source-access.test.ts
+
+[Read tests](../../tests/session-source-access.test.ts)
+
+- source reads hold only a short gate and release it on success and error
+- fresh session use is reserved before spawn and released only after child close
+- only a known unspawned opening is abandoned automatically

@@ -12,7 +12,7 @@ Selecting a session starts an authenticated event connection and independent his
 
 The SSE writer frames JSON with event IDs, sends heartbeat comments, respects output backpressure and closes slow or revoked connections. The browser reducer tracks session, epoch and sequence. Stale or duplicate frames must not replay visible changes. A frame belonging to a different active run can advance the cursor while its live payload is discarded, preserving stream position without changing the visible projection. A selection generation prevents an old asynchronous connection from writing into the new selection.
 
-Source / verification: [`SessionService.subscribeEvents`](../../../src/sessions/service.ts#L497) · [src/server/sse.ts](../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../tests/web-events.test.ts)
+Source / verification: [`SessionService.subscribeEvents`](../../../src/sessions/service.ts#L502) · [src/server/sse.ts](../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../tests/web-events.test.ts)
 
 <a id="projection"></a>
 
@@ -44,7 +44,7 @@ After settlement, the client may still need further history reads. It retains un
 
 A history deletion or unprovable result is exposed as unavailable/partial evidence. The recorded durable outcome is preserved.
 
-Source / verification: [`renderConversation`](../../../src/clients/web/client.ts#L1165) · [`loadHistory`](../../../src/clients/web/client.ts#L1391) · [`SessionService.getHistory`](../../../src/sessions/service.ts#L804) · [tests/session-events.test.ts](../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../tests/history-service.test.ts)
+Source / verification: [`renderConversation`](../../../src/clients/web/client.ts#L1165) · [`loadHistory`](../../../src/clients/web/client.ts#L1391) · [`SessionService.getHistory`](../../../src/sessions/service.ts#L815) · [tests/session-events.test.ts](../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../tests/history-service.test.ts)
 
 <a id="reconnect"></a>
 

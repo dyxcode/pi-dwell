@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readIntegrations } from "../integrations/configuration.ts";
+import { openDistill, type DistillStorage } from "../integrations/distill.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { HOST_PAGE, STYLE } from "../clients/web/page.ts";
 import { BROWSER_ASSETS } from "../clients/web/script.ts";
@@ -125,6 +127,7 @@ export async function startHost({
   };
   let auth: LocalAuth | undefined;
   let sessions: SessionService | undefined;
+  let distill: DistillStorage | undefined;
   let url = "";
   let stopping = false;
   let browserOrigin: string | undefined;
@@ -609,11 +612,18 @@ export async function startHost({
         try {
           await sessions?.shutdown();
         } finally {
-          await auth?.drain();
-          await new Promise<void>((resolve, reject) =>
-            server.close((error) => (error ? reject(error) : resolve())),
-          );
-          server.closeAllConnections();
+          try {
+            distill?.close();
+          } finally {
+            try {
+              await auth?.drain();
+            } finally {
+              await new Promise<void>((resolve, reject) =>
+                server.close((error) => (error ? reject(error) : resolve())),
+              );
+              server.closeAllConnections();
+            }
+          }
         }
       })();
     }
@@ -627,7 +637,14 @@ export async function startHost({
         "The HTTPS browserOrigin must use a different authority from the local listener.",
       );
     auth = await LocalAuth.open(dataDir, now);
-    sessions = await SessionService.create({ dataDir, ...sessionOptions, now });
+    const integrations = await readIntegrations(root);
+    if (integrations.distill) distill = await openDistill(integrations.distill);
+    sessions = await SessionService.create({
+      dataDir,
+      ...sessionOptions,
+      now,
+      ...(distill ? { distill } : {}),
+    });
   } catch (error) {
     await close();
     throw error;

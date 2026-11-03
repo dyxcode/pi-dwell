@@ -87,3 +87,20 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 - 完整刷新页面或关闭浏览器后恢复未发送 draft 的方式。浏览器认证失效或被忘记时，图片 draft 也会清除。
 
 当前功能和数值限制请参阅[功能参考](reference.md)。实现行为和测试覆盖请参阅 [Web client 内部说明](web-client.md)、[共享 contracts](contracts.md)和[手册索引](README.md)。
+
+
+## Distill storage coordination
+
+在 Distill checkout 中运行 `npm run build:package`，构建 public Node API。然后在 Dwell data directory 创建 owner-only `0600` 的 `integrations.json`：
+
+```json
+{
+  "version": 1,
+  "distill": {
+    "module": "/absolute/path/to/pi-distill/dist/host-storage.js",
+    "database": "/absolute/path/to/your/distill.sqlite"
+  }
+}
+```
+
+`database` 指向管理这些 Pi sessions 的 Distill store，然后 restart Dwell。Dwell 的文件读取与 hosted Pi processes 会参与该 store 的 cleanup coordination。省略文件或 Distill entry 时继续 standalone operation。Configuration 或 module opening 失败会停止 startup。详见 [access lifecycle](implementation/storage-integrations.md)。

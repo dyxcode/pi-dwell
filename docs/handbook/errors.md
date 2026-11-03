@@ -88,6 +88,7 @@ These errors are raised by `SessionService` or by its delegated history/discover
 | `directory_changed` | 409 | The saved project path now resolves to a different canonical directory. |
 | `directory_unavailable` | 403 or 500 | The selected directory cannot be read, or the directory browser itself failed. |
 | `discovery_cleanup_failed` | 503 | Temporary, isolated model-discovery state or its Pi process could not be cleaned up. |
+| `source_busy` | 503 | Distill source coordination is occupied. Retry after the current source operation finishes. |
 | `history_busy` | 429 | The bounded saved-history read queue is full. |
 | `history_changed` | 409 | The native history file changed while it was being read. |
 | `history_limit` | 413 | The saved history exceeds record, byte, depth, or branch bounds. |

@@ -12,7 +12,7 @@ The CLI starts or administers the Dwell host. The host runs Pi in child processe
 
 Follow the [message workflow](workflow-message.md) for a complete request, then use the [implementation index](README.md) to explore individual modules.
 
-Source / verification: [`runCli`](../../../src/clients/cli/main.ts#L9) · [`startHost`](../../../src/server/http.ts#L106) · [`PiProcess`](../../../src/runtime/pi-process.ts#L215)
+Source / verification: [`runCli`](../../../src/clients/cli/main.ts#L9) · [`startHost`](../../../src/server/http.ts#L108) · [`PiProcess`](../../../src/runtime/pi-process.ts#L217)
 
 <a id="state"></a>
 
@@ -28,7 +28,7 @@ Source / verification: [`runCli`](../../../src/clients/cli/main.ts#L9) · [`star
 | Pi | [Pi](runtime.md) | Run the agent loop, model calls, tools and extensions; save conversations | Context in the Pi process and native JSONL session files |
 | Browser | [Web client](browser-controller.md) | Submit user input and render Pi messages, tool results and progress | Drafts, attachment previews, selection and displayed content |
 
-Source / verification: [`LocalAuth`](../../../src/server/auth.ts#L87) · [`SessionService`](../../../src/sessions/service.ts#L214) · [`SessionCatalog`](../../../src/storage/catalog.ts#L643) · [`SessionEvents`](../../../src/sessions/events.ts#L373) · [Web client](../../../src/clients/web/client.ts)
+Source / verification: [`LocalAuth`](../../../src/server/auth.ts#L87) · [`SessionService`](../../../src/sessions/service.ts#L217) · [`SessionCatalog`](../../../src/storage/catalog.ts#L643) · [`SessionEvents`](../../../src/sessions/events.ts#L373) · [Web client](../../../src/clients/web/client.ts)
 
 <a id="processes"></a>
 
@@ -40,7 +40,7 @@ The host runs Pi in independent subprocesses, retaining the Pi CLI's startup flo
 
 At startup, Dwell reads the catalog and starts Pi processes on demand. The [lifecycle workflow](workflow-lifecycle.md) follows session creation, resumption and shutdown through the relevant functions.
 
-Source / verification: [`SessionService.createSession`](../../../src/sessions/service.ts#L561) · [`SessionService.#open`](../../../src/sessions/service.ts#L2031) · [`PiProcess.start`](../../../src/runtime/pi-process.ts#L274)
+Source / verification: [`SessionService.createSession`](../../../src/sessions/service.ts#L566) · [`SessionService.#open`](../../../src/sessions/service.ts#L2048) · [`PiProcess.start`](../../../src/runtime/pi-process.ts#L276)
 
 <a id="boundaries"></a>
 
@@ -54,7 +54,7 @@ During execution, Dwell converts Pi events into bounded SSE updates. It reads sa
 
 Pi extensions can start work without a submitted Dwell request. Dwell tracks that work using a separate native execution ID so it can report progress and target cancellation without attributing it to another request.
 
-Source / verification: [`SessionService.submitTurn`](../../../src/sessions/service.ts#L950) · [`SessionCatalog.markTurnDispatching`](../../../src/storage/catalog.ts#L937) · [`SessionService.getTurnResult`](../../../src/sessions/service.ts#L1032) · [`SessionService.#observeRuntime`](../../../src/sessions/service.ts#L1799)
+Source / verification: [`SessionService.submitTurn`](../../../src/sessions/service.ts#L961) · [`SessionCatalog.markTurnDispatching`](../../../src/storage/catalog.ts#L937) · [`SessionService.getTurnResult`](../../../src/sessions/service.ts#L1043) · [`SessionService.#observeRuntime`](../../../src/sessions/service.ts#L1816)
 
 <a id="terms"></a>
 

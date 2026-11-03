@@ -111,3 +111,5 @@
 Source 和 test atlases 是当前 declaration 和 test name 的 snapshot。代码移动时，刷新受影响的条目和行锚点，并对照 `src/` 与 `tests/` 下的文件核验覆盖范围。Source line anchor 只是导航辅助；当前 revision 的源码仍是权威依据。
 
 运行 `npm run check:docs` 验证两种 handbook file sets、local links/anchors、source line positions 和 callable-to-explanation coverage。[Implementation coverage](implementation/coverage.md) 解释维护约定，[tooling](implementation/tooling.md) 解释 checker。
+
+构建 Distill API 后，使用 `DWELL_TEST_DISTILL_MODULE=/absolute/path/to/pi-distill/dist/host-storage.js npm run check` 执行实际 integration tests。未设置该变量时，跨产品 cases 会明确 skip，standalone checks 仍会运行。Fixtures 使用临时 synthetic databases 与 Pi sessions。

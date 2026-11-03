@@ -129,3 +129,20 @@ For all current features and numeric limits, see the
 [feature reference](reference.md). For implementation behavior and test
 coverage, see [web client internals](web-client.md),
 [shared contracts](contracts.md), and the [handbook index](README.md).
+
+
+## Distill storage coordination
+
+Build Distill's public Node API with `npm run build:package` in its checkout. In Dwell's data directory, create `integrations.json` with owner-only `0600` permissions:
+
+```json
+{
+  "version": 1,
+  "distill": {
+    "module": "/absolute/path/to/pi-distill/dist/host-storage.js",
+    "database": "/absolute/path/to/your/distill.sqlite"
+  }
+}
+```
+
+Point `database` at the Distill store that manages these Pi sessions, then restart Dwell. Dwell coordinates file reads and hosted Pi processes with that store's cleanup. An omitted file or omitted Distill entry keeps standalone operation. Configuration and module-opening errors stop startup. See [the access lifecycle](implementation/storage-integrations.md).

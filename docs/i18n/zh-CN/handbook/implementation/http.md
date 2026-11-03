@@ -9,20 +9,20 @@ Loopback HTTP host 负责 request validation、route dispatch 和 response clean
 <a id="request-validation"></a>
 ## 请求校验与 response helper
 
-[http.ts](../../../../../src/server/http.ts) 中的小型 helper 定义了 request boundary。[fail](../../../../../src/server/http.ts#L35) 将校验或策略判断转换为 AccessError，使外层 handler 统一生成稳定的错误 envelope。[cookieToken](../../../../../src/server/http.ts#L38) 只有在所选 cookie 名称恰好出现一次时才接受它。[browserRequest](../../../../../src/server/http.ts#L46) 要求 browser POST 的 Origin 完全匹配，并带有 Dwell request marker；Origin 必须匹配哪个 authority 由 access layer 选择。
+[http.ts](../../../../../src/server/http.ts) 中的小型 helper 定义了 request boundary。[fail](../../../../../src/server/http.ts#L37) 将校验或策略判断转换为 AccessError，使外层 handler 统一生成稳定的错误 envelope。[cookieToken](../../../../../src/server/http.ts#L40) 只有在所选 cookie 名称恰好出现一次时才接受它。[browserRequest](../../../../../src/server/http.ts#L48) 要求 browser POST 的 Origin 完全匹配，并带有 Dwell request marker；Origin 必须匹配哪个 authority 由 access layer 选择。
 
-[readJson](../../../../../src/server/http.ts#L51) 接受带可选 UTF-8 charset 的 JSON，拒绝压缩 body，并分别限制 Content-Length 声明值和实际读取的字节数。请求中断会变成带类型的 400 错误。解析后的值必须是非 null object，不能是 array 或 primitive；函数再把 enumerable entries 复制为普通 record，供路由校验。大多数请求限制为 8 KiB。Turn submission 的 JSON envelope 可到 8 MiB，以容纳 image references；message text 则单独限制为 8 KiB UTF-8。
+[readJson](../../../../../src/server/http.ts#L53) 接受带可选 UTF-8 charset 的 JSON，拒绝压缩 body，并分别限制 Content-Length 声明值和实际读取的字节数。请求中断会变成带类型的 400 错误。解析后的值必须是非 null object，不能是 array 或 primitive；函数再把 enumerable entries 复制为普通 record，供路由校验。大多数请求限制为 8 KiB。Turn submission 的 JSON envelope 可到 8 MiB，以容纳 image references；message text 则单独限制为 8 KiB UTF-8。
 
-[send](../../../../../src/server/http.ts#L88) 写入 status 和 JSON body。[parseHistoryCursor](../../../../../src/server/http.ts#L92) 只允许一个非空且不超过 1536 个字符的 cursor，并拒绝重复、混合或其他不支持的 query parameter。Directory browsing 的 path query 在 route handler 中单独校验。
+[send](../../../../../src/server/http.ts#L90) 写入 status 和 JSON body。[parseHistoryCursor](../../../../../src/server/http.ts#L94) 只允许一个非空且不超过 1536 个字符的 cursor，并拒绝重复、混合或其他不支持的 query parameter。Directory browsing 的 path query 在 route handler 中单独校验。
 
 <a id="host-lifecycle"></a>
 ## Host 启动、活动请求与关闭
 
-[startHost](../../../../../src/server/http.ts#L106) 接受 port、data directory、mode、clock、session environment/extensions 和 heartbeat interval 等内部 embedding/test seams。Public CLI 不暴露 port 或 data-directory override。函数校验 port，创建 protocol version 2 的 status metadata、全新的 instance ID 和 sessions 可用/tasks 不可用的 capability flags，并在 host 局部变量中保存 authentication、sessions、stopping state、活动 handler 与 SSE stream。
+[startHost](../../../../../src/server/http.ts#L108) 接受 port、data directory、mode、clock、session environment/extensions 和 heartbeat interval 等内部 embedding/test seams。Public CLI 不暴露 port 或 data-directory override。函数校验 port，创建 protocol version 2 的 status metadata、全新的 instance ID 和 sessions 可用/tasks 不可用的 capability flags，并在 host 局部变量中保存 authentication、sessions、stopping state、活动 handler 与 SSE stream。
 
-嵌套的 [revalidateEventStreams](../../../../../src/server/http.ts#L134) 会在 credential 变化后检查现有 writer。[openEventStream](../../../../../src/server/http.ts#L138) 将 writer 绑定到当前 request 的 authorization check，订阅 session event hub，并以订阅快照启动。订阅 callback 会 enqueue 每个 frame；onClose callback 会把 writer 从 host set 中移除。如果订阅或启动失败，会先关闭 writer 再返回错误。Stream 保持打开期间会重新检查 authorization；cookie 和 bearer 规则见 [Authentication](authentication.md#browser-session-auth)。
+嵌套的 [revalidateEventStreams](../../../../../src/server/http.ts#L137) 会在 credential 变化后检查现有 writer。[openEventStream](../../../../../src/server/http.ts#L141) 将 writer 绑定到当前 request 的 authorization check，订阅 session event hub，并以订阅快照启动。订阅 callback 会 enqueue 每个 frame；onClose callback 会把 writer 从 host set 中移除。如果订阅或启动失败，会先关闭 writer 再返回错误。Stream 保持打开期间会重新检查 authorization；cookie 和 bearer 规则见 [Authentication](authentication.md#browser-session-auth)。
 
-嵌套的 [handle](../../../../../src/server/http.ts#L171) 在进入 request pipeline 前设置 response 安全 headers。它先拒绝重复的 Host、Origin、Authorization、Cookie、Dwell binding/request marker 和 Last-Event-ID headers；再选择 configured authority，拒绝 cross-origin Origin 和 HTTPS lane 上的 bearer credential；随后检查 host 生命周期和 URL 长度。Query parsing 仅支持 directory path 或 saved-history cursor。精确的 Host 与 proxy-header 规则见 [authority selection](authentication.md#authority-and-cookies)。
+嵌套的 [handle](../../../../../src/server/http.ts#L174) 在进入 request pipeline 前设置 response 安全 headers。它先拒绝重复的 Host、Origin、Authorization、Cookie、Dwell binding/request marker 和 Last-Event-ID headers；再选择 configured authority，拒绝 cross-origin Origin 和 HTTPS lane 上的 bearer credential；随后检查 host 生命周期和 URL 长度。Query parsing 仅支持 directory path 或 saved-history cursor。精确的 Host 与 proxy-header 规则见 [authority selection](authentication.md#authority-and-cookies)。
 
 Handler 识别已知 route family 并确定所需 method。未知路由返回 404；method 错误的已知路由返回 405 和 Allow header。受保护路由会先完成身份验证，再解析 body 或调用 service。GET 拒绝 transfer-encoded 或非空 body。Pi executable 配置仅限 CLI；browser POST 会再次校验 Origin/request marker。每个路由随后执行专属的 shape check，再调用 session service。具体 branch 如下。
 

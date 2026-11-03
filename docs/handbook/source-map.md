@@ -656,7 +656,7 @@ Local dependencies: [shared/discovery.ts](../../src/shared/discovery.ts), [share
 
 Prose explanation: [runtime](implementation/runtime.md)
 
-[Open source](../../src/runtime/pi-process.ts) · 929 lines
+[Open source](../../src/runtime/pi-process.ts) · 936 lines
 
 Local dependencies: [local/paths.ts](../../src/local/paths.ts), [shared/discovery.ts](../../src/shared/discovery.ts), [shared/images.ts](../../src/shared/images.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [runtime/pi-models.ts](../../src/runtime/pi-models.ts), [runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts).
 
@@ -666,79 +666,79 @@ Local dependencies: [local/paths.ts](../../src/local/paths.ts), [shared/discover
 | [`SUPPORTED_PI_VERSION`](../../src/runtime/pi-process.ts#L19) | Module value | Inferred from initializer | [Read explanation](implementation/runtime.md) |
 | [`RuntimeState`](../../src/runtime/pi-process.ts#L20) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
 | [`PiOptions`](../../src/runtime/pi-process.ts#L21) | Interface |  | [Read explanation](implementation/runtime.md) |
-| [`SessionState`](../../src/runtime/pi-process.ts#L39) | Interface |  | [Read explanation](implementation/runtime.md) |
-| [`RunResult`](../../src/runtime/pi-process.ts#L49) | Interface |  | [Read explanation](implementation/runtime.md) |
-| [`NativeExecutionResult`](../../src/runtime/pi-process.ts#L53) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
-| [`ActiveExecution`](../../src/runtime/pi-process.ts#L57) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
-| [`NativeExecutionEvent`](../../src/runtime/pi-process.ts#L59) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
-| [`PiEntry`](../../src/runtime/pi-process.ts#L62) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
-| [`Listener`](../../src/runtime/pi-process.ts#L67) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
-| [`StateListener`](../../src/runtime/pi-process.ts#L68) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
-| [`NativeExecutionListener`](../../src/runtime/pi-process.ts#L69) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
-| [`Subscription`](../../src/runtime/pi-process.ts#L70) | Interface |  | [Read explanation](implementation/runtime.md) |
-| [`Run`](../../src/runtime/pi-process.ts#L74) | Interface |  | [Read explanation](implementation/runtime.md) |
-| [`NativeRun`](../../src/runtime/pi-process.ts#L86) | Interface |  | [Read explanation](implementation/runtime.md) |
-| [`ActiveRun`](../../src/runtime/pi-process.ts#L92) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
-| [`UiResponse`](../../src/runtime/pi-process.ts#L93) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
-| [`sessionState`](../../src/runtime/pi-process.ts#L99) | Function | value | [Read explanation](implementation/runtime.md#runtime-types-and-boundary-validation) |
-| [`isSelectedModel`](../../src/runtime/pi-process.ts#L133) | Function | value | [Read explanation](implementation/runtime.md#runtime-types-and-boundary-validation) |
-| [`sessionEntries`](../../src/runtime/pi-process.ts#L143) | Function | value | [Read explanation](implementation/runtime.md#runtime-types-and-boundary-validation) |
-| [`verifyPiConfiguration`](../../src/runtime/pi-process.ts#L172) | Function | configuration, cwd, env, timeout | [Read explanation](implementation/runtime.md#runtime-types-and-boundary-validation) |
-| [`PiProcess`](../../src/runtime/pi-process.ts#L215) | Class |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#state`](../../src/runtime/pi-process.ts#L216) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#child`](../../src/runtime/pi-process.ts#L217) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#rpc`](../../src/runtime/pi-process.ts#L218) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#listeners`](../../src/runtime/pi-process.ts#L219) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#stateListeners`](../../src/runtime/pi-process.ts#L220) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#nativeExecutionListeners`](../../src/runtime/pi-process.ts#L221) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#dialogs`](../../src/runtime/pi-process.ts#L222) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#requestMs`](../../src/runtime/pi-process.ts#L223) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#shutdownMs`](../../src/runtime/pi-process.ts#L224) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#closed`](../../src/runtime/pi-process.ts#L225) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#stderr`](../../src/runtime/pi-process.ts#L226) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#run`](../../src/runtime/pi-process.ts#L227) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#lastNativeExecution`](../../src/runtime/pi-process.ts#L228) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#stopping`](../../src/runtime/pi-process.ts#L229) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.#error`](../../src/runtime/pi-process.ts#L230) | Property |  | [Read explanation](implementation/runtime.md) |
-| [`PiProcess.constructor`](../../src/runtime/pi-process.ts#L232) | Constructor | child, requestMs, shutdownMs | [Read explanation](implementation/runtime.md#runtime-startup-and-session-handshake) |
-| [`PiProcess.start`](../../src/runtime/pi-process.ts#L274) | Method | options | [Read explanation](implementation/runtime.md#runtime-startup-and-session-handshake) |
-| [`PiProcess.state`](../../src/runtime/pi-process.ts#L393) | GetAccessor |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.pid`](../../src/runtime/pi-process.ts#L396) | GetAccessor |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.stderrTail`](../../src/runtime/pi-process.ts#L399) | GetAccessor |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.activeExecution`](../../src/runtime/pi-process.ts#L403) | GetAccessor |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.subscribe`](../../src/runtime/pi-process.ts#L411) | Method | listener, options | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.subscribeState`](../../src/runtime/pi-process.ts#L420) | Method | listener | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.subscribeNativeExecution`](../../src/runtime/pi-process.ts#L426) | Method | listener | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.getState`](../../src/runtime/pi-process.ts#L439) | Method |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.getAvailableModels`](../../src/runtime/pi-process.ts#L449) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
-| [`PiProcess.getAvailableThinkingLevels`](../../src/runtime/pi-process.ts#L455) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
-| [`PiProcess.setThinkingLevel`](../../src/runtime/pi-process.ts#L478) | Method | level | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
-| [`PiProcess.setModel`](../../src/runtime/pi-process.ts#L487) | Method | provider, model | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
-| [`PiProcess.getMessages`](../../src/runtime/pi-process.ts#L516) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
-| [`PiProcess.getEntries`](../../src/runtime/pi-process.ts#L532) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
-| [`PiProcess.supportsImages`](../../src/runtime/pi-process.ts#L542) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
-| [`PiProcess.startRun`](../../src/runtime/pi-process.ts#L578) | Method | message, images | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
-| [`PiProcess.run`](../../src/runtime/pi-process.ts#L648) | Method | message | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
-| [`PiProcess.abort`](../../src/runtime/pi-process.ts#L654) | Method |  | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
-| [`PiProcess.respondToUi`](../../src/runtime/pi-process.ts#L659) | Method | response | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
-| [`PiProcess.stop`](../../src/runtime/pi-process.ts#L682) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
-| [`PiProcess.#stop`](../../src/runtime/pi-process.ts#L687) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
-| [`PiProcess.#finish`](../../src/runtime/pi-process.ts#L705) | Method | run, result | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
-| [`PiProcess.#rejectRun`](../../src/runtime/pi-process.ts#L713) | Method | run, error | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
-| [`PiProcess.#fail`](../../src/runtime/pi-process.ts#L721) | Method | error | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
-| [`PiProcess.#onRecord`](../../src/runtime/pi-process.ts#L730) | Method | record | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
-| [`PiProcess.#setState`](../../src/runtime/pi-process.ts#L784) | Method | state | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.#beginNativeRun`](../../src/runtime/pi-process.ts#L792) | Method |  | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
-| [`PiProcess.#finishNativeRun`](../../src/runtime/pi-process.ts#L800) | Method | run, result | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
-| [`PiProcess.#transferHandledRun`](../../src/runtime/pi-process.ts#L808) | Method | run | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
-| [`PiProcess.#interruptRun`](../../src/runtime/pi-process.ts#L835) | Method | error | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
-| [`PiProcess.#publishNativeExecution`](../../src/runtime/pi-process.ts#L851) | Method | event | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
-| [`PiProcess.#notifyNativeExecutionListener`](../../src/runtime/pi-process.ts#L857) | Method | listener, event | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.#notifyStateListener`](../../src/runtime/pi-process.ts#L869) | Method | listener, state | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
-| [`PiProcess.#hasInteractiveObservers`](../../src/runtime/pi-process.ts#L878) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
-| [`PiProcess.#cancelDialogs`](../../src/runtime/pi-process.ts#L882) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
-| [`PiProcess.#uiRequest`](../../src/runtime/pi-process.ts#L887) | Method | record | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
-| [`PiProcess.#clearDialogs`](../../src/runtime/pi-process.ts#L925) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
+| [`SessionState`](../../src/runtime/pi-process.ts#L41) | Interface |  | [Read explanation](implementation/runtime.md) |
+| [`RunResult`](../../src/runtime/pi-process.ts#L51) | Interface |  | [Read explanation](implementation/runtime.md) |
+| [`NativeExecutionResult`](../../src/runtime/pi-process.ts#L55) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
+| [`ActiveExecution`](../../src/runtime/pi-process.ts#L59) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
+| [`NativeExecutionEvent`](../../src/runtime/pi-process.ts#L61) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
+| [`PiEntry`](../../src/runtime/pi-process.ts#L64) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
+| [`Listener`](../../src/runtime/pi-process.ts#L69) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
+| [`StateListener`](../../src/runtime/pi-process.ts#L70) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
+| [`NativeExecutionListener`](../../src/runtime/pi-process.ts#L71) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
+| [`Subscription`](../../src/runtime/pi-process.ts#L72) | Interface |  | [Read explanation](implementation/runtime.md) |
+| [`Run`](../../src/runtime/pi-process.ts#L76) | Interface |  | [Read explanation](implementation/runtime.md) |
+| [`NativeRun`](../../src/runtime/pi-process.ts#L88) | Interface |  | [Read explanation](implementation/runtime.md) |
+| [`ActiveRun`](../../src/runtime/pi-process.ts#L94) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
+| [`UiResponse`](../../src/runtime/pi-process.ts#L95) | TypeAlias |  | [Read explanation](implementation/runtime.md) |
+| [`sessionState`](../../src/runtime/pi-process.ts#L101) | Function | value | [Read explanation](implementation/runtime.md#runtime-types-and-boundary-validation) |
+| [`isSelectedModel`](../../src/runtime/pi-process.ts#L135) | Function | value | [Read explanation](implementation/runtime.md#runtime-types-and-boundary-validation) |
+| [`sessionEntries`](../../src/runtime/pi-process.ts#L145) | Function | value | [Read explanation](implementation/runtime.md#runtime-types-and-boundary-validation) |
+| [`verifyPiConfiguration`](../../src/runtime/pi-process.ts#L174) | Function | configuration, cwd, env, timeout | [Read explanation](implementation/runtime.md#runtime-types-and-boundary-validation) |
+| [`PiProcess`](../../src/runtime/pi-process.ts#L217) | Class |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#state`](../../src/runtime/pi-process.ts#L218) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#child`](../../src/runtime/pi-process.ts#L219) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#rpc`](../../src/runtime/pi-process.ts#L220) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#listeners`](../../src/runtime/pi-process.ts#L221) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#stateListeners`](../../src/runtime/pi-process.ts#L222) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#nativeExecutionListeners`](../../src/runtime/pi-process.ts#L223) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#dialogs`](../../src/runtime/pi-process.ts#L224) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#requestMs`](../../src/runtime/pi-process.ts#L225) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#shutdownMs`](../../src/runtime/pi-process.ts#L226) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#closed`](../../src/runtime/pi-process.ts#L227) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#stderr`](../../src/runtime/pi-process.ts#L228) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#run`](../../src/runtime/pi-process.ts#L229) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#lastNativeExecution`](../../src/runtime/pi-process.ts#L230) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#stopping`](../../src/runtime/pi-process.ts#L231) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.#error`](../../src/runtime/pi-process.ts#L232) | Property |  | [Read explanation](implementation/runtime.md) |
+| [`PiProcess.constructor`](../../src/runtime/pi-process.ts#L234) | Constructor | child, requestMs, shutdownMs | [Read explanation](implementation/runtime.md#runtime-startup-and-session-handshake) |
+| [`PiProcess.start`](../../src/runtime/pi-process.ts#L276) | Method | options | [Read explanation](implementation/runtime.md#runtime-startup-and-session-handshake) |
+| [`PiProcess.state`](../../src/runtime/pi-process.ts#L400) | GetAccessor |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.pid`](../../src/runtime/pi-process.ts#L403) | GetAccessor |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.stderrTail`](../../src/runtime/pi-process.ts#L406) | GetAccessor |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.activeExecution`](../../src/runtime/pi-process.ts#L410) | GetAccessor |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.subscribe`](../../src/runtime/pi-process.ts#L418) | Method | listener, options | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.subscribeState`](../../src/runtime/pi-process.ts#L427) | Method | listener | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.subscribeNativeExecution`](../../src/runtime/pi-process.ts#L433) | Method | listener | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.getState`](../../src/runtime/pi-process.ts#L446) | Method |  | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.getAvailableModels`](../../src/runtime/pi-process.ts#L456) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
+| [`PiProcess.getAvailableThinkingLevels`](../../src/runtime/pi-process.ts#L462) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
+| [`PiProcess.setThinkingLevel`](../../src/runtime/pi-process.ts#L485) | Method | level | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
+| [`PiProcess.setModel`](../../src/runtime/pi-process.ts#L494) | Method | provider, model | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
+| [`PiProcess.getMessages`](../../src/runtime/pi-process.ts#L523) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
+| [`PiProcess.getEntries`](../../src/runtime/pi-process.ts#L539) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
+| [`PiProcess.supportsImages`](../../src/runtime/pi-process.ts#L549) | Method |  | [Read explanation](implementation/runtime.md#runtime-model-and-context-operations) |
+| [`PiProcess.startRun`](../../src/runtime/pi-process.ts#L585) | Method | message, images | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
+| [`PiProcess.run`](../../src/runtime/pi-process.ts#L655) | Method | message | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
+| [`PiProcess.abort`](../../src/runtime/pi-process.ts#L661) | Method |  | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
+| [`PiProcess.respondToUi`](../../src/runtime/pi-process.ts#L666) | Method | response | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
+| [`PiProcess.stop`](../../src/runtime/pi-process.ts#L689) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
+| [`PiProcess.#stop`](../../src/runtime/pi-process.ts#L694) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
+| [`PiProcess.#finish`](../../src/runtime/pi-process.ts#L712) | Method | run, result | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
+| [`PiProcess.#rejectRun`](../../src/runtime/pi-process.ts#L720) | Method | run, error | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
+| [`PiProcess.#fail`](../../src/runtime/pi-process.ts#L728) | Method | error | [Read explanation](implementation/runtime.md#runtime-dwell-run-lifecycle) |
+| [`PiProcess.#onRecord`](../../src/runtime/pi-process.ts#L737) | Method | record | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
+| [`PiProcess.#setState`](../../src/runtime/pi-process.ts#L791) | Method | state | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.#beginNativeRun`](../../src/runtime/pi-process.ts#L799) | Method |  | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
+| [`PiProcess.#finishNativeRun`](../../src/runtime/pi-process.ts#L807) | Method | run, result | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
+| [`PiProcess.#transferHandledRun`](../../src/runtime/pi-process.ts#L815) | Method | run | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
+| [`PiProcess.#interruptRun`](../../src/runtime/pi-process.ts#L842) | Method | error | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
+| [`PiProcess.#publishNativeExecution`](../../src/runtime/pi-process.ts#L858) | Method | event | [Read explanation](implementation/runtime.md#runtime-rpc-events-and-native-execution) |
+| [`PiProcess.#notifyNativeExecutionListener`](../../src/runtime/pi-process.ts#L864) | Method | listener, event | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.#notifyStateListener`](../../src/runtime/pi-process.ts#L876) | Method | listener, state | [Read explanation](implementation/runtime.md#runtime-observation-and-process-state) |
+| [`PiProcess.#hasInteractiveObservers`](../../src/runtime/pi-process.ts#L885) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
+| [`PiProcess.#cancelDialogs`](../../src/runtime/pi-process.ts#L889) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
+| [`PiProcess.#uiRequest`](../../src/runtime/pi-process.ts#L894) | Method | record | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
+| [`PiProcess.#clearDialogs`](../../src/runtime/pi-process.ts#L932) | Method |  | [Read explanation](implementation/runtime.md#runtime-extension-dialogs-and-shutdown) |
 
 
 ## src/runtime/pi-rpc.ts
@@ -841,24 +841,24 @@ Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts]
 
 Prose explanation: [http](implementation/http.md)
 
-[Open source](../../src/server/http.ts) · 636 lines
+[Open source](../../src/server/http.ts) · 653 lines
 
 Local dependencies: [clients/web/page.ts](../../src/clients/web/page.ts), [clients/web/script.ts](../../src/clients/web/script.ts), [local/files.ts](../../src/local/files.ts), [local/paths.ts](../../src/local/paths.ts), [sessions/service.ts](../../src/sessions/service.ts), [shared/protocol.ts](../../src/shared/protocol.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/turns.ts](../../src/shared/turns.ts), [server/access.ts](../../src/server/access.ts), [server/auth.ts](../../src/server/auth.ts), [server/sse.ts](../../src/server/sse.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`HostOptions`](../../src/server/http.ts#L20) | Interface |  | [Read explanation](implementation/http.md) |
-| [`RunningHost`](../../src/server/http.ts#L30) | Interface |  | [Read explanation](implementation/http.md) |
-| [`fail`](../../src/server/http.ts#L35) | Function | status, code, message | [Read explanation](implementation/http.md#request-validation) |
-| [`cookieToken`](../../src/server/http.ts#L38) | Function | request, name | [Read explanation](implementation/http.md#request-validation) |
-| [`browserRequest`](../../src/server/http.ts#L46) | Function | request, origin | [Read explanation](implementation/http.md#request-validation) |
-| [`readJson`](../../src/server/http.ts#L51) | Function | request, limit | [Read explanation](implementation/http.md#request-validation) |
-| [`send`](../../src/server/http.ts#L88) | Function | response, status, body | [Read explanation](implementation/http.md#request-validation) |
-| [`parseHistoryCursor`](../../src/server/http.ts#L92) | Function | query | [Read explanation](implementation/http.md#request-validation) |
-| [`startHost`](../../src/server/http.ts#L106) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [Read explanation](implementation/http.md#host-lifecycle) |
-| [`startHost.revalidateEventStreams`](../../src/server/http.ts#L134) | Nested function |  | [Read explanation](implementation/http.md#host-lifecycle) |
-| [`startHost.openEventStream`](../../src/server/http.ts#L138) | Nested function | request, response, sessionId, cursor, cookieName | [Read explanation](implementation/http.md#host-lifecycle) |
-| [`startHost.handle`](../../src/server/http.ts#L171) | Nested function | request, response | [Read explanation](implementation/http.md#route-dispatch) |
+| [`HostOptions`](../../src/server/http.ts#L22) | Interface |  | [Read explanation](implementation/http.md) |
+| [`RunningHost`](../../src/server/http.ts#L32) | Interface |  | [Read explanation](implementation/http.md) |
+| [`fail`](../../src/server/http.ts#L37) | Function | status, code, message | [Read explanation](implementation/http.md#request-validation) |
+| [`cookieToken`](../../src/server/http.ts#L40) | Function | request, name | [Read explanation](implementation/http.md#request-validation) |
+| [`browserRequest`](../../src/server/http.ts#L48) | Function | request, origin | [Read explanation](implementation/http.md#request-validation) |
+| [`readJson`](../../src/server/http.ts#L53) | Function | request, limit | [Read explanation](implementation/http.md#request-validation) |
+| [`send`](../../src/server/http.ts#L90) | Function | response, status, body | [Read explanation](implementation/http.md#request-validation) |
+| [`parseHistoryCursor`](../../src/server/http.ts#L94) | Function | query | [Read explanation](implementation/http.md#request-validation) |
+| [`startHost`](../../src/server/http.ts#L108) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [Read explanation](implementation/http.md#host-lifecycle) |
+| [`startHost.revalidateEventStreams`](../../src/server/http.ts#L137) | Nested function |  | [Read explanation](implementation/http.md#host-lifecycle) |
+| [`startHost.openEventStream`](../../src/server/http.ts#L141) | Nested function | request, response, sessionId, cursor, cookieName | [Read explanation](implementation/http.md#host-lifecycle) |
+| [`startHost.handle`](../../src/server/http.ts#L174) | Nested function | request, response | [Read explanation](implementation/http.md#route-dispatch) |
 
 
 ## src/server/session-discovery.ts
@@ -1180,112 +1180,112 @@ Local dependencies: [runtime/message-identity.ts](../../src/runtime/message-iden
 
 Prose explanation: [sessions](implementation/sessions.md)
 
-[Open source](../../src/sessions/service.ts) · 2194 lines
+[Open source](../../src/sessions/service.ts) · 2224 lines
 
 Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts](../../src/local/paths.ts), [runtime/message-identity.ts](../../src/runtime/message-identity.ts), [runtime/pi-history.ts](../../src/runtime/pi-history.ts), [runtime/pi-process.ts](../../src/runtime/pi-process.ts), [runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts), [server/session-discovery.ts](../../src/server/session-discovery.ts), [shared/discovery.ts](../../src/shared/discovery.ts), [shared/events.ts](../../src/shared/events.ts), [shared/history.ts](../../src/shared/history.ts), [shared/images.ts](../../src/shared/images.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/turns.ts](../../src/shared/turns.ts), [storage/catalog.ts](../../src/storage/catalog.ts), [sessions/events.ts](../../src/sessions/events.ts), [sessions/history.ts](../../src/sessions/history.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`SessionError`](../../src/sessions/service.ts#L58) | Class |  | [Read explanation](implementation/sessions.md) |
-| [`SessionError.status`](../../src/sessions/service.ts#L59) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionError.code`](../../src/sessions/service.ts#L60) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionError.constructor`](../../src/sessions/service.ts#L61) | Constructor | status, code, message | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionServiceOptions`](../../src/sessions/service.ts#L68) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`HISTORY_UNAVAILABLE`](../../src/sessions/service.ts#L83) | Module value | Inferred from initializer | [Read explanation](implementation/sessions.md) |
-| [`MAX_OPEN_SESSIONS`](../../src/sessions/service.ts#L84) | Module value | Inferred from initializer | [Read explanation](implementation/sessions.md) |
-| [`turnPayloadIdentity`](../../src/sessions/service.ts#L86) | Function | message, images | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`validateStored`](../../src/sessions/service.ts#L98) | Function | stored | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`ActiveTurn`](../../src/sessions/service.ts#L114) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`HistoryIdentity`](../../src/sessions/service.ts#L130) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`NativeExecutionRecord`](../../src/sessions/service.ts#L135) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`NativeStateRefreshRequest`](../../src/sessions/service.ts#L146) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`NativeStateRefresh`](../../src/sessions/service.ts#L151) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`isMessageAfterBaseline`](../../src/sessions/service.ts#L156) | Function | key, baseline | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`messageKeysAfterBaseline`](../../src/sessions/service.ts#L168) | Function | entries, baseline | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`messageKeyDelta`](../../src/sessions/service.ts#L178) | Function | baseline, finalCounts | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`turnView`](../../src/sessions/service.ts#L192) | Function | turn | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`active`](../../src/sessions/service.ts#L197) | Function | turn | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`truncateUtf8`](../../src/sessions/service.ts#L201) | Function | value, maxBytes | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService`](../../src/sessions/service.ts#L214) | Class |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#catalog`](../../src/sessions/service.ts#L215) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#dataDir`](../../src/sessions/service.ts#L216) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#env`](../../src/sessions/service.ts#L217) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#extensions`](../../src/sessions/service.ts#L218) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#now`](../../src/sessions/service.ts#L219) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#runtimes`](../../src/sessions/service.ts#L220) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#runtimeObservers`](../../src/sessions/service.ts#L221) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#historyIdentity`](../../src/sessions/service.ts#L222) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#nativeExecutions`](../../src/sessions/service.ts#L223) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#nativeStateRefreshes`](../../src/sessions/service.ts#L224) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#turns`](../../src/sessions/service.ts#L225) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#storageFaults`](../../src/sessions/service.ts#L226) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#events`](../../src/sessions/service.ts#L227) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#historyPages`](../../src/sessions/service.ts#L228) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#reads`](../../src/sessions/service.ts#L231) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#nativeRefreshes`](../../src/sessions/service.ts#L232) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#shutdownController`](../../src/sessions/service.ts#L233) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#modelDiscovery`](../../src/sessions/service.ts#L234) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#modelCapabilityDiscoveries`](../../src/sessions/service.ts#L235) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#sessionModelReads`](../../src/sessions/service.ts#L236) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#checkpoint`](../../src/sessions/service.ts#L237) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#queue`](../../src/sessions/service.ts#L239) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#stopping`](../../src/sessions/service.ts#L240) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#shutdown`](../../src/sessions/service.ts#L241) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.constructor`](../../src/sessions/service.ts#L243) | Constructor | catalog, dataDir, options | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.create`](../../src/sessions/service.ts#L254) | Method | options | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.runtimeCount`](../../src/sessions/service.ts#L269) | GetAccessor |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.configure`](../../src/sessions/service.ts#L273) | Method | configuration | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.listSessions`](../../src/sessions/service.ts#L296) | Method |  | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.getSession`](../../src/sessions/service.ts#L301) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.listDirectories`](../../src/sessions/service.ts#L347) | Method | path | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.listAvailableModels`](../../src/sessions/service.ts#L370) | Method |  | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.listSessionModels`](../../src/sessions/service.ts#L395) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.getSessionModelCapabilities`](../../src/sessions/service.ts#L438) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.getModelCapabilities`](../../src/sessions/service.ts#L458) | Method | request | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.subscribeEvents`](../../src/sessions/service.ts#L497) | Method | id, cursor, listener | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.#publishState`](../../src/sessions/service.ts#L528) | Method | id, withTurn | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.#storageFault`](../../src/sessions/service.ts#L551) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.createSession`](../../src/sessions/service.ts#L561) | Method | request | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.setSessionModel`](../../src/sessions/service.ts#L645) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.openSession`](../../src/sessions/service.ts#L752) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.closeSession`](../../src/sessions/service.ts#L756) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.getContext`](../../src/sessions/service.ts#L792) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.getHistory`](../../src/sessions/service.ts#L804) | Method | id, cursor | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.getHistoryImage`](../../src/sessions/service.ts#L922) | Method | id, entryId, imageIndex | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.submitTurn`](../../src/sessions/service.ts#L950) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.getTurn`](../../src/sessions/service.ts#L1026) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.getTurnResult`](../../src/sessions/service.ts#L1032) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.abortTurn`](../../src/sessions/service.ts#L1084) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.abortNativeExecution`](../../src/sessions/service.ts#L1119) | Method | id, executionId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#storedTurn`](../../src/sessions/service.ts#L1163) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#checkStorage`](../../src/sessions/service.ts#L1171) | Method | id | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#writeTurn`](../../src/sessions/service.ts#L1180) | Method | turn | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#abortRuntime`](../../src/sessions/service.ts#L1194) | Method | slot | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#executeTurn`](../../src/sessions/service.ts#L1209) | Method | slot, message, images | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.#completeHandledTurn`](../../src/sessions/service.ts#L1392) | Method | sessionId, runId, runtime, before, historyWasExpected | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.shutdown`](../../src/sessions/service.ts#L1455) | Method |  | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#configuration`](../../src/sessions/service.ts#L1524) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#admit`](../../src/sessions/service.ts#L1535) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#mutate`](../../src/sessions/service.ts#L1540) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#read`](../../src/sessions/service.ts#L1554) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#stored`](../../src/sessions/service.ts#L1584) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#view`](../../src/sessions/service.ts#L1592) | Method | stored | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#directory`](../../src/sessions/service.ts#L1640) | Method | path | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#prune`](../../src/sessions/service.ts#L1656) | Method |  | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#checkHistory`](../../src/sessions/service.ts#L1667) | Method | stored | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#savedHistory`](../../src/sessions/service.ts#L1770) | Method | stored, options | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#identityForEntries`](../../src/sessions/service.ts#L1788) | Method | entries | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#identityForHistory`](../../src/sessions/service.ts#L1793) | Method | history | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#observeRuntime`](../../src/sessions/service.ts#L1799) | Method | sessionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#nativeExecutionEvent`](../../src/sessions/service.ts#L1833) | Method | sessionId, event, startedLate | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#refreshNativeHistory`](../../src/sessions/service.ts#L1919) | Method | sessionId, executionId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#scheduleNativeStateRefresh`](../../src/sessions/service.ts#L1950) | Method | sessionId, executionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#refreshNativeSessionState`](../../src/sessions/service.ts#L1980) | Method | sessionId, executionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#open`](../../src/sessions/service.ts#L2031) | Method | stored, options | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#rememberHistory`](../../src/sessions/service.ts#L2169) | Method | stored, runtime | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#recordHistoryCheck`](../../src/sessions/service.ts#L1728) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#historyCheckState`](../../src/sessions/service.ts#L1759) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.renameSession`](../../src/sessions/service.ts#L306) | Method |  | [Read explanation](implementation/sessions.md#sessions-shared-names) |
+| [`SessionError`](../../src/sessions/service.ts#L60) | Class |  | [Read explanation](implementation/sessions.md) |
+| [`SessionError.status`](../../src/sessions/service.ts#L61) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionError.code`](../../src/sessions/service.ts#L62) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionError.constructor`](../../src/sessions/service.ts#L63) | Constructor | status, code, message | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionServiceOptions`](../../src/sessions/service.ts#L70) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`HISTORY_UNAVAILABLE`](../../src/sessions/service.ts#L86) | Module value | Inferred from initializer | [Read explanation](implementation/sessions.md) |
+| [`MAX_OPEN_SESSIONS`](../../src/sessions/service.ts#L87) | Module value | Inferred from initializer | [Read explanation](implementation/sessions.md) |
+| [`turnPayloadIdentity`](../../src/sessions/service.ts#L89) | Function | message, images | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`validateStored`](../../src/sessions/service.ts#L101) | Function | stored | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`ActiveTurn`](../../src/sessions/service.ts#L117) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`HistoryIdentity`](../../src/sessions/service.ts#L133) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`NativeExecutionRecord`](../../src/sessions/service.ts#L138) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`NativeStateRefreshRequest`](../../src/sessions/service.ts#L149) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`NativeStateRefresh`](../../src/sessions/service.ts#L154) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`isMessageAfterBaseline`](../../src/sessions/service.ts#L159) | Function | key, baseline | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`messageKeysAfterBaseline`](../../src/sessions/service.ts#L171) | Function | entries, baseline | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`messageKeyDelta`](../../src/sessions/service.ts#L181) | Function | baseline, finalCounts | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`turnView`](../../src/sessions/service.ts#L195) | Function | turn | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`active`](../../src/sessions/service.ts#L200) | Function | turn | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`truncateUtf8`](../../src/sessions/service.ts#L204) | Function | value, maxBytes | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService`](../../src/sessions/service.ts#L217) | Class |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#catalog`](../../src/sessions/service.ts#L218) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#dataDir`](../../src/sessions/service.ts#L219) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#env`](../../src/sessions/service.ts#L220) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#extensions`](../../src/sessions/service.ts#L221) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#now`](../../src/sessions/service.ts#L222) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#runtimes`](../../src/sessions/service.ts#L223) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#runtimeObservers`](../../src/sessions/service.ts#L224) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#historyIdentity`](../../src/sessions/service.ts#L225) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#nativeExecutions`](../../src/sessions/service.ts#L226) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#nativeStateRefreshes`](../../src/sessions/service.ts#L227) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#turns`](../../src/sessions/service.ts#L228) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#storageFaults`](../../src/sessions/service.ts#L229) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#events`](../../src/sessions/service.ts#L230) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#historyPages`](../../src/sessions/service.ts#L231) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#reads`](../../src/sessions/service.ts#L235) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#nativeRefreshes`](../../src/sessions/service.ts#L236) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#shutdownController`](../../src/sessions/service.ts#L237) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#modelDiscovery`](../../src/sessions/service.ts#L238) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#modelCapabilityDiscoveries`](../../src/sessions/service.ts#L239) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#sessionModelReads`](../../src/sessions/service.ts#L240) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#checkpoint`](../../src/sessions/service.ts#L241) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#queue`](../../src/sessions/service.ts#L243) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#stopping`](../../src/sessions/service.ts#L244) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#shutdown`](../../src/sessions/service.ts#L245) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.constructor`](../../src/sessions/service.ts#L247) | Constructor | catalog, dataDir, options | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.create`](../../src/sessions/service.ts#L259) | Method | options | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.runtimeCount`](../../src/sessions/service.ts#L274) | GetAccessor |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.configure`](../../src/sessions/service.ts#L278) | Method | configuration | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.listSessions`](../../src/sessions/service.ts#L301) | Method |  | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.getSession`](../../src/sessions/service.ts#L306) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.listDirectories`](../../src/sessions/service.ts#L352) | Method | path | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.listAvailableModels`](../../src/sessions/service.ts#L375) | Method |  | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.listSessionModels`](../../src/sessions/service.ts#L400) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.getSessionModelCapabilities`](../../src/sessions/service.ts#L443) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.getModelCapabilities`](../../src/sessions/service.ts#L463) | Method | request | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.subscribeEvents`](../../src/sessions/service.ts#L502) | Method | id, cursor, listener | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.#publishState`](../../src/sessions/service.ts#L533) | Method | id, withTurn | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.#storageFault`](../../src/sessions/service.ts#L556) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.createSession`](../../src/sessions/service.ts#L566) | Method | request | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.setSessionModel`](../../src/sessions/service.ts#L650) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.openSession`](../../src/sessions/service.ts#L757) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.closeSession`](../../src/sessions/service.ts#L761) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.getContext`](../../src/sessions/service.ts#L803) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.getHistory`](../../src/sessions/service.ts#L815) | Method | id, cursor | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.getHistoryImage`](../../src/sessions/service.ts#L933) | Method | id, entryId, imageIndex | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.submitTurn`](../../src/sessions/service.ts#L961) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.getTurn`](../../src/sessions/service.ts#L1037) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.getTurnResult`](../../src/sessions/service.ts#L1043) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.abortTurn`](../../src/sessions/service.ts#L1095) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.abortNativeExecution`](../../src/sessions/service.ts#L1130) | Method | id, executionId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#storedTurn`](../../src/sessions/service.ts#L1174) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#checkStorage`](../../src/sessions/service.ts#L1182) | Method | id | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#writeTurn`](../../src/sessions/service.ts#L1191) | Method | turn | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#abortRuntime`](../../src/sessions/service.ts#L1205) | Method | slot | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#executeTurn`](../../src/sessions/service.ts#L1220) | Method | slot, message, images | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.#completeHandledTurn`](../../src/sessions/service.ts#L1403) | Method | sessionId, runId, runtime, before, historyWasExpected | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.shutdown`](../../src/sessions/service.ts#L1466) | Method |  | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#configuration`](../../src/sessions/service.ts#L1539) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#admit`](../../src/sessions/service.ts#L1550) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#mutate`](../../src/sessions/service.ts#L1555) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#read`](../../src/sessions/service.ts#L1569) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#stored`](../../src/sessions/service.ts#L1599) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#view`](../../src/sessions/service.ts#L1607) | Method | stored | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#directory`](../../src/sessions/service.ts#L1655) | Method | path | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#prune`](../../src/sessions/service.ts#L1671) | Method |  | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#checkHistory`](../../src/sessions/service.ts#L1682) | Method | stored | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#savedHistory`](../../src/sessions/service.ts#L1787) | Method | stored, options | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#identityForEntries`](../../src/sessions/service.ts#L1805) | Method | entries | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#identityForHistory`](../../src/sessions/service.ts#L1810) | Method | history | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#observeRuntime`](../../src/sessions/service.ts#L1816) | Method | sessionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#nativeExecutionEvent`](../../src/sessions/service.ts#L1850) | Method | sessionId, event, startedLate | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#refreshNativeHistory`](../../src/sessions/service.ts#L1936) | Method | sessionId, executionId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#scheduleNativeStateRefresh`](../../src/sessions/service.ts#L1967) | Method | sessionId, executionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#refreshNativeSessionState`](../../src/sessions/service.ts#L1997) | Method | sessionId, executionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#open`](../../src/sessions/service.ts#L2048) | Method | stored, options | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#rememberHistory`](../../src/sessions/service.ts#L2199) | Method | stored, runtime | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#recordHistoryCheck`](../../src/sessions/service.ts#L1745) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#historyCheckState`](../../src/sessions/service.ts#L1776) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.renameSession`](../../src/sessions/service.ts#L311) | Method |  | [Read explanation](implementation/sessions.md#sessions-shared-names) |
 
 ## src/shared/discovery.ts
 
@@ -1577,4 +1577,67 @@ Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts]
 | [`migrateV5ToV6`](../../src/storage/catalog.ts#L537) | Function |  | [Read explanation](implementation/catalog.md#catalog-session-names) |
 | [`SessionCatalog.rename`](../../src/storage/catalog.ts#L756) | Method |  | [Read explanation](implementation/catalog.md#catalog-session-names) |
 
-Indexed **44 source files** and **612 callable explanations**.
+## src/integrations/configuration.ts
+
+Prose explanation: [storage integrations](implementation/storage-integrations.md#integration-configuration)
+
+[Open source](../../src/integrations/configuration.ts) · 52 lines
+
+Local dependencies: [src/local/files.ts](../../src/local/files.ts), [src/local/paths.ts](../../src/local/paths.ts), [src/runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts).
+
+| Symbol | Kind | Parameters or type | Explanation |
+| --- | --- | --- | --- |
+| [`IntegrationsConfiguration`](../../src/integrations/configuration.ts#L6) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`absolutePath`](../../src/integrations/configuration.ts#L11) | Function | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`readIntegrations`](../../src/integrations/configuration.ts#L15) | Function | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+
+## src/integrations/distill.ts
+
+Prose explanation: [storage integrations](implementation/storage-integrations.md#integration-configuration)
+
+[Open source](../../src/integrations/distill.ts) · 99 lines
+
+Local dependencies: [src/runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts).
+
+| Symbol | Kind | Parameters or type | Explanation |
+| --- | --- | --- | --- |
+| [`DistillModuleConfiguration`](../../src/integrations/distill.ts#L4) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`DistillSource`](../../src/integrations/distill.ts#L9) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`DistillChild`](../../src/integrations/distill.ts#L16) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`DistillUseSource`](../../src/integrations/distill.ts#L21) | Type alias | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`DistillUseRecord`](../../src/integrations/distill.ts#L27) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`DistillRecovery`](../../src/integrations/distill.ts#L39) | Type alias | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`DistillDeletionReceipt`](../../src/integrations/distill.ts#L43) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`DistillRead`](../../src/integrations/distill.ts#L52) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`DistillUse`](../../src/integrations/distill.ts#L57) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`DistillStorage`](../../src/integrations/distill.ts#L64) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`isDistillStorage`](../../src/integrations/distill.ts#L74) | Function | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`openDistill`](../../src/integrations/distill.ts#L87) | Function | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+
+## src/sessions/source-access.ts
+
+Prose explanation: [storage integrations](implementation/storage-integrations.md#source-read-coordination)
+
+[Open source](../../src/sessions/source-access.ts) · 145 lines
+
+Local dependencies: [src/integrations/distill.ts](../../src/integrations/distill.ts), [src/storage/catalog.ts](../../src/storage/catalog.ts).
+
+| Symbol | Kind | Parameters or type | Explanation |
+| --- | --- | --- | --- |
+| [`SourceSession`](../../src/sessions/source-access.ts#L4) | Type alias | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`OpeningSource`](../../src/sessions/source-access.ts#L6) | Interface | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SourceAccessError`](../../src/sessions/source-access.ts#L11) | Class | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SourceAccessError.constructor`](../../src/sessions/source-access.ts#L12) | Constructor | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess`](../../src/sessions/source-access.ts#L21) | Class | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.#storage`](../../src/sessions/source-access.ts#L22) | Property | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.#reads`](../../src/sessions/source-access.ts#L23) | Property | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.#children`](../../src/sessions/source-access.ts#L24) | Property | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.#releases`](../../src/sessions/source-access.ts#L25) | Property | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.constructor`](../../src/sessions/source-access.ts#L27) | Constructor | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.read`](../../src/sessions/source-access.ts#L35) | Method | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.#releaseRead`](../../src/sessions/source-access.ts#L59) | Method | lease | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.begin`](../../src/sessions/source-access.ts#L69) | Method | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.drain`](../../src/sessions/source-access.ts#L111) | Method | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+| [`SessionSourceAccess.#release`](../../src/sessions/source-access.ts#L137) | Method | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
+
+Indexed **47 source files** and **623 callable explanations**.

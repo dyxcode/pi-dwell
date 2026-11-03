@@ -27,9 +27,9 @@ Each response starts with `Cache-Control: no-store`, `X-Content-Type-Options: no
 1. Reject duplicate security-sensitive headers: Host, Origin, Authorization, Cookie, both Dwell headers, and Last-Event-ID.
 2. Select the local or configured HTTPS authority, reject cross-origin requests, and reject CLI Authorization on the HTTPS lane.
 3. Reject requests while starting/stopping and request targets longer than 2048 characters.
-4. Parse the path and the narrowly supported query forms. Directory browsing accepts one `path`; history accepts one nonempty `cursor` of at most 1536 characters. Other query strings fail.
+4. Parse the path and the narrowly supported query forms. Directory browsing accepts one `path`; history accepts one nonempty `cursor` of at most 1536 characters. Latest library browsing accepts optional `source` and `limit`; other query strings fail.
 5. Determine the allowed method. Unknown paths return 404; wrong methods return 405 with `Allow`.
-6. Authenticate protected routes; reject bodies on GET; enforce CLI-only runtime configuration and browser mutation checks.
+6. Authenticate protected routes; reject bodies on GET and DELETE; enforce CLI-only runtime configuration and browser mutation checks.
 7. Parse bounded JSON, apply operation-specific validators, and delegate to the service.
 8. Map typed errors to the public error envelope. Unknown exceptions produce a generic 500; errors after headers have been sent destroy the response.
 
@@ -37,7 +37,7 @@ Each response starts with `Cache-Control: no-store`, `X-Content-Type-Options: no
 
 ## Complete route map
 
-All API paths below are relative to `/api/v1`. **Either** means local bearer authentication or a browser cookie plus binding key. Browser POST operations also require the matching Origin and `X-Dwell-Request: 1`. Empty bodies mean the JSON object `{}`, not a missing Content-Type.
+All API paths below are relative to `/api/v1`. **Either** means local bearer authentication or a browser cookie plus binding key. Browser POST and DELETE operations also require the matching Origin and `X-Dwell-Request: 1`. Empty bodies mean the JSON object `{}`, not a missing Content-Type.
 
 | Method and route | Authentication | Input and result |
 | --- | --- | --- |
@@ -53,6 +53,12 @@ All API paths below are relative to `/api/v1`. **Either** means local bearer aut
 | `GET /directories[?path=…]` | Either | Canonical host directory, parent, child directories, truncation flag |
 | `GET /models` | Either | Global isolated discovery result wrapped in `models` |
 | `POST /model-capabilities` | Either | Provider/model → thinking levels and image support |
+| `POST /library/search` | Either | `{query, source?, limit?}` → matching item views |
+| `GET /library/latest[?source=…&limit=…]` | Either | Latest batch and bounded item views |
+| `GET /library/:binding/items/:item/versions/:version` | Either | Exact Current version |
+| `GET /sessions/:id/library-references` | Either | Persisted exact-version references |
+| `POST /sessions/:id/library-references` | Either | `{binding,itemId,versionId}` → saved references |
+| `DELETE /sessions/:id/library-references/:binding/items/:item/versions/:version` | Either | Remove the exact reference |
 | `GET /sessions` | Either | Session list |
 | `POST /sessions` | Either | requestId, directory, optional provider+model → 201 ready session; failed/interrupted creation returns a typed error |
 | `GET /sessions/:id` | Either | SessionInfo |
@@ -127,3 +133,5 @@ Copies are limited to 8 MiB per file and 16 MiB total and written privately. The
 Public errors use `{error: {code, message}}`. AccessError and SessionError preserve their status and code. SSE initialization maps unauthenticated to 401 and other initialization failures to 503. Rate limits receive Retry-After (300 seconds for pending-code saturation, otherwise 60). Unknown internal errors do not expose stack traces.
 
 Read [host.test.ts](../../tests/host.test.ts), [auth.test.ts](../../tests/auth.test.ts), and [access.test.ts](../../tests/access.test.ts) for transport and authentication boundaries; [sessions-http.test.ts](../../tests/sessions-http.test.ts), [turns-http.test.ts](../../tests/turns-http.test.ts), [history-http.test.ts](../../tests/history-http.test.ts), and [images-http.test.ts](../../tests/images-http.test.ts) for operation routes; [events-http.test.ts](../../tests/events-http.test.ts) for streams; [session-discovery.test.ts](../../tests/session-discovery.test.ts) for isolated discovery.
+
+Library routes use the same authentication and browser mutation checks. Latest accepts optional `source` and `limit` query fields; exact reference routes accept no query. See [library HTTP/browser](implementation/storage-integrations.md#library-http-browser).

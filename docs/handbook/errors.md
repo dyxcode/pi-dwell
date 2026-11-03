@@ -182,3 +182,13 @@ Pi RPC transport errors such as `Pi RPC connection closed`, `Pi RPC record excee
 | Browser handling of host errors and retry states | [web client](../../tests/web-client.test.ts) |
 
 For a type inventory and endpoint schemas, use [shared contracts](contracts.md). For the detailed dispatch/recovery algorithm, read [sessions and storage](sessions-storage.md); for route and access checks, read [HTTP and authentication](http-auth.md).
+
+<a id="library-errors"></a>
+
+## Current library
+
+| Code | HTTP | Meaning |
+| --- | --- | --- |
+| `library_unavailable` | 503 | Current is unconfigured or unavailable. |
+| `library_not_found` | 404 | The exact item version is absent; its saved reference can still be removed. |
+| `library_binding_mismatch` | 409 | The reference belongs to another library, or the binding is associated with a different root. |

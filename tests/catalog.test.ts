@@ -166,7 +166,7 @@ test("version-one catalogs migrate transactionally while preserving sessions and
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 6n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 7n);
   assert.equal(
     migrated.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'turns'").get()
       ?.count,
@@ -232,7 +232,7 @@ test("version-two migration preserves sessions, turns, indexes, and foreign keys
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 6n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 7n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   const index = migrated
     .prepare("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = ?")
@@ -288,7 +288,7 @@ test("version-three migration preserves sessions and turns while adding thinking
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 6n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 7n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   assert.ok(
     migrated
@@ -345,7 +345,7 @@ test("version-five migration adds shared names without changing sessions or turn
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 6n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 7n);
   migrated.close();
 });
 

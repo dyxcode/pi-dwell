@@ -21,6 +21,7 @@ const modules = {
   "/shared/discovery.js": new URL("../../shared/discovery.ts", import.meta.url),
   "/shared/history.js": new URL("../../shared/history.ts", import.meta.url),
   "/shared/events.js": new URL("../../shared/events.ts", import.meta.url),
+  "/shared/library.js": new URL("../../shared/library.ts", import.meta.url),
   "/shared/protocol.js": new URL("../../shared/protocol.ts", import.meta.url),
 };
 export const BROWSER_ASSETS = new Map<string, string>(

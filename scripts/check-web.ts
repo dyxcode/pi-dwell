@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { request as httpsRequest } from "node:https";
 import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { request as httpsRequest } from "node:https";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { startHost } from "../src/server/http.ts";
 import { createHttpsProxy, type HttpsProxyFixture } from "../tests/fixtures/https-proxy.ts";
 import { createPiEnvironment } from "../tests/fixtures/pi-environment.ts";
@@ -1358,6 +1358,446 @@ async function stagePngImages(page: BrowserPage, count: number, name: string): P
   })()`);
 }
 
+interface CurrentBrowserStore {
+  save(request: unknown): Promise<{ items: { itemId: string; versionId: string }[] }>;
+  close(): Promise<void>;
+}
+
+interface CurrentBrowserModule {
+  openContentLibrary(options: { root: string }): CurrentBrowserStore;
+}
+
+function isCurrentBrowserModule(value: unknown): value is CurrentBrowserModule {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const module = Object.fromEntries(Object.entries(value));
+  return typeof module.openContentLibrary === "function";
+}
+
+async function saveCurrentBrowserVersion(
+  store: CurrentBrowserStore,
+  externalId: string,
+  title: string,
+  text: string,
+): Promise<{ itemId: string; versionId: string }> {
+  const now = new Date().toISOString();
+  const batch = {
+    id: randomUUID(),
+    sourceId: "test-source",
+    collectedAt: now,
+    items: [
+      {
+        sourceId: "test-source",
+        externalId,
+        url: `https://example.test/${externalId}`,
+        title,
+        author: "Browser fixture author",
+        summary: `Synthetic Current summary: ${text}`,
+        text,
+        retrievedAt: now,
+        discoveredAt: now,
+        sourceCompleteness: "unknown",
+        truncated: false,
+      },
+    ],
+    failures: [],
+    stopReason: "complete",
+  };
+  const saved = await store.save({ batch, requestedCount: 1, startedAt: now });
+  const item = saved.items[0];
+  assert.ok(item);
+  return item;
+}
+
+async function runCurrentLibraryBrowserAcceptance(
+  executable: string,
+  currentModulePath: string,
+): Promise<void> {
+  assert.ok(currentModulePath.startsWith("/"), "DWELL_TEST_CURRENT_MODULE must be absolute.");
+  const environment = await createPiEnvironment();
+  const dataDir = join(environment.root, "dwell-current-browser");
+  const currentRoot = join(environment.root, "current-browser-store");
+  const binding = "browser-current";
+  const externalId = "browser-article";
+  const oldText = "Old exact browser version body marker.";
+  const latestText = "Newest BrowserSearchToken exact version body marker.";
+  let host: Awaited<ReturnType<typeof startHost>> | undefined;
+  let chrome: ReturnType<typeof spawn> | undefined;
+  let writer: CurrentBrowserStore | undefined;
+  const pages: BrowserPage[] = [];
+
+  try {
+    await mkdir(currentRoot, { recursive: true, mode: 0o700 });
+    const canonicalRoot = await realpath(currentRoot);
+    const moduleValue: unknown = await import(pathToFileURL(currentModulePath).href);
+    assert.ok(isCurrentBrowserModule(moduleValue), "Current library API v1 entry is unavailable.");
+    writer = moduleValue.openContentLibrary({ root: canonicalRoot });
+    const oldVersion = await saveCurrentBrowserVersion(
+      writer,
+      externalId,
+      "Old Current browser title",
+      oldText,
+    );
+    const latestVersion = await saveCurrentBrowserVersion(
+      writer,
+      externalId,
+      "Latest Current browser title",
+      latestText,
+    );
+    assert.equal(latestVersion.itemId, oldVersion.itemId);
+    assert.notEqual(latestVersion.versionId, oldVersion.versionId);
+    await writer.close();
+    writer = undefined;
+
+    await mkdir(dataDir, { recursive: true, mode: 0o700 });
+    await writeFile(
+      join(dataDir, "integrations.json"),
+      JSON.stringify({
+        version: 1,
+        current: { module: currentModulePath, root: canonicalRoot, binding },
+      }),
+      { mode: 0o600 },
+    );
+    const oldReference = {
+      binding,
+      itemId: oldVersion.itemId,
+      versionId: oldVersion.versionId,
+    };
+    await writeFile(
+      join(environment.agentDir, "models.json"),
+      JSON.stringify({
+        providers: {
+          "dwell-test": {
+            baseUrl: "http://127.0.0.1:1/v1",
+            apiKey: "synthetic-key",
+            api: "openai-completions",
+            models: [
+              { id: "dwell-test", name: "Dwell test model", contextWindow: 8192, maxTokens: 1024 },
+            ],
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    host = await startHost({
+      port: 0,
+      dataDir,
+      sessions: { env: environment.env, extensions: [environment.extensionPath] },
+    });
+    const hostPort = Number(new URL(host.url).port);
+    const token = (await readFile(join(dataDir, "auth-token"), "utf8")).trim();
+    const request = async (path: string, body?: unknown) => {
+      const response = await fetch(`${host?.url}/api/v1${path}`, {
+        method: body === undefined ? "GET" : "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      assert.ok(response.ok, `${path}: ${response.status}`);
+      return response.json();
+    };
+    await request("/runtime", {
+      executable: process.execPath,
+      entryPoint: fileURLToPath(
+        new URL("./cli.js", import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry")),
+      ),
+    });
+    const firstSessionData = record(
+      await request("/sessions", {
+        requestId: randomUUID(),
+        directory: environment.cwd,
+        provider: "dwell-test",
+        model: "dwell-test",
+      }),
+    );
+    const secondSessionData = record(
+      await request("/sessions", {
+        requestId: randomUUID(),
+        directory: environment.cwd,
+        provider: "dwell-test",
+        model: "dwell-test",
+      }),
+    );
+    const firstSession = String(firstSessionData.id);
+    const secondSession = String(secondSessionData.id);
+    assert.equal(firstSessionData.status, "ready");
+    assert.equal(secondSessionData.status, "ready");
+    assert.deepEqual(await request(`/sessions/${firstSession}/library-references`, oldReference), {
+      references: [oldReference],
+    });
+    assert.deepEqual(await request(`/sessions/${firstSession}/library-references`), {
+      references: [oldReference],
+    });
+
+    const profile = join(environment.root, "browser-current-library");
+    chrome = spawn(
+      executable,
+      [
+        "--headless=new",
+        "--disable-gpu",
+        "--disable-background-networking",
+        "--no-first-run",
+        "--no-default-browser-check",
+        `--user-data-dir=${profile}`,
+        "--remote-debugging-port=0",
+        "--remote-allow-origins=*",
+        "about:blank",
+      ],
+      { stdio: "ignore" },
+    );
+    chrome.on("error", (error) => {
+      process.stderr.write(`Chrome: ${error.message}\n`);
+    });
+    let debugPort = "";
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try {
+        debugPort =
+          (await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0] ?? "";
+        if (debugPort) break;
+      } catch {
+        /* wait for Chrome */
+      }
+      await delay(100);
+    }
+    assert.match(debugPort, /^\d+$/);
+    const target = record(
+      await (
+        await fetch(`http://127.0.0.1:${debugPort}/json/new?about:blank`, { method: "PUT" })
+      ).json(),
+    );
+    assert.equal(typeof target.webSocketDebuggerUrl, "string");
+    const page = new BrowserPage(String(target.webSocketDebuggerUrl));
+    pages.push(page);
+    await page.open();
+    await page.call("Emulation.setDeviceMetricsOverride", {
+      width: 1280,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await page.call("Page.navigate", { url: host.url });
+    await page.until(
+      'document.querySelector("#gate-message")?.textContent === "Pair this browser to connect." && !document.querySelector("#pair-button").disabled',
+    );
+    const pairing = record(await request("/auth/pairings", {}));
+    assert.match(String(pairing.code), /^[A-HJ-NP-Za-hj-np-z2-9]{8}$/);
+    await page.type("#pair-code", String(pairing.code));
+    await page.click("#pair-button");
+    await page.until(
+      '!document.querySelector("#app").hidden && document.querySelectorAll("#session-list .name-row").length===2',
+    );
+
+    await page.evaluate(
+      "document.querySelector('#session-list .name-row[data-session-id=\"" +
+        secondSession +
+        "\"]').click()",
+    );
+    await page.until(
+      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
+        JSON.stringify(secondSession),
+    );
+    await page.click("#library-open");
+    await page.until('document.querySelector("#library-dialog").open');
+    await page.until(
+      'document.querySelector("#library-items").textContent.includes("Latest Current browser title")',
+    );
+    await page.click("#close-library");
+    await page.until('!document.querySelector("#library-dialog").open');
+    await page.evaluate(
+      "document.querySelector('#session-list .name-row[data-session-id=\"" +
+        firstSession +
+        "\"]').click()",
+    );
+    await page.until(
+      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
+        JSON.stringify(firstSession),
+    );
+
+    const firstReferencesPath = `/api/v1/sessions/${firstSession}/library-references`;
+    const secondReferencesPath = `/api/v1/sessions/${secondSession}/library-references`;
+    await page.evaluate(
+      "(()=>{" +
+        "const original=window.fetch.bind(window);" +
+        "let release=()=>{};" +
+        "const gate=new Promise(resolve=>{release=resolve;});" +
+        "window.__firstLibraryResponseWaiting=false;" +
+        "window.__secondLibraryResponseSeen=false;" +
+        "window.__releaseFirstLibraryResponse=()=>{window.fetch=original;release();};" +
+        "window.fetch=async(input,init)=>{" +
+        "const path=new URL(typeof input==='string'?input:input.url,location.href).pathname;" +
+        "const response=await original(input,init);" +
+        "if(path===" +
+        JSON.stringify(firstReferencesPath) +
+        "){" +
+        "window.__firstLibraryResponseWaiting=true;await gate;" +
+        "}else if(path===" +
+        JSON.stringify(secondReferencesPath) +
+        "){window.__secondLibraryResponseSeen=true;}" +
+        "return response;" +
+        "};})()",
+    );
+    await page.click("#library-open");
+    await page.until("window.__firstLibraryResponseWaiting===true");
+    await page.click("#close-library");
+    await page.until('!document.querySelector("#library-dialog").open');
+    await page.evaluate(
+      "document.querySelector('#session-list .name-row[data-session-id=\"" +
+        secondSession +
+        "\"]').click()",
+    );
+    await page.until(
+      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
+        JSON.stringify(secondSession),
+    );
+    await page.click("#library-open");
+    await page.until(
+      "window.__secondLibraryResponseSeen===true && document.querySelector('#library-session-label').textContent==='Session " +
+        secondSession.slice(0, 8) +
+        "' && document.querySelector('#library-references').textContent.includes('No saved content is attached.')",
+    );
+    await page.evaluate("window.__releaseFirstLibraryResponse()");
+    await delay(200);
+    assert.equal(
+      await page.evaluate('document.querySelector("#library-references").textContent'),
+      "No saved content is attached.",
+      "a delayed first-session response cannot replace references for the newly selected session",
+    );
+    console.log("PASS HTTP Chrome ignores a delayed reference response from the previous session");
+
+    await page.click("#close-library");
+    await page.until('!document.querySelector("#library-dialog").open');
+    await page.evaluate(
+      "document.querySelector('#session-list .name-row[data-session-id=\"" +
+        firstSession +
+        "\"]').click()",
+    );
+    await page.until(
+      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
+        JSON.stringify(firstSession),
+    );
+    await page.click("#library-open");
+    await page.until(
+      'document.querySelector("#library-references").textContent.includes("' +
+        oldVersion.versionId.slice(0, 8) +
+        '")',
+    );
+    await page.click("#library-references .library-reference-row > button:first-child");
+    await page.until(
+      'document.querySelector("#library-text").textContent.includes(' +
+        JSON.stringify(oldText) +
+        ")",
+    );
+    assert.equal(
+      await page.evaluate('document.querySelector("#library-reader-title").textContent'),
+      "Old Current browser title",
+      "the reader opens the saved original version by exact identity",
+    );
+    await page.click("#library-references .library-reference-row .library-remove");
+    await page.until(
+      'document.querySelector("#library-references").textContent.includes("No saved content is attached.")',
+    );
+    console.log("PASS HTTP Chrome reads and removes an exact older Current version");
+
+    await page.type("#library-query", "BrowserSearchToken");
+    await page.click("#library-search");
+    await page.until(
+      'document.querySelector("#library-items").textContent.includes("Latest Current browser title") && document.querySelector("#library-items").textContent.includes("BrowserSearchToken")',
+    );
+    await page.click("#library-items .library-result");
+    await page.until(
+      'document.querySelector("#library-text").textContent.includes(' +
+        JSON.stringify(latestText) +
+        ")",
+    );
+    assert.equal(
+      await page.evaluate('document.querySelector("#library-reader-title").textContent'),
+      "Latest Current browser title",
+    );
+    await page.click("#library-reference-action");
+    await page.until(
+      'document.querySelector("#library-reference-action").textContent==="Remove reference" && document.querySelector("#library-references").textContent.includes("' +
+        latestVersion.versionId.slice(0, 8) +
+        '")',
+    );
+    const latestReference = {
+      binding,
+      itemId: latestVersion.itemId,
+      versionId: latestVersion.versionId,
+    };
+    assert.deepEqual(await request(`/sessions/${firstSession}/library-references`), {
+      references: [latestReference],
+    });
+    console.log("PASS HTTP Chrome searches, reads, and attaches the latest Current version");
+
+    await host.close();
+    host = undefined;
+    await writeFile(join(dataDir, "integrations.json"), JSON.stringify({ version: 1 }), {
+      mode: 0o600,
+    });
+    host = await startHost({
+      port: hostPort,
+      dataDir,
+      sessions: { env: environment.env, extensions: [environment.extensionPath] },
+    });
+    await page.call("Page.reload");
+    await page.until(
+      '!document.querySelector("#app").hidden && document.querySelectorAll("#session-list .name-row").length===2',
+    );
+    await page.evaluate(
+      "document.querySelector('#session-list .name-row[data-session-id=\"" +
+        firstSession +
+        "\"]').click()",
+    );
+    await page.until(
+      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
+        JSON.stringify(firstSession),
+    );
+    await page.click("#library-open");
+    await page.until(
+      'document.querySelector("#library-references").textContent.includes("' +
+        latestReference.versionId.slice(0, 8) +
+        '")',
+    );
+    await page.click("#library-references .library-reference-row > button:first-child");
+    await page.until(
+      'document.querySelector("#library-error").textContent.includes("library is unavailable")',
+    );
+    assert.equal(
+      await page.evaluate(
+        'document.querySelector("#library-references").textContent.includes("' +
+          latestReference.versionId.slice(0, 8) +
+          '")',
+      ),
+      true,
+      "offline content leaves the stored reference visible",
+    );
+    await page.click("#library-references .library-reference-row .library-remove");
+    await page.until(
+      'document.querySelector("#library-references").textContent.includes("No saved content is attached.")',
+    );
+    assert.deepEqual(await request(`/sessions/${firstSession}/library-references`), {
+      references: [],
+    });
+    assert.deepEqual(
+      pages.flatMap((browser) => browser.errors),
+      [],
+    );
+    console.log("PASS HTTP Chrome shows and removes stored references while Current is offline");
+  } finally {
+    for (const browser of pages) browser.socket.close();
+    if (chrome && chrome.exitCode === null) {
+      const exited = new Promise<void>((resolve) => chrome?.once("exit", () => resolve()));
+      chrome.kill("SIGTERM");
+      await Promise.race([exited, delay(3000)]);
+      if (chrome.exitCode === null) chrome.kill("SIGKILL");
+    }
+    await host?.close();
+    await writer?.close();
+    await environment.cleanup();
+  }
+}
+
 const args = process.argv.slice(2);
 const browserExecutables = args.filter((argument) => !argument.startsWith("--"));
 assert.ok(browserExecutables.length <= 1, "Provide at most one Chrome executable path.");
@@ -1369,6 +1809,12 @@ const modes: BrowserMode[] = args.includes("--https")
   : args.includes("--http")
     ? ["http"]
     : ["http", "https"];
+const currentModulePath = process.env.DWELL_TEST_CURRENT_MODULE;
+if (args.includes("--current-library-only")) {
+  assert.ok(currentModulePath, "Set DWELL_TEST_CURRENT_MODULE to the built Current API v1 entry.");
+  await runCurrentLibraryBrowserAcceptance(executable, currentModulePath);
+  process.exit(0);
+}
 
 for (const mode of modes) {
   const environment = await createPiEnvironment();
@@ -2980,3 +3426,5 @@ for (const mode of modes) {
     await environment.cleanup();
   }
 }
+
+if (currentModulePath) await runCurrentLibraryBrowserAcceptance(executable, currentModulePath);

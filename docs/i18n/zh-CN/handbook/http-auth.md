@@ -33,9 +33,9 @@
 1. 拒绝重复的安全敏感 header：Host、Origin、Authorization、Cookie、两个 Dwell header，以及 Last-Event-ID。
 2. 选择本地或已配置的 HTTPS authority，拒绝 cross-origin 请求，并拒绝 HTTPS lane 上的 CLI Authorization。
 3. 拒绝处于启动/停止阶段的请求，以及长度超过 2048 个字符的 request target。
-4. 解析 path 和有限支持的 query 格式。目录浏览只接受一个 `path`；history 只接受一个非空、最长 1536 个字符的 `cursor`。其他 query 都会失败。
+4. 解析 path 和有限支持的 query 格式。目录浏览只接受一个 `path`；history 只接受一个非空、最长 1536 个字符的 `cursor`。Library latest 接受可选 `source` 与 `limit`；其他 query 都会失败。
 5. 确定允许的方法。未知 path 返回 404；方法不正确则返回带 `Allow` 的 405。
-6. 验证受保护 route 的身份；拒绝 GET body；强制 runtime 配置只能由 CLI 使用，并检查浏览器 mutation 请求。
+6. 验证受保护 route 的身份；拒绝 GET 与 DELETE body；强制 runtime 配置只能由 CLI 使用，并检查浏览器 mutation 请求。
 7. 解析受限大小的 JSON，应用对应操作的 validator，再委托给 service。
 8. 将 typed error 映射成公开 error envelope。未知异常返回通用 500；如果 headers 已发送，则销毁 response。
 
@@ -45,7 +45,7 @@
 
 ## 完整 route 表
 
-下表中的 API path 都相对于 `/api/v1`。**Either** 表示使用本地 bearer authentication，或使用浏览器 cookie 加 binding key。浏览器 POST 操作还要求匹配的 Origin 和 `X-Dwell-Request: 1`。空 body 表示 JSON object `{}`，并不表示省略 Content-Type。
+下表中的 API path 都相对于 `/api/v1`。**Either** 表示使用本地 bearer authentication，或使用浏览器 cookie 加 binding key。浏览器 POST 和 DELETE 操作还要求匹配的 Origin 和 `X-Dwell-Request: 1`。空 body 表示 JSON object `{}`，并不表示省略 Content-Type。
 
 | 方法和 route | 认证 | 输入和结果 |
 | --- | --- | --- |
@@ -61,6 +61,12 @@
 | `GET /directories[?path=…]` | Either | Canonical host directory、parent、子目录和截断标志 |
 | `GET /models` | Either | 封装在 `models` 中的全局隔离发现结果 |
 | `POST /model-capabilities` | Either | Provider/model → thinking levels 和图片支持情况 |
+| `POST /library/search` | Either | `{query, source?, limit?}` → matching item views |
+| `GET /library/latest[?source=…&limit=…]` | Either | Latest batch and bounded item views |
+| `GET /library/:binding/items/:item/versions/:version` | Either | Exact Current version |
+| `GET /sessions/:id/library-references` | Either | Persisted exact-version references |
+| `POST /sessions/:id/library-references` | Either | `{binding,itemId,versionId}` → saved references |
+| `DELETE /sessions/:id/library-references/:binding/items/:item/versions/:version` | Either | Remove the exact reference |
 | `GET /sessions` | Either | Session list |
 | `POST /sessions` | Either | requestId、directory、可选的 provider+model → 201 ready session；创建失败/中断时返回 typed error |
 | `GET /sessions/:id` | Either | SessionInfo |
@@ -147,3 +153,5 @@ Event hub 拥有排序和 replay；`createSseConnection` 拥有单个 HTTP respo
 公开 error 使用 `{error: {code, message}}`。AccessError 和 SessionError 会保留自己的 status 和 code。SSE 初始化错误中，unauthenticated 映射为 401，其他初始化失败映射为 503。Rate limit 会附带 Retry-After（待处理 code 达到上限时为 300 秒，其他情况为 60 秒）。未知内部错误不会暴露 stack trace。
 
 传输与认证边界可读 [host.test.ts](../../../../tests/host.test.ts)、[auth.test.ts](../../../../tests/auth.test.ts) 和 [access.test.ts](../../../../tests/access.test.ts)；操作 route 可读 [sessions-http.test.ts](../../../../tests/sessions-http.test.ts)、[turns-http.test.ts](../../../../tests/turns-http.test.ts)、[history-http.test.ts](../../../../tests/history-http.test.ts) 和 [images-http.test.ts](../../../../tests/images-http.test.ts)；stream 测试见 [events-http.test.ts](../../../../tests/events-http.test.ts)；隔离发现见 [session-discovery.test.ts](../../../../tests/session-discovery.test.ts)。
+
+Library routes 使用同一 authentication 和 browser mutation checks。Latest 接受可选 `source` 与 `limit` query；exact reference routes 不接受 query。完整行为见 [library HTTP/browser](implementation/storage-integrations.md#library-http-browser)。

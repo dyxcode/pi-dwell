@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { open as openFile } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { createPrivateFile, prepareDataDirectory } from "../local/files.ts";
 import { hasCode } from "../local/paths.ts";
@@ -10,7 +10,9 @@ import {
   type HistoryCheckState,
   type RuntimeConfiguration,
   isSessionDisplayName,
+  SESSION_ID,
 } from "../shared/sessions.ts";
+import { isLibraryBinding, isLibraryReference, type LibraryReference } from "../shared/library.ts";
 import { isThinkingLevel, type ThinkingLevel } from "../shared/thinking.ts";
 import { isTurnInfo, type TurnError, type TurnInfo, type TurnStatus } from "../shared/turns.ts";
 
@@ -38,12 +40,13 @@ export interface StoredTurn extends TurnInfo {
   payloadIdentity: string;
 }
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 const V1_SCHEMA_VERSION = 1;
 const V2_SCHEMA_VERSION = 2;
 const V3_SCHEMA_VERSION = 3;
 const V4_SCHEMA_VERSION = 4;
 const V5_SCHEMA_VERSION = 5;
+const V6_SCHEMA_VERSION = 6;
 const DATABASE_NAME = "catalog.sqlite";
 const SESSION_COLUMNS = `
   id, request_id, payload_identity, directory, provider, model, pi_session_id,
@@ -83,6 +86,10 @@ const ACTIVE_TURN_INDEX =
   "CREATE UNIQUE INDEX one_active_turn_per_session ON turns(session_id) WHERE status IN ('accepted', 'dispatching', 'running')";
 const TURN_COLUMNS =
   "run_id, session_id, request_id, payload_identity, status, cancellation_requested, created_at, updated_at, error_code, error_message, entry_ids";
+const LIBRARY_BINDINGS_SCHEMA =
+  "CREATE TABLE library_bindings (binding TEXT NOT NULL PRIMARY KEY CHECK (length(binding) BETWEEN 1 AND 64 AND instr(binding, char(0)) = 0), root TEXT NOT NULL CHECK (length(root) > 0 AND instr(root, char(0)) = 0)) STRICT";
+const SESSION_LIBRARY_REFERENCES_SCHEMA =
+  "CREATE TABLE session_library_references (session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, binding TEXT NOT NULL REFERENCES library_bindings(binding), item_id TEXT NOT NULL CHECK (length(item_id) = 36), version_id TEXT NOT NULL CHECK (length(version_id) = 36), PRIMARY KEY (session_id, binding, item_id, version_id)) STRICT";
 
 const SESSION_STATUSES = new Set(["creating", "ready", "failed", "interrupted"]);
 const TURN_STATUSES = new Set<string>([
@@ -309,6 +316,38 @@ function stringFromDatabase(row: Record<string, SQLOutputValue>, column: string)
   return value;
 }
 
+function isCanonicalLibraryRoot(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    !value.includes("\0") &&
+    isAbsolute(value) &&
+    resolve(value) === value
+  );
+}
+
+function libraryBindingFromDatabase(row: Record<string, SQLOutputValue>): {
+  binding: string;
+  root: string;
+} {
+  const binding = stringFromDatabase(row, "binding");
+  const root = stringFromDatabase(row, "root");
+  if (!isLibraryBinding(binding) || !isCanonicalLibraryRoot(root)) {
+    throw invalidCatalog("library binding or canonical root is invalid");
+  }
+  return { binding, root };
+}
+
+function libraryReferenceFromDatabase(row: Record<string, SQLOutputValue>): LibraryReference {
+  const reference = {
+    binding: stringFromDatabase(row, "binding"),
+    itemId: stringFromDatabase(row, "item_id"),
+    versionId: stringFromDatabase(row, "version_id"),
+  };
+  if (!isLibraryReference(reference)) throw invalidCatalog("library reference is invalid");
+  return reference;
+}
+
 function nullableStringFromDatabase(
   row: Record<string, SQLOutputValue>,
   column: string,
@@ -445,36 +484,46 @@ function hasUserSchema(database: DatabaseSync): boolean {
   );
 }
 
-function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4 | 5 | 6): void {
+function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4 | 5 | 6 | 7): void {
   const rows = databaseRows(
     database,
     "SELECT type, name, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name",
   );
+  const sessionSchema =
+    version === V2_SCHEMA_VERSION
+      ? V2_SESSIONS_SCHEMA
+      : version === V3_SCHEMA_VERSION
+        ? V3_SESSIONS_SCHEMA
+        : version === V4_SCHEMA_VERSION
+          ? V4_SESSIONS_SCHEMA
+          : version === V5_SCHEMA_VERSION
+            ? V5_SESSIONS_SCHEMA
+            : SESSIONS_SCHEMA;
   const expected =
     version === 1
       ? [
           { type: "table", name: "runtime_configuration", sql: CONFIGURATION_SCHEMA },
           { type: "table", name: "sessions", sql: V2_SESSIONS_SCHEMA },
         ]
-      : [
-          { type: "index", name: "one_active_turn_per_session", sql: ACTIVE_TURN_INDEX },
-          { type: "table", name: "runtime_configuration", sql: CONFIGURATION_SCHEMA },
-          {
-            type: "table",
-            name: "sessions",
-            sql:
-              version === V2_SCHEMA_VERSION
-                ? V2_SESSIONS_SCHEMA
-                : version === V3_SCHEMA_VERSION
-                  ? V3_SESSIONS_SCHEMA
-                  : version === V4_SCHEMA_VERSION
-                    ? V4_SESSIONS_SCHEMA
-                    : version === V5_SCHEMA_VERSION
-                      ? V5_SESSIONS_SCHEMA
-                      : SESSIONS_SCHEMA,
-          },
-          { type: "table", name: "turns", sql: TURNS_SCHEMA },
-        ];
+      : version === SCHEMA_VERSION
+        ? [
+            { type: "table", name: "library_bindings", sql: LIBRARY_BINDINGS_SCHEMA },
+            { type: "index", name: "one_active_turn_per_session", sql: ACTIVE_TURN_INDEX },
+            { type: "table", name: "runtime_configuration", sql: CONFIGURATION_SCHEMA },
+            {
+              type: "table",
+              name: "session_library_references",
+              sql: SESSION_LIBRARY_REFERENCES_SCHEMA,
+            },
+            { type: "table", name: "sessions", sql: SESSIONS_SCHEMA },
+            { type: "table", name: "turns", sql: TURNS_SCHEMA },
+          ]
+        : [
+            { type: "index", name: "one_active_turn_per_session", sql: ACTIVE_TURN_INDEX },
+            { type: "table", name: "runtime_configuration", sql: CONFIGURATION_SCHEMA },
+            { type: "table", name: "sessions", sql: sessionSchema },
+            { type: "table", name: "turns", sql: TURNS_SCHEMA },
+          ];
   if (
     rows.length !== expected.length ||
     !expected.every((schema, index) => {
@@ -541,6 +590,13 @@ function migrateV5ToV6(database: DatabaseSync): void {
   database.exec(
     "ALTER TABLE sessions ADD COLUMN metadata_revision INTEGER NOT NULL DEFAULT 0 CHECK (metadata_revision >= 0)",
   );
+  database.exec(`PRAGMA user_version = ${V6_SCHEMA_VERSION}`);
+  verifySchema(database, V6_SCHEMA_VERSION);
+}
+
+function migrateV6ToV7(database: DatabaseSync): void {
+  database.exec(LIBRARY_BINDINGS_SCHEMA);
+  database.exec(SESSION_LIBRARY_REFERENCES_SCHEMA);
   database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   verifySchema(database, SCHEMA_VERSION);
 }
@@ -560,6 +616,8 @@ function initializeSchema(database: DatabaseSync): void {
         database.exec(SESSIONS_SCHEMA);
         database.exec(TURNS_SCHEMA);
         database.exec(ACTIVE_TURN_INDEX);
+        database.exec(LIBRARY_BINDINGS_SCHEMA);
+        database.exec(SESSION_LIBRARY_REFERENCES_SCHEMA);
         database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
         verifySchema(database, SCHEMA_VERSION);
       } else if (version === V1_SCHEMA_VERSION) {
@@ -572,24 +630,32 @@ function initializeSchema(database: DatabaseSync): void {
         migrateV3ToV4(database);
         migrateV4ToV5(database);
         migrateV5ToV6(database);
+        migrateV6ToV7(database);
       } else if (version === V2_SCHEMA_VERSION) {
         verifySchema(database, V2_SCHEMA_VERSION);
         migrateV2ToV3(database);
         migrateV3ToV4(database);
         migrateV4ToV5(database);
         migrateV5ToV6(database);
+        migrateV6ToV7(database);
       } else if (version === V3_SCHEMA_VERSION) {
         verifySchema(database, V3_SCHEMA_VERSION);
         migrateV3ToV4(database);
         migrateV4ToV5(database);
         migrateV5ToV6(database);
+        migrateV6ToV7(database);
       } else if (version === V4_SCHEMA_VERSION) {
         verifySchema(database, V4_SCHEMA_VERSION);
         migrateV4ToV5(database);
         migrateV5ToV6(database);
+        migrateV6ToV7(database);
       } else if (version === V5_SCHEMA_VERSION) {
         verifySchema(database, V5_SCHEMA_VERSION);
         migrateV5ToV6(database);
+        migrateV6ToV7(database);
+      } else if (version === V6_SCHEMA_VERSION) {
+        verifySchema(database, V6_SCHEMA_VERSION);
+        migrateV6ToV7(database);
       } else if (version === SCHEMA_VERSION) {
         verifySchema(database, SCHEMA_VERSION);
       } else {
@@ -597,7 +663,8 @@ function initializeSchema(database: DatabaseSync): void {
       }
 
       const foreignKeyErrors = databaseRows(database, "PRAGMA foreign_key_check");
-      if (foreignKeyErrors.length > 0) throw invalidCatalog("turn session references are invalid");
+      if (foreignKeyErrors.length > 0)
+        throw invalidCatalog("session or turn references are invalid");
       database.exec("COMMIT");
     } catch (error) {
       if (database.isTransaction) database.exec("ROLLBACK");
@@ -672,6 +739,7 @@ export class SessionCatalog {
       database.exec("PRAGMA synchronous = FULL");
       const catalog = new SessionCatalog(database);
       catalog.listTurns();
+      catalog.#validateLibraryRows();
       return catalog;
     } catch (error) {
       if (database?.isOpen) {
@@ -702,6 +770,61 @@ export class SessionCatalog {
         "INSERT INTO runtime_configuration (singleton, executable, entry_point) VALUES (1, ?, ?) ON CONFLICT(singleton) DO UPDATE SET executable = excluded.executable, entry_point = excluded.entry_point",
       )
       .run(validated.executable, validated.entryPoint ?? null);
+  }
+
+  bindLibrary(binding: string, root: string): boolean {
+    if (!isLibraryBinding(binding) || !isCanonicalLibraryRoot(root))
+      throw new TypeError("Invalid library binding or canonical root.");
+
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = this.database
+        .prepare("SELECT binding, root FROM library_bindings WHERE binding = ?")
+        .get(binding);
+      if (existing) {
+        const stored = libraryBindingFromDatabase(existing);
+        this.database.exec("COMMIT");
+        return stored.root === root;
+      }
+      this.database
+        .prepare("INSERT INTO library_bindings (binding, root) VALUES (?, ?)")
+        .run(binding, root);
+      this.database.exec("COMMIT");
+      return true;
+    } catch (error) {
+      if (this.database.isTransaction) this.database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  listLibraryReferences(sessionId: string): LibraryReference[] {
+    if (!SESSION_ID.test(sessionId)) throw new TypeError("Invalid session ID.");
+    return this.database
+      .prepare(
+        "SELECT binding, item_id, version_id FROM session_library_references WHERE session_id = ? ORDER BY binding, item_id, version_id",
+      )
+      .all(sessionId)
+      .map(libraryReferenceFromDatabase);
+  }
+
+  addLibraryReference(sessionId: string, reference: LibraryReference): void {
+    if (!SESSION_ID.test(sessionId) || !isLibraryReference(reference))
+      throw new TypeError("Invalid session library reference.");
+    this.database
+      .prepare(
+        "INSERT INTO session_library_references (session_id, binding, item_id, version_id) VALUES (?, ?, ?, ?) ON CONFLICT (session_id, binding, item_id, version_id) DO NOTHING",
+      )
+      .run(sessionId, reference.binding, reference.itemId, reference.versionId);
+  }
+
+  removeLibraryReference(sessionId: string, reference: LibraryReference): void {
+    if (!SESSION_ID.test(sessionId) || !isLibraryReference(reference))
+      throw new TypeError("Invalid session library reference.");
+    this.database
+      .prepare(
+        "DELETE FROM session_library_references WHERE session_id = ? AND binding = ? AND item_id = ? AND version_id = ?",
+      )
+      .run(sessionId, reference.binding, reference.itemId, reference.versionId);
   }
 
   list(): StoredSession[] {
@@ -965,6 +1088,18 @@ export class SessionCatalog {
         "UPDATE turns SET status = 'interrupted', updated_at = CASE WHEN updated_at > ? THEN updated_at ELSE ? END, error_code = CASE WHEN status = 'accepted' THEN 'not_dispatched' ELSE 'outcome_unknown' END, error_message = CASE WHEN status = 'accepted' THEN 'Host stopped before dispatch; the prompt was not sent.' ELSE 'Turn execution was interrupted by host restart; the outcome is unknown.' END WHERE status IN ('accepted', 'dispatching', 'running')",
       )
       .run(now, now);
+  }
+
+  #validateLibraryRows(): void {
+    databaseRows(this.database, "SELECT binding, root FROM library_bindings ORDER BY binding").map(
+      libraryBindingFromDatabase,
+    );
+    for (const row of databaseRows(
+      this.database,
+      "SELECT binding, item_id, version_id FROM session_library_references ORDER BY session_id, binding, item_id, version_id",
+    )) {
+      libraryReferenceFromDatabase(row);
+    }
   }
 
   close(): void {

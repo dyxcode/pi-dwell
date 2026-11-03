@@ -1,11 +1,22 @@
 /// <reference lib="dom" />
 
 import {
-  isSessionModelsResponse,
   isHostDirectoryListing,
+  isSessionModelsResponse,
   type PiModelOption,
 } from "../../shared/discovery.ts";
+import type { LiveMessage } from "../../shared/events.ts";
 import { type ContextSource, type HistoryEntry, isHistoryPage } from "../../shared/history.ts";
+import type { ImageContent } from "../../shared/images.ts";
+import {
+  isLibraryItemsResponse,
+  isLibraryItemView,
+  isLibraryLatestResponse,
+  isLibraryReferencesResponse,
+  type LibraryItemView,
+  type LibraryReference,
+  libraryItemPath,
+} from "../../shared/library.ts";
 import { isHostStatus } from "../../shared/protocol.ts";
 import {
   isSessionInfo,
@@ -13,33 +24,31 @@ import {
   mergeSessionMetadata,
   type SessionInfo,
 } from "../../shared/sessions.ts";
-import { isTurnInfo, type TurnInfo } from "../../shared/turns.ts";
-import {
-  visibleLiveContent,
-  emptyConversationState,
-  mergeHistoryEntries,
-  reconcileHistory,
-  reduceFrame,
-  SSEDecoder,
-} from "./events.ts";
-import { appendToolCommand } from "./tool-command.ts";
-import { actionIcon, labelWithIcon } from "./icons.ts";
-import { Attachments } from "./attachments.ts";
-import { renderMarkdown } from "./markdown.ts";
-import {
-  SavedConversationRenderer,
-  renderLiveMessageBlock,
-  thinkingDisclosureKey,
-} from "./conversation.ts";
-import { reconcileChildren } from "./dom.ts";
-import type { ImageContent } from "../../shared/images.ts";
-import type { LiveMessage } from "../../shared/events.ts";
 import {
   isModelCapabilitiesResponse,
   type ModelCapabilitiesResponse,
   type ThinkingLevel,
 } from "../../shared/thinking.ts";
+import { isTurnInfo, type TurnInfo } from "../../shared/turns.ts";
+import { Attachments } from "./attachments.ts";
+import {
+  renderLiveMessageBlock,
+  SavedConversationRenderer,
+  thinkingDisclosureKey,
+} from "./conversation.ts";
+import { reconcileChildren } from "./dom.ts";
+import {
+  emptyConversationState,
+  mergeHistoryEntries,
+  reconcileHistory,
+  reduceFrame,
+  SSEDecoder,
+  visibleLiveContent,
+} from "./events.ts";
+import { actionIcon, labelWithIcon } from "./icons.ts";
 import { setupComposer } from "./input.ts";
+import { renderMarkdown } from "./markdown.ts";
+import { appendToolCommand } from "./tool-command.ts";
 import { ApiError, api, binding, headers, message, responseError } from "./transport.ts";
 
 function el<T extends HTMLElement>(id: string, type: { new (): T }): T {
@@ -90,6 +99,16 @@ const importLocalName = el("import-local-name", HTMLButtonElement);
 const modelDialog = el("model-dialog", HTMLDialogElement);
 const modelSearch = el("model-search", HTMLInputElement);
 const chooseModel = el("choose-model", HTMLButtonElement);
+const libraryDialog = el("library-dialog", HTMLDialogElement);
+const libraryItems = el("library-items", HTMLElement);
+const libraryReferences = el("library-references", HTMLElement);
+const libraryError = el("library-error", HTMLElement);
+let libraryReadGeneration = 0;
+let libraryDialogGeneration = 0;
+let libraryReferencesGeneration = 0;
+let libraryReferenceMutationPending = false;
+let currentLibraryItem: LibraryItemView | null = null;
+let currentLibraryReferences: LibraryReference[] = [];
 let availableModels: PiModelOption[] = [];
 const capabilities = new Map<string, ModelCapabilitiesResponse>();
 const capabilityRequests = new Map<string, Promise<ModelCapabilitiesResponse>>();
@@ -198,6 +217,266 @@ function showImage(url: string, name: string): void {
   el("preview-image", HTMLImageElement).alt = name;
   el("image-title", HTMLElement).textContent = name;
   imageDialog.showModal();
+}
+function sameLibraryReference(a: LibraryReference, b: LibraryReference): boolean {
+  return a.binding === b.binding && a.itemId === b.itemId && a.versionId === b.versionId;
+}
+function libraryFailure(error: unknown): void {
+  if (error instanceof ApiError && error.status === 401) showError(error);
+  else libraryError.textContent = message(error);
+}
+function renderLibraryReferences(): void {
+  libraryReferences.replaceChildren();
+  if (selected === null) {
+    libraryReferences.append(node("p", "Select a session to attach saved content.", "footnote"));
+    return;
+  }
+  if (currentLibraryReferences.length === 0) {
+    libraryReferences.append(node("p", "No saved content is attached.", "footnote"));
+    return;
+  }
+  for (const reference of currentLibraryReferences) {
+    const row = node("div", "", "library-reference-row");
+    const read = node(
+      "button",
+      `${reference.binding} · ${reference.itemId.slice(0, 8)} · ${reference.versionId.slice(0, 8)}`,
+    );
+    read.type = "button";
+    read.setAttribute(
+      "aria-label",
+      `Read ${reference.binding} item ${reference.itemId} version ${reference.versionId}`,
+    );
+    read.onclick = () => void readLibraryItem(reference);
+    const remove = node("button", "Remove", "library-remove");
+    remove.type = "button";
+    remove.disabled = libraryReferenceMutationPending;
+    remove.onclick = () => void changeLibraryReference(reference, false);
+    row.append(read, remove);
+    libraryReferences.append(row);
+  }
+}
+function renderLibraryItems(items: LibraryItemView[]): void {
+  libraryItems.replaceChildren();
+  if (items.length === 0) {
+    libraryItems.append(node("p", "No matching saved content.", "footnote"));
+    return;
+  }
+  for (const item of items) {
+    const button = node("button", "", "library-result");
+    button.type = "button";
+    const excerpt = item.summary ?? item.text.slice(0, 240);
+    button.append(
+      node("strong", item.title || "Untitled"),
+      node("small", `${item.sourceId} · ${new Date(item.retrievedAt).toLocaleDateString()}`),
+      node("span", excerpt),
+    );
+    button.onclick = () => void readLibraryItem(item.reference);
+    libraryItems.append(button);
+  }
+}
+function renderLibraryReader(): void {
+  const reader = el("library-reader", HTMLElement);
+  if (!currentLibraryItem) {
+    reader.hidden = true;
+    return;
+  }
+  const item = currentLibraryItem;
+  reader.hidden = false;
+  el("library-reader-title", HTMLElement).textContent = item.title || "Untitled";
+  el("library-reader-meta", HTMLElement).textContent = [
+    item.sourceId,
+    item.author,
+    item.retrievedAt,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" · ");
+  const link = el("library-source-link", HTMLAnchorElement);
+  link.href = item.url;
+  el("library-summary", HTMLElement).textContent = item.summary ?? "";
+  el("library-text", HTMLPreElement).textContent = item.text;
+  const completeness =
+    item.sourceCompleteness === "known-partial"
+      ? "Known partial source"
+      : "Source completeness unknown";
+  el("library-completeness", HTMLElement).textContent =
+    item.truncated || item.displayTruncated
+      ? `${completeness} · displayed text is shortened.`
+      : completeness;
+  const action = el("library-reference-action", HTMLButtonElement);
+  const attached = currentLibraryReferences.some((reference) =>
+    sameLibraryReference(reference, item.reference),
+  );
+  action.disabled = selected === null || libraryReferenceMutationPending;
+  action.textContent =
+    selected === null
+      ? "Select a session to attach"
+      : attached
+        ? "Remove reference"
+        : "Attach to session";
+  action.onclick = () => void changeLibraryReference(item.reference, !attached);
+}
+async function loadLibraryReferences(): Promise<void> {
+  const sessionId = selected;
+  const dialogAttempt = libraryDialogGeneration;
+  const attempt = ++libraryReferencesGeneration;
+  libraryError.textContent = "";
+  currentLibraryReferences = [];
+  renderLibraryReferences();
+  el("library-session-label", HTMLElement).textContent = sessionId
+    ? `Session ${sessionId.slice(0, 8)}`
+    : "Browse saved content without attaching it to a session.";
+  if (sessionId === null) return;
+  try {
+    const value = await api(`/api/v1/sessions/${sessionId}/library-references`);
+    if (
+      !libraryDialog.open ||
+      dialogAttempt !== libraryDialogGeneration ||
+      attempt !== libraryReferencesGeneration ||
+      selected !== sessionId
+    )
+      return;
+    if (!isLibraryReferencesResponse(value)) throw new Error("Invalid saved library references.");
+    currentLibraryReferences = value.references;
+    renderLibraryReferences();
+    renderLibraryReader();
+  } catch (error) {
+    if (
+      attempt === libraryReferencesGeneration &&
+      dialogAttempt === libraryDialogGeneration &&
+      libraryDialog.open
+    )
+      libraryFailure(error);
+  }
+}
+async function loadLatestLibraryItems(): Promise<void> {
+  const dialogAttempt = libraryDialogGeneration;
+  const sessionId = selected;
+  const attempt = ++libraryReadGeneration;
+  libraryError.textContent = "";
+  el("library-items-title", HTMLElement).textContent = "Latest items";
+  try {
+    const value = await api("/api/v1/library/latest");
+    if (
+      !libraryDialog.open ||
+      dialogAttempt !== libraryDialogGeneration ||
+      selected !== sessionId ||
+      attempt !== libraryReadGeneration
+    )
+      return;
+    if (!isLibraryLatestResponse(value)) throw new Error("Invalid Current library response.");
+    renderLibraryItems(value.items);
+  } catch (error) {
+    if (
+      attempt === libraryReadGeneration &&
+      dialogAttempt === libraryDialogGeneration &&
+      selected === sessionId &&
+      libraryDialog.open
+    )
+      libraryFailure(error);
+  }
+}
+async function searchLibrary(query: string): Promise<void> {
+  const dialogAttempt = libraryDialogGeneration;
+  const sessionId = selected;
+  const attempt = ++libraryReadGeneration;
+  libraryError.textContent = "";
+  el("library-items-title", HTMLElement).textContent = "Search results";
+  try {
+    const value = await api("/api/v1/library/search", { query });
+    if (
+      !libraryDialog.open ||
+      dialogAttempt !== libraryDialogGeneration ||
+      selected !== sessionId ||
+      attempt !== libraryReadGeneration
+    )
+      return;
+    if (!isLibraryItemsResponse(value)) throw new Error("Invalid Current library response.");
+    renderLibraryItems(value.items);
+  } catch (error) {
+    if (
+      attempt === libraryReadGeneration &&
+      dialogAttempt === libraryDialogGeneration &&
+      selected === sessionId &&
+      libraryDialog.open
+    )
+      libraryFailure(error);
+  }
+}
+async function readLibraryItem(reference: LibraryReference): Promise<void> {
+  const dialogAttempt = libraryDialogGeneration;
+  const sessionId = selected;
+  const attempt = ++libraryReadGeneration;
+  libraryError.textContent = "";
+  currentLibraryItem = null;
+  renderLibraryReader();
+  try {
+    const value = await api(libraryItemPath(reference));
+    if (
+      !libraryDialog.open ||
+      dialogAttempt !== libraryDialogGeneration ||
+      selected !== sessionId ||
+      attempt !== libraryReadGeneration
+    )
+      return;
+    if (!isLibraryItemView(value) || !sameLibraryReference(value.reference, reference))
+      throw new Error("The host returned a different saved item version.");
+    currentLibraryItem = value;
+    renderLibraryReader();
+  } catch (error) {
+    if (
+      attempt === libraryReadGeneration &&
+      dialogAttempt === libraryDialogGeneration &&
+      selected === sessionId &&
+      libraryDialog.open
+    )
+      libraryFailure(error);
+  }
+}
+async function changeLibraryReference(reference: LibraryReference, add: boolean): Promise<void> {
+  const sessionId = selected;
+  if (sessionId === null || libraryReferenceMutationPending) return;
+  const dialogAttempt = libraryDialogGeneration;
+  libraryReferenceMutationPending = true;
+  renderLibraryReferences();
+  renderLibraryReader();
+  libraryError.textContent = "";
+  const collection = `/api/v1/sessions/${sessionId}/library-references`;
+  const path = add
+    ? collection
+    : `${collection}/${encodeURIComponent(reference.binding)}/items/${encodeURIComponent(reference.itemId)}/versions/${encodeURIComponent(reference.versionId)}`;
+  let failed = false;
+  let failure: unknown;
+  try {
+    const value = add ? await api(path, reference) : await api(path, undefined, "DELETE");
+    if (!isLibraryReferencesResponse(value)) throw new Error("Invalid saved library references.");
+  } catch (error) {
+    failed = true;
+    failure = error;
+  }
+  if (libraryDialog.open && authenticated) await loadLibraryReferences();
+  libraryReferenceMutationPending = false;
+  if (libraryDialog.open) {
+    renderLibraryReferences();
+    renderLibraryReader();
+  }
+  if (
+    failed &&
+    libraryDialog.open &&
+    dialogAttempt === libraryDialogGeneration &&
+    selected === sessionId
+  )
+    libraryFailure(failure);
+}
+function openLibrary(): void {
+  if (!authenticated) return;
+  nav(false);
+  libraryDialogGeneration++;
+  libraryDialog.showModal();
+  libraryError.textContent = "";
+  currentLibraryItem = null;
+  renderLibraryReader();
+  void loadLibraryReferences();
+  void loadLatestLibraryItems();
 }
 const attachments = new Attachments({
   input: el("image-files", HTMLInputElement),
@@ -1646,6 +1925,10 @@ async function select(id: string | null): Promise<void> {
   navigation();
   renderConversation();
   scroll.scrollTop = 0;
+  if (libraryDialog.open) {
+    void loadLibraryReferences();
+    renderLibraryReader();
+  }
   if (id) {
     probeCurrentModel(id);
     void stream(id, generation);
@@ -1750,6 +2033,7 @@ function disconnect(reason: string): void {
   resetCapabilities();
   releaseImages();
   imageDialog.close();
+  libraryDialog.close();
   authenticated = false;
   authAttempt++;
   generation++;
@@ -2209,6 +2493,22 @@ el("scrim", HTMLButtonElement).onclick = () => nav(false);
 el("new-mobile", HTMLButtonElement).onclick = () => {
   void newSession();
 };
+for (const id of ["library-open", "library-open-mobile"])
+  el(id, HTMLButtonElement).onclick = openLibrary;
+el("close-library", HTMLButtonElement).onclick = () => libraryDialog.close();
+el("library-search-form", HTMLFormElement).onsubmit = (event) => {
+  event.preventDefault();
+  const query = el("library-query", HTMLInputElement).value.trim();
+  if (query) void searchLibrary(query);
+  else void loadLatestLibraryItems();
+};
+libraryDialog.addEventListener("close", () => {
+  libraryDialogGeneration++;
+  libraryReadGeneration++;
+  libraryReferencesGeneration++;
+  currentLibraryItem = null;
+  renderLibraryReader();
+});
 el("new-session", HTMLButtonElement).onclick = () => {
   void newSession();
 };

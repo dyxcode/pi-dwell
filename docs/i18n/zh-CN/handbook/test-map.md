@@ -667,3 +667,44 @@
 - source reads hold only a short gate and release it on success and error
 - fresh session use is reserved before spawn and released only after child close
 - only a known unspawned opening is abandoned automatically
+
+## tests/current-library.test.ts
+
+[Open source](../../../../tests/current-library.test.ts)
+
+- [Current stays optional when no binding is configured](../../../../tests/current-library.test.ts#L21)
+- [library references accept the configured binding shape](../../../../tests/current-library.test.ts#L25)
+- [Current rejects a module that does not publish API v1](../../../../tests/current-library.test.ts#L38)
+- [Current reads exact saved versions and reports removed items](../../../../tests/current-library.test.ts#L63)
+
+## tests/library-http.test.ts
+
+[Open source](../../../../tests/library-http.test.ts)
+
+- [authenticated library routes search and read an exact saved Current version](../../../../tests/library-http.test.ts#L13)
+- [test-source](../../../../tests/library-http.test.ts#L37)
+- [authenticated library routes report when the optional library is absent](../../../../tests/library-http.test.ts#L149)
+- [an unavailable configured Current module leaves Dwell running](../../../../tests/library-http.test.ts#L175)
+- [malformed integration configuration prevents host startup](../../../../tests/library-http.test.ts#L204)
+- [a Current close failure still closes the host listener](../../../../tests/library-http.test.ts#L220)
+
+## tests/library-references.test.ts
+
+[Open source](../../../../tests/library-references.test.ts)
+
+- [library references persist exact versions without changing turns or Pi context](../../../../tests/library-references.test.ts#L30)
+- [catalog schema v6 migrates to v7 without dropping existing session rows](../../../../tests/library-references.test.ts#L167)
+
+## tests/library-web.test.ts
+
+[Open source](../../../../tests/library-web.test.ts)
+
+- [the browser exposes one library dialog with desktop and mobile entry points](../../../../tests/library-web.test.ts#L6)
+- [the browser reads exact library references and keeps attach actions out of turn submission](../../../../tests/library-web.test.ts#L23)
+- [library reference mutations stay serialized and reload saved state after writes](../../../../tests/library-web.test.ts#L42)
+
+## tests/storage-composition.test.ts
+
+[Open source](../../../../tests/storage-composition.test.ts)
+
+四个配置组合：standalone、Distill only、Current only、both。覆盖 native turn、history、shared name、restart、exact-version reference、Pi context 保持独立，以及 source-read/child reservation 的释放。

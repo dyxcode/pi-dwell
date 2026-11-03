@@ -204,3 +204,13 @@ Pi RPC transport errors，例如 `Pi RPC connection closed`、`Pi RPC record exc
 | 浏览器处理 Host errors 和 retry states | [web client](../../../../tests/web-client.test.ts) |
 
 类型清单和 endpoint schema 见[共享契约](contracts.md)。详细 dispatch/recovery algorithm 见[sessions 和 storage](sessions-storage.md)；路由和 access checks 见[HTTP 和 authentication](http-auth.md)。
+
+<a id="library-errors"></a>
+
+## Current library
+
+| Code | HTTP | 含义 |
+| --- | --- | --- |
+| `library_unavailable` | 503 | Current 未配置或暂不可用。 |
+| `library_not_found` | 404 | Exact item version 不存在；已保存 reference 仍可移除。 |
+| `library_binding_mismatch` | 409 | Reference 属于另一个 library，或 binding 已关联不同 root。 |

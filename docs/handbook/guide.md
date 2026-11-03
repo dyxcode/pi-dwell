@@ -145,4 +145,28 @@ Build Distill's public Node API with `npm run build:package` in its checkout. In
 }
 ```
 
-Point `database` at the Distill store that manages these Pi sessions, then restart Dwell. Dwell coordinates file reads and hosted Pi processes with that store's cleanup. An omitted file or omitted Distill entry keeps standalone operation. Configuration and module-opening errors stop startup. See [the access lifecycle](implementation/storage-integrations.md).
+Point `database` at the Distill store that manages these Pi sessions, then restart Dwell. Dwell coordinates file reads and hosted Pi processes with that store's cleanup. Omitting the Distill entry disables source coordination; omitting the file selects standalone operation. Configuration and module-opening errors stop startup. See [the access lifecycle](implementation/storage-integrations.md).
+
+<a id="current-library"></a>
+
+## Use the Current library
+
+Run `npm run build:library` in the Current checkout, then add a `current` object to Dwell's private `integrations.json`. `module` must be the absolute filesystem path to the installed JavaScript library entry; `root` is the local data-directory path used by Current. `binding` is a stable local label for that root, up to 64 letters, digits, dots, underscores, or hyphens.
+
+```json
+{
+  "version": 1,
+  "current": {
+    "module": "/absolute/path/to/pi-current/dist/library-api/library/index.js",
+    "root": "/absolute/path/to/current-data",
+    "binding": "personal-current"
+  }
+}
+```
+
+Replace both paths with the absolute paths on this host. Keep the same binding for the same canonical root; when Current opens, Dwell rejects a binding that points at a different root. The configuration file is read from Dwell's data directory and must satisfy its private-file permission checks. Omitting `current` leaves the session host available and library routes report `library_unavailable`.
+
+
+Open **Library** to browse latest items, search, and read an exact version. With a session selected, use **Attach to session** to save its reference. This leaves the Pi prompt unchanged. Saved references remain available for listing and removal while Current is unavailable.
+
+`current` and `distill` may share one version 1 configuration. See [storage integrations](implementation/storage-integrations.md).

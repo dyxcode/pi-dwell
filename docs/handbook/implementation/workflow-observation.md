@@ -12,7 +12,7 @@ Selecting a session starts an authenticated event connection and independent his
 
 The SSE writer frames JSON with event IDs, sends heartbeat comments, respects output backpressure and closes slow or revoked connections. The browser reducer tracks session, epoch and sequence. Stale or duplicate frames must not replay visible changes. A frame belonging to a different active run can advance the cursor while its live payload is discarded, preserving stream position without changing the visible projection. A selection generation prevents an old asynchronous connection from writing into the new selection.
 
-Source / verification: [`SessionService.subscribeEvents`](../../../src/sessions/service.ts#L502) · [src/server/sse.ts](../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../tests/web-events.test.ts)
+Source / verification: [`SessionService.subscribeEvents`](../../../src/sessions/service.ts#L540) · [src/server/sse.ts](../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../tests/web-events.test.ts)
 
 <a id="projection"></a>
 
@@ -44,7 +44,7 @@ After settlement, the client may still need further history reads. It retains un
 
 A history deletion or unprovable result is exposed as unavailable/partial evidence. The recorded durable outcome is preserved.
 
-Source / verification: [`renderConversation`](../../../src/clients/web/client.ts#L1165) · [`loadHistory`](../../../src/clients/web/client.ts#L1391) · [`SessionService.getHistory`](../../../src/sessions/service.ts#L815) · [tests/session-events.test.ts](../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../tests/history-service.test.ts)
+Source / verification: [`renderConversation`](../../../src/clients/web/client.ts#L1444) · [`loadHistory`](../../../src/clients/web/client.ts#L1670) · [`SessionService.getHistory`](../../../src/sessions/service.ts#L853) · [tests/session-events.test.ts](../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../tests/history-service.test.ts)
 
 <a id="reconnect"></a>
 
@@ -54,4 +54,4 @@ The server supports reconnect with a last-known event cursor. If a caller suppli
 
 Page wake-up and refresh restore connectivity and selected-session views without replaying a prompt. Authentication failure returns the browser to pairing; a network outage preserves recoverable local state and retries observation. Late responses are checked against selection/generation so switching sessions does not display another session's history. The distinction between retrying observation and submitting new work is the key invariant across refresh, reconnect and host restart.
 
-Source / verification: [`stream`](../../../src/clients/web/client.ts#L1504) · [`resume`](../../../src/clients/web/client.ts#L2404) · [src/sessions/events.ts](../../../src/sessions/events.ts) · [tests/events.test.ts](../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../tests/web-events.test.ts)
+Source / verification: [`stream`](../../../src/clients/web/client.ts#L1783) · [`resume`](../../../src/clients/web/client.ts#L2704) · [src/sessions/events.ts](../../../src/sessions/events.ts) · [tests/events.test.ts](../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../tests/web-events.test.ts)

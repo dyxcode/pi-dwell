@@ -103,4 +103,27 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 }
 ```
 
-`database` 指向管理这些 Pi sessions 的 Distill store，然后 restart Dwell。Dwell 的文件读取与 hosted Pi processes 会参与该 store 的 cleanup coordination。省略文件或 Distill entry 时继续 standalone operation。Configuration 或 module opening 失败会停止 startup。详见 [access lifecycle](implementation/storage-integrations.md)。
+`database` 指向管理这些 Pi sessions 的 Distill store，然后 restart Dwell。Dwell 的文件读取与 hosted Pi processes 会参与该 store 的 cleanup coordination。省略 Distill entry 时不启用 source coordination；省略整个文件时采用 standalone operation。Configuration 或 module opening 失败会停止 startup。详见 [access lifecycle](implementation/storage-integrations.md)。
+
+<a id="current-library"></a>
+
+## 使用 Current library
+
+在 Current checkout 中运行 `npm run build:library`，然后在 Dwell 私有 `integrations.json` 中加入 `current` object。`module` 必须是已安装 JavaScript library entry 的 absolute filesystem path；`root` 是 Current 使用的本地 data-directory path。`binding` 是该 root 的稳定本地 label，最多 64 个 letters、digits、dots、underscores 或 hyphens。
+
+```json
+{
+  "version": 1,
+  "current": {
+    "module": "/absolute/path/to/pi-current/dist/library-api/library/index.js",
+    "root": "/absolute/path/to/current-data",
+    "binding": "personal-current"
+  }
+}
+```
+
+请将两个 path 替换为本机 absolute path。同一个 canonical root 应持续使用相同 binding；Current 打开后，若该 binding 指向不同 root，Dwell 会拒绝启动。配置文件从 Dwell data directory 读取，并需满足现有 private-file permission checks。省略 `current` 时 session host 仍可用，library routes 会返回 `library_unavailable`。
+
+打开 **Library** 可查看 latest items、搜索和读取 exact version。选中 session 后，使用 **Attach to session** 保存 reference；该操作不会改变 Pi prompt。已保存的 reference 可在 Current 暂不可用时继续查看和移除。
+
+`current` 和 `distill` 可放在同一个 version 1 configuration 中。详见 [storage integrations](implementation/storage-integrations.md)。

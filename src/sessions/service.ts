@@ -4,6 +4,7 @@ import { type OpeningSource, SessionSourceAccess, SourceAccessError } from "./so
 import { realpath, stat } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { prepareDataDirectory } from "../local/files.ts";
+import { type CurrentLibrary, CurrentLibraryError } from "../integrations/current.ts";
 import { savedMessageKeys } from "../runtime/message-identity.ts";
 import { HistoryReadBudgetError } from "../runtime/pi-history-budget.ts";
 import { HistoryReadError, readSavedHistory, type SavedHistory } from "../runtime/pi-history.ts";
@@ -27,6 +28,7 @@ import type {
 } from "../shared/discovery.ts";
 import type { StreamFrame } from "../shared/events.ts";
 import type { HistoryPage } from "../shared/history.ts";
+import { isLibraryReference, type LibraryReference } from "../shared/library.ts";
 import type { ImageContent } from "../shared/images.ts";
 import {
   isSessionModelRequest,
@@ -70,6 +72,7 @@ export class SessionError extends Error {
 export interface SessionServiceOptions {
   distill?: DistillStorage;
   dataDir: string;
+  library?: CurrentLibrary;
   /** Explicit embedding/test environment and resources; public clients cannot set them. */
   env?: NodeJS.ProcessEnv;
   extensions?: readonly string[];
@@ -216,6 +219,7 @@ function truncateUtf8(value: string, maxBytes: number): string {
 /** Durable session/turn identities and host-owned runtime execution. */
 export class SessionService {
   readonly #catalog: SessionCatalog;
+  readonly #library: CurrentLibrary | undefined;
   readonly #dataDir: string;
   readonly #env: NodeJS.ProcessEnv;
   readonly #extensions: readonly string[];
@@ -246,6 +250,7 @@ export class SessionService {
 
   private constructor(catalog: SessionCatalog, dataDir: string, options: SessionServiceOptions) {
     this.#catalog = catalog;
+    this.#library = options.library;
     this.#dataDir = dataDir;
     this.#sessionFiles = new SessionFiles(dataDir);
     this.#sourceAccess = new SessionSourceAccess(options.distill);
@@ -262,6 +267,9 @@ export class SessionService {
     try {
       for (const stored of catalog.list()) validateStored(stored);
       catalog.listTurns(); // Validate durable turn identities before recovery.
+      if (options.library && !catalog.bindLibrary(options.library.binding, options.library.root)) {
+        throw new CurrentLibraryError("library_binding_mismatch");
+      }
       catalog.interruptCreating((options.now ?? Date.now)());
       catalog.interruptTurns((options.now ?? Date.now)());
       return new SessionService(catalog, dataDir, options);
@@ -346,6 +354,36 @@ export class SessionService {
         );
       if (saved.metadataRevision !== expectedRevision) this.#publishState(id);
       return this.#view(saved);
+    });
+  }
+
+  listLibraryReferences(id: string): LibraryReference[] {
+    this.#admit();
+    this.#stored(id);
+    return this.#catalog.listLibraryReferences(id);
+  }
+
+  addLibraryReference(id: string, input: unknown): Promise<LibraryReference[]> {
+    return this.#mutate(async () => {
+      this.#stored(id);
+      if (!isLibraryReference(input)) throw new CurrentLibraryError("invalid_input");
+      const library = this.#library;
+      if (!library) throw new CurrentLibraryError("library_unavailable");
+      if (input.binding !== library.binding) {
+        throw new CurrentLibraryError("library_binding_mismatch");
+      }
+      await library.read(input);
+      this.#catalog.addLibraryReference(id, input);
+      return this.#catalog.listLibraryReferences(id);
+    });
+  }
+
+  removeLibraryReference(id: string, input: unknown): Promise<LibraryReference[]> {
+    return this.#mutate(async () => {
+      this.#stored(id);
+      if (!isLibraryReference(input)) throw new CurrentLibraryError("invalid_input");
+      this.#catalog.removeLibraryReference(id, input);
+      return this.#catalog.listLibraryReferences(id);
     });
   }
 

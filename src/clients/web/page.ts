@@ -41,6 +41,7 @@ export const HOST_PAGE = `<!doctype html>
 <nav id="session-list" class="session-names" aria-label="Session names">
 </nav>
 <div class="rail-foot">
+<button id="library-open" class="text-button library-launch" type="button" aria-haspopup="dialog">Browse library</button>
 <button id="connection-badge" class="text-button" type="button">Connecting…</button>
 </div>
 </aside>
@@ -51,6 +52,7 @@ export const HOST_PAGE = `<!doctype html>
 </button>
 <nav id="status-list" aria-label="Session status">
 </nav>
+<button id="library-open-mobile" class="icon" type="button" aria-label="Browse library" aria-haspopup="dialog">▤</button>
 <button id="new-mobile" class="icon" type="button" aria-label="New conversation">＋</button>
 </header>
 <div class="notice-area">
@@ -153,7 +155,37 @@ export const HOST_PAGE = `<!doctype html>
 <button id="logout-button" class="action">Forget this browser</button>
 <p class="footnote">Disconnecting leaves your work running on the host.</p>
 </dialog>
-<dialog id="image-dialog" aria-labelledby="image-title"><div class="panel-heading"><h2 id="image-title">Image</h2><button id="close-image" class="icon" type="button" aria-label="Close image preview">×</button></div><img id="preview-image" alt=""></dialog></body>
+<dialog id="image-dialog" aria-labelledby="image-title"><div class="panel-heading"><h2 id="image-title">Image</h2><button id="close-image" class="icon" type="button" aria-label="Close image preview">×</button></div><img id="preview-image" alt=""></dialog>
+<dialog id="library-dialog" aria-labelledby="library-title">
+<div class="handle"></div>
+<div class="panel-heading">
+<div><h2 id="library-title">Current library</h2><p id="library-session-label" class="footnote"></p></div>
+<button id="close-library" class="icon" type="button" aria-label="Close library">×</button>
+</div>
+<form id="library-search-form" class="library-search">
+<label class="sr-only" for="library-query">Search saved content</label>
+<input id="library-query" type="search" maxlength="200" placeholder="Search saved content…" autocomplete="off">
+<button id="library-search" class="action" type="submit">Search</button>
+</form>
+<p id="library-error" class="feedback" role="status"></p>
+<section class="library-section">
+<h3 id="library-references-title">Attached to this session</h3>
+<div id="library-references"></div>
+</section>
+<section class="library-section">
+<h3 id="library-items-title">Latest items</h3>
+<div id="library-items"></div>
+</section>
+<section id="library-reader" class="library-reader" hidden>
+<div class="panel-heading"><div><h3 id="library-reader-title"></h3><p id="library-reader-meta" class="footnote"></p></div></div>
+<a id="library-source-link" rel="noreferrer noopener" target="_blank">Open original source ↗</a>
+<p id="library-summary" class="library-summary"></p>
+<pre id="library-text"></pre>
+<p id="library-completeness" class="footnote"></p>
+<button id="library-reference-action" class="action" type="button" disabled>Select a session to attach</button>
+</section>
+</dialog>
+</body>
 </html>`;
 
 export const STYLE = `:root{--paper:#f3eee3;--surface:#fbf8f0;--rail:#ece6da;--ink:#252329;--muted:#82796c;--line:#c8bfaf;--teal:#3e8983;--dark:#28635e;--pale:#e0ebe3;--lilac:#ccbae2;--close-wash:#f0ded5;--close-line:#bb8270;--close-ink:#904d3c;--close-fill:#a85e4a;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -894,4 +926,38 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 .session-name-actions .close-actions button{min-height:38px;padding:0 10px;font:11px var(--mono)}
 #save-session-name{border:1px solid var(--dark);background:var(--dark);color:var(--surface);box-shadow:2px 2px var(--lilac)}
 @media(max-width:760px){#session-name-dialog{inset:auto 0 0;margin:0;width:100%;max-width:none;max-height:86dvh;padding:14px 20px max(24px,env(safe-area-inset-bottom));border:0;border-top:1px solid var(--line);box-shadow:0 -3px var(--lilac)}#session-name-dialog .handle{margin-bottom:14px}}
+
+.library-launch{display:block;min-height:38px;padding:7px 0;color:var(--dark);font:11px/1.6 var(--mono);text-align:left}
+#library-dialog{width:min(620px,calc(100vw - 32px));padding:18px;box-shadow:4px 4px var(--lilac)}
+#library-dialog .panel-heading{margin-bottom:12px;gap:12px;align-items:flex-start}
+#library-dialog h2{font:600 18px/1.4 var(--sans);letter-spacing:0;margin:0}
+#library-dialog .footnote{margin:4px 0 0}
+#library-dialog #close-library{width:32px;height:32px}
+.library-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:12px 0}
+.library-search input{min-width:0;height:40px;border:1px solid var(--line);background:var(--paper);padding:8px;font:13px var(--mono)}
+.library-search .action{min-height:40px;padding:8px 12px;font:11px var(--mono)}
+#library-error:empty{display:none}
+.library-section{margin:15px 0}
+.library-section h3,.library-reader h3{font:10px/1.6 var(--mono);letter-spacing:.5px;color:var(--muted);margin:0 0 7px}
+.library-result{display:block;width:100%;min-height:48px;padding:10px;text-align:left;border-bottom:1px solid var(--line)}
+.library-result strong,.library-result small,.library-result span{display:block;overflow-wrap:anywhere}
+.library-result strong{font:600 12px/1.5 var(--sans);color:var(--dark)}
+.library-result small,.library-reference-row small{font:9px/1.6 var(--mono);color:var(--muted)}
+.library-result span{font:12px/1.6 var(--sans);color:var(--ink);margin-top:3px}
+.library-reference-row{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);min-height:42px}
+.library-reference-row>button:first-child{flex:1;min-width:0;text-align:left;padding:7px 2px;font:10px/1.5 var(--mono);overflow-wrap:anywhere}
+.library-reference-row .library-remove{min-height:36px;padding:5px;color:var(--muted);font:10px var(--mono)}
+.library-reader{border-top:1px solid var(--line);margin-top:16px;padding-top:14px}
+.library-reader .panel-heading{margin-bottom:8px!important}
+#library-source-link{font:10px/1.6 var(--mono);color:var(--dark);overflow-wrap:anywhere}
+.library-summary{font:12px/1.7 var(--sans);color:var(--muted);margin:12px 0}
+#library-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:38dvh;overflow:auto;padding:12px;background:var(--paper);font:12px/1.7 var(--sans)}
+#library-reference-action{min-height:38px;padding:8px 12px;font:11px var(--mono);margin-top:8px}
+#library-reference-action:disabled{opacity:.6}
+@media(max-width:760px){
+ #library-open-mobile{display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:36px;height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:17px var(--mono)}
+ #library-dialog{width:100%;max-width:none;padding:12px 16px max(18px,env(safe-area-inset-bottom));box-shadow:0 -3px var(--lilac)}
+ #library-dialog .handle{margin-bottom:12px}
+ #library-text{max-height:34dvh}
+}
 `;

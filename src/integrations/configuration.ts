@@ -2,10 +2,12 @@ import { isAbsolute, join } from "node:path";
 import { readPrivateFile } from "../local/files.ts";
 import { hasCode } from "../local/paths.ts";
 import { isRecord } from "../runtime/pi-rpc.ts";
+import { isLibraryBinding } from "../shared/library.ts";
 
 export interface IntegrationsConfiguration {
   version: 1;
   distill?: { module: string; database: string };
+  current?: { module: string; root: string; binding: string };
 }
 
 function absolutePath(value: unknown): value is string {
@@ -22,7 +24,7 @@ export async function readIntegrations(dataDir: string): Promise<IntegrationsCon
   }
   const invalid = () =>
     new Error(
-      "Invalid integrations.json. Use version 1 and absolute local module and database paths.",
+      "Invalid integrations.json. Use version 1, absolute local module/store paths, and a Current binding name.",
     );
   let value: unknown;
   try {
@@ -33,7 +35,7 @@ export async function readIntegrations(dataDir: string): Promise<IntegrationsCon
   if (
     !isRecord(value) ||
     value.version !== 1 ||
-    Object.keys(value).some((key) => !["version", "distill"].includes(key))
+    Object.keys(value).some((key) => !["version", "distill", "current"].includes(key))
   )
     throw invalid();
   const configuration: IntegrationsConfiguration = { version: 1 };
@@ -47,6 +49,22 @@ export async function readIntegrations(dataDir: string): Promise<IntegrationsCon
     )
       throw invalid();
     configuration.distill = { module: distill.module, database: distill.database };
+  }
+  if (value.current !== undefined) {
+    const current = value.current;
+    if (
+      !isRecord(current) ||
+      !absolutePath(current.module) ||
+      !absolutePath(current.root) ||
+      !isLibraryBinding(current.binding) ||
+      Object.keys(current).length !== 3
+    )
+      throw invalid();
+    configuration.current = {
+      module: current.module,
+      root: current.root,
+      binding: current.binding,
+    };
   }
   return configuration;
 }

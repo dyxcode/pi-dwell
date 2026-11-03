@@ -124,177 +124,189 @@ Local dependencies： [clients/web/icons.ts](../../../../src/clients/web/icons.t
 
 文字解释：[browser-controller](implementation/browser-controller.md)
 
-[查看源码](../../../../src/clients/web/client.ts) · 2434 行
+[查看源码](../../../../src/clients/web/client.ts) · 2734 行
 
 Local dependencies： [shared/discovery.ts](../../../../src/shared/discovery.ts), [shared/history.ts](../../../../src/shared/history.ts), [shared/protocol.ts](../../../../src/shared/protocol.ts), [shared/sessions.ts](../../../../src/shared/sessions.ts), [shared/turns.ts](../../../../src/shared/turns.ts), [clients/web/events.ts](../../../../src/clients/web/events.ts), [clients/web/tool-command.ts](../../../../src/clients/web/tool-command.ts), [clients/web/icons.ts](../../../../src/clients/web/icons.ts), [clients/web/attachments.ts](../../../../src/clients/web/attachments.ts), [clients/web/markdown.ts](../../../../src/clients/web/markdown.ts), [clients/web/conversation.ts](../../../../src/clients/web/conversation.ts), [clients/web/dom.ts](../../../../src/clients/web/dom.ts), [shared/images.ts](../../../../src/shared/images.ts), [shared/events.ts](../../../../src/shared/events.ts), [shared/thinking.ts](../../../../src/shared/thinking.ts), [clients/web/input.ts](../../../../src/clients/web/input.ts), [clients/web/transport.ts](../../../../src/clients/web/transport.ts).
 
 | Symbol | 类型 | Parameter 或 type | 文字解释 |
 | --- | --- | --- | --- |
-| [`el`](../../../../src/clients/web/client.ts#L45) | Function | id, type | [文字解释](implementation/browser-controller.md#dom-contract-coordinator-state) |
-| [`node`](../../../../src/clients/web/client.ts#L50) | Function | tag, text, className | [文字解释](implementation/browser-controller.md#dom-contract-coordinator-state) |
-| [`input`](../../../../src/clients/web/client.ts#L55) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`form`](../../../../src/clients/web/client.ts#L56) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`rail`](../../../../src/clients/web/client.ts#L57) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`main`](../../../../src/clients/web/client.ts#L58) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`gate`](../../../../src/clients/web/client.ts#L59) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`app`](../../../../src/clients/web/client.ts#L60) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`scroll`](../../../../src/clients/web/client.ts#L61) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`conversation`](../../../../src/clients/web/client.ts#L62) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`composer`](../../../../src/clients/web/client.ts#L63) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`savedRenderer`](../../../../src/clients/web/client.ts#L64) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`imageGeneration`](../../../../src/clients/web/client.ts#L65) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`send`](../../../../src/clients/web/client.ts#L66) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`notice`](../../../../src/clients/web/client.ts#L67) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`dialog`](../../../../src/clients/web/client.ts#L68) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`directory`](../../../../src/clients/web/client.ts#L69) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`createButton`](../../../../src/clients/web/client.ts#L70) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`closeDialog`](../../../../src/clients/web/client.ts#L71) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`closeDirectory`](../../../../src/clients/web/client.ts#L72) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`closeTitle`](../../../../src/clients/web/client.ts#L73) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`closeCopy`](../../../../src/clients/web/client.ts#L74) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`closeError`](../../../../src/clients/web/client.ts#L75) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`cancelClose`](../../../../src/clients/web/client.ts#L76) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`confirmClose`](../../../../src/clients/web/client.ts#L77) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`modelDialog`](../../../../src/clients/web/client.ts#L85) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`modelSearch`](../../../../src/clients/web/client.ts#L86) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`chooseModel`](../../../../src/clients/web/client.ts#L87) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`availableModels`](../../../../src/clients/web/client.ts#L88) | Module value | `PiModelOption[]` | [文字解释](implementation/browser-controller.md) |
-| [`capabilities`](../../../../src/clients/web/client.ts#L89) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`capabilityRequests`](../../../../src/clients/web/client.ts#L90) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`capabilityErrors`](../../../../src/clients/web/client.ts#L91) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`capabilityGeneration`](../../../../src/clients/web/client.ts#L92) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`resetCapabilities`](../../../../src/clients/web/client.ts#L98) | Function |  | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`thinkingChoice`](../../../../src/clients/web/client.ts#L99) | Module value | `PiModelOption \| null` | [文字解释](implementation/browser-controller.md) |
-| [`levelNames`](../../../../src/clients/web/client.ts#L100) | Module value | `Record<ThinkingLevel, string>` | [文字解释](implementation/browser-controller.md) |
-| [`modelSession`](../../../../src/clients/web/client.ts#L109) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
-| [`changingModel`](../../../../src/clients/web/client.ts#L110) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
-| [`older`](../../../../src/clients/web/client.ts#L111) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`drafts`](../../../../src/clients/web/client.ts#L128) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`turns`](../../../../src/clients/web/client.ts#L129) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`sessions`](../../../../src/clients/web/client.ts#L130) | Module value | `SessionInfo[]` | [文字解释](implementation/browser-controller.md) |
-| [`selected`](../../../../src/clients/web/client.ts#L131) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
-| [`state`](../../../../src/clients/web/client.ts#L132) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`contextSources`](../../../../src/clients/web/client.ts#L133) | Module value | `ContextSource[]` | [文字解释](implementation/browser-controller.md) |
-| [`contextSourcesTruncated`](../../../../src/clients/web/client.ts#L134) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`entries`](../../../../src/clients/web/client.ts#L135) | Module value | `HistoryEntry[]` | [文字解释](implementation/browser-controller.md) |
-| [`nextCursor`](../../../../src/clients/web/client.ts#L136) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
-| [`controller`](../../../../src/clients/web/client.ts#L137) | Module value | `AbortController \| null` | [文字解释](implementation/browser-controller.md) |
-| [`generation`](../../../../src/clients/web/client.ts#L138) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`authenticated`](../../../../src/clients/web/client.ts#L139) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`reconnectTimer`](../../../../src/clients/web/client.ts#L140) | Module value | `number \| undefined` | [文字解释](implementation/browser-controller.md) |
-| [`pollTimer`](../../../../src/clients/web/client.ts#L140) | Module value | `number \| undefined` | [文字解释](implementation/browser-controller.md) |
-| [`polling`](../../../../src/clients/web/client.ts#L141) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`suspended`](../../../../src/clients/web/client.ts#L142) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`HistoryReadRecovery`](../../../../src/clients/web/client.ts#L143) | Interface |  | [文字解释](implementation/browser-controller.md) |
-| [`historyRecovery`](../../../../src/clients/web/client.ts#L148) | Module value | `Record<"latest" \| "older", HistoryReadRecovery>` | [文字解释](implementation/browser-controller.md) |
-| [`historyContentFailed`](../../../../src/clients/web/client.ts#L152) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`historyCoverageReads`](../../../../src/clients/web/client.ts#L153) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`historyCoverageRun`](../../../../src/clients/web/client.ts#L154) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
-| [`resetHistoryPagination`](../../../../src/clients/web/client.ts#L155) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`historyPending`](../../../../src/clients/web/client.ts#L156) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`sending`](../../../../src/clients/web/client.ts#L157) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`pendingSend`](../../../../src/clients/web/client.ts#L158) | Module value | `{   session: string;   requestId: string;   message: string;   images: ImageContent[]; } \| null` | [文字解释](implementation/browser-controller.md) |
-| [`pendingCreate`](../../../../src/clients/web/client.ts#L164) | Module value | `{   requestId: string;   directory: string; } \| null` | [文字解释](implementation/browser-controller.md) |
-| [`tabSlots`](../../../../src/clients/web/client.ts#L168) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`openingSessions`](../../../../src/clients/web/client.ts#L169) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`closeArmedSession`](../../../../src/clients/web/client.ts#L170) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
-| [`preparingCloseSession`](../../../../src/clients/web/client.ts#L171) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
-| [`closeTarget`](../../../../src/clients/web/client.ts#L172) | Module value | `{   id: string;   activeRunId: string \| null;   nativeExecutionId: string \| null;   attempted: boolean; } \| null` | [文字解释](implementation/browser-controller.md) |
-| [`closingSession`](../../../../src/clients/web/client.ts#L178) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
-| [`closePreparationGeneration`](../../../../src/clients/web/client.ts#L179) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`closeAttemptGeneration`](../../../../src/clients/web/client.ts#L180) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`sessionRefreshGeneration`](../../../../src/clients/web/client.ts#L181) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`sessionStateGeneration`](../../../../src/clients/web/client.ts#L182) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`selectionGeneration`](../../../../src/clients/web/client.ts#L183) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`openIntentGeneration`](../../../../src/clients/web/client.ts#L184) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`authAttempt`](../../../../src/clients/web/client.ts#L185) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`browseAttempt`](../../../../src/clients/web/client.ts#L186) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`modelAttempt`](../../../../src/clients/web/client.ts#L187) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`hostMode`](../../../../src/clients/web/client.ts#L188) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`streamConnected`](../../../../src/clients/web/client.ts#L189) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`imageDialog`](../../../../src/clients/web/client.ts#L190) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`showImage`](../../../../src/clients/web/client.ts#L196) | Function | url, name | [文字解释](implementation/browser-controller.md#dom-contract-coordinator-state) |
-| [`attachments`](../../../../src/clients/web/client.ts#L197) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`attachButton`](../../../../src/clients/web/client.ts#L205) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`imageFiles`](../../../../src/clients/web/client.ts#L206) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`imageCache`](../../../../src/clients/web/client.ts#L244) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`imageQueue`](../../../../src/clients/web/client.ts#L245) | Module value | `Promise<unknown>` | [文字解释](implementation/browser-controller.md) |
-| [`liveOrder`](../../../../src/clients/web/client.ts#L246) | Module value | `{ kind: "message" \| "tool"; id: string }[]` | [文字解释](implementation/browser-controller.md) |
-| [`releaseImages`](../../../../src/clients/web/client.ts#L252) | Function |  | [文字解释](implementation/browser-controller.md#dom-contract-coordinator-state) |
-| [`historyImage`](../../../../src/clients/web/client.ts#L262) | Function | entryId, index, mimeType | [文字解释](implementation/browser-controller.md#conversation-rendering-saved-images) |
-| [`localPreferences`](../../../../src/clients/web/client.ts#L318) | Module value | `Record<string, string>` | [文字解释](implementation/browser-controller.md) |
-| [`savePreference`](../../../../src/clients/web/client.ts#L332) | Function | key, value | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`activeSession`](../../../../src/clients/web/client.ts#L420) | Function |  | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`modelCapabilityKey`](../../../../src/clients/web/client.ts#L423) | Function | provider, model, sessionId | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`requestModelCapabilities`](../../../../src/clients/web/client.ts#L432) | Function | choice, sessionId | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`probeCurrentModel`](../../../../src/clients/web/client.ts#L472) | Function | sessionId | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`label`](../../../../src/clients/web/client.ts#L500) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`runtimeOpen`](../../../../src/clients/web/client.ts#L516) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`nativeRunning`](../../../../src/clients/web/client.ts#L519) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`sessionBusy`](../../../../src/clients/web/client.ts#L522) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`status`](../../../../src/clients/web/client.ts#L525) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`TabStatus`](../../../../src/clients/web/client.ts#L542) | TypeAlias |  | [文字解释](implementation/browser-controller.md) |
-| [`tabStatus`](../../../../src/clients/web/client.ts#L548) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`tabStatusLabel`](../../../../src/clients/web/client.ts#L557) | Function | value | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`SVG_NS`](../../../../src/clients/web/client.ts#L563) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`statusPaths`](../../../../src/clients/web/client.ts#L564) | Module value | `Record<   "ready" \| "working" \| "attention" \| "stopped" \| "opening" \| "close",   string >` | [文字解释](implementation/browser-controller.md) |
-| [`tabSymbol`](../../../../src/clients/web/client.ts#L580) | Function | value | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`synchronizeTabSlots`](../../../../src/clients/web/client.ts#L596) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`openTabIds`](../../../../src/clients/web/client.ts#L608) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`closeBlockedReason`](../../../../src/clients/web/client.ts#L611) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`showError`](../../../../src/clients/web/client.ts#L621) | Function | error | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`clearNotice`](../../../../src/clients/web/client.ts#L629) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`nav`](../../../../src/clients/web/client.ts#L633) | Function | open | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`navigation`](../../../../src/clients/web/client.ts#L642) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`updatedSession`](../../../../src/clients/web/client.ts#L822) | Function | session | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`neighborAfterClose`](../../../../src/clients/web/client.ts#L834) | Function | id, previousTabs | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`reconcileClosedRuntime`](../../../../src/clients/web/client.ts#L849) | Function | id, previousTabs | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`userMessageSnippet`](../../../../src/clients/web/client.ts#L858) | Function | values | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`showCloseError`](../../../../src/clients/web/client.ts#L871) | Function | error | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`prepareClose`](../../../../src/clients/web/client.ts#L875) | Function | id | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`sessionSnapshot`](../../../../src/clients/web/client.ts#L959) | Function | id | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`turnSnapshot`](../../../../src/clients/web/client.ts#L965) | Function | id, runId | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`turnIsActive`](../../../../src/clients/web/client.ts#L971) | Function | turn | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`waitForTurnAndRuntime`](../../../../src/clients/web/client.ts#L974) | Function | id, runId, authentication | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`finishClose`](../../../../src/clients/web/client.ts#L999) | Function | id, previousTabs | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`confirmSessionClose`](../../../../src/clients/web/client.ts#L1005) | Function |  | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`openFromSidebar`](../../../../src/clients/web/client.ts#L1117) | Function | id | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`identifyLiveThinking`](../../../../src/clients/web/client.ts#L1153) | Function | message | [文字解释](implementation/browser-controller.md#conversation-rendering-saved-images) |
-| [`renderConversation`](../../../../src/clients/web/client.ts#L1165) | Function |  | [文字解释](implementation/browser-controller.md#conversation-rendering-saved-images) |
-| [`historyProblem`](../../../../src/clients/web/client.ts#L1351) | Function |  | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
-| [`resetHistoryRecovery`](../../../../src/clients/web/client.ts#L1355) | Function | more | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
-| [`uncoveredHistoryRun`](../../../../src/clients/web/client.ts#L1371) | Function |  | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
-| [`scheduleHistoryRecovery`](../../../../src/clients/web/client.ts#L1382) | Function | more | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
-| [`loadHistory`](../../../../src/clients/web/client.ts#L1391) | Function | more | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
-| [`stopStream`](../../../../src/clients/web/client.ts#L1490) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`renderFrame`](../../../../src/clients/web/client.ts#L1488) | Module value | `number \| undefined` | [文字解释](implementation/browser-controller.md) |
-| [`scheduleStreamRender`](../../../../src/clients/web/client.ts#L1496) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`stream`](../../../../src/clients/web/client.ts#L1504) | Function | id, epoch | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`select`](../../../../src/clients/web/client.ts#L1621) | Function | id | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`connection`](../../../../src/clients/web/client.ts#L1655) | Function | text | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`refresh`](../../../../src/clients/web/client.ts#L1658) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`poll`](../../../../src/clients/web/client.ts#L1726) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`disconnect`](../../../../src/clients/web/client.ts#L1748) | Function | reason | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`connect`](../../../../src/clients/web/client.ts#L1773) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`submit`](../../../../src/clients/web/client.ts#L1812) | Function |  | [文字解释](implementation/browser-controller.md#sending-stopping-safe-retry) |
-| [`browse`](../../../../src/clients/web/client.ts#L1915) | Function | path | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`renderModels`](../../../../src/clients/web/client.ts#L1964) | Function |  | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`showModels`](../../../../src/clients/web/client.ts#L1992) | Function |  | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`showThinking`](../../../../src/clients/web/client.ts#L2043) | Function | choice | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`changeModel`](../../../../src/clients/web/client.ts#L2104) | Function | choice, thinkingLevel | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`newSession`](../../../../src/clients/web/client.ts#L2149) | Function |  | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`createSession`](../../../../src/clients/web/client.ts#L2157) | Function |  | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`resetCloseDialog`](../../../../src/clients/web/client.ts#L2248) | Function |  | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`dismissCloseDialog`](../../../../src/clients/web/client.ts#L2261) | Function |  | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`pairingCode`](../../../../src/clients/web/client.ts#L2280) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`viewport`](../../../../src/clients/web/client.ts#L2373) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
-| [`responsive`](../../../../src/clients/web/client.ts#L2382) | Function |  | [文字解释](implementation/browser-controller.md#event-bindings-page-lifecycle) |
-| [`resume`](../../../../src/clients/web/client.ts#L2404) | Function |  | [文字解释](implementation/browser-controller.md#event-bindings-page-lifecycle) |
-| [`savedHistoryWarning`](../../../../src/clients/web/client.ts#L506) | Function | | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`invalidateSessionNameEditor`](../../../../src/clients/web/client.ts#L343) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
-| [`closeSessionNameEditor`](../../../../src/clients/web/client.ts#L347) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
-| [`openSessionNameEditor`](../../../../src/clients/web/client.ts#L351) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
-| [`saveSessionNameValue`](../../../../src/clients/web/client.ts#L368) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
+| [`el`](../../../../src/clients/web/client.ts#L54) | Function | id, type | [文字解释](implementation/browser-controller.md#dom-contract-coordinator-state) |
+| [`node`](../../../../src/clients/web/client.ts#L59) | Function | tag, text, className | [文字解释](implementation/browser-controller.md#dom-contract-coordinator-state) |
+| [`input`](../../../../src/clients/web/client.ts#L64) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`form`](../../../../src/clients/web/client.ts#L65) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`rail`](../../../../src/clients/web/client.ts#L66) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`main`](../../../../src/clients/web/client.ts#L67) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`gate`](../../../../src/clients/web/client.ts#L68) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`app`](../../../../src/clients/web/client.ts#L69) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`scroll`](../../../../src/clients/web/client.ts#L70) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`conversation`](../../../../src/clients/web/client.ts#L71) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`composer`](../../../../src/clients/web/client.ts#L72) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`savedRenderer`](../../../../src/clients/web/client.ts#L73) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`imageGeneration`](../../../../src/clients/web/client.ts#L74) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`send`](../../../../src/clients/web/client.ts#L75) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`notice`](../../../../src/clients/web/client.ts#L76) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`dialog`](../../../../src/clients/web/client.ts#L77) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`directory`](../../../../src/clients/web/client.ts#L78) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`createButton`](../../../../src/clients/web/client.ts#L79) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`closeDialog`](../../../../src/clients/web/client.ts#L80) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`closeDirectory`](../../../../src/clients/web/client.ts#L81) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`closeTitle`](../../../../src/clients/web/client.ts#L82) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`closeCopy`](../../../../src/clients/web/client.ts#L83) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`closeError`](../../../../src/clients/web/client.ts#L84) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`cancelClose`](../../../../src/clients/web/client.ts#L85) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`confirmClose`](../../../../src/clients/web/client.ts#L86) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`modelDialog`](../../../../src/clients/web/client.ts#L94) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`modelSearch`](../../../../src/clients/web/client.ts#L95) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`chooseModel`](../../../../src/clients/web/client.ts#L96) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`availableModels`](../../../../src/clients/web/client.ts#L97) | Module value | `PiModelOption[]` | [文字解释](implementation/browser-controller.md) |
+| [`capabilities`](../../../../src/clients/web/client.ts#L98) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`capabilityRequests`](../../../../src/clients/web/client.ts#L99) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`capabilityErrors`](../../../../src/clients/web/client.ts#L100) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`capabilityGeneration`](../../../../src/clients/web/client.ts#L101) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`resetCapabilities`](../../../../src/clients/web/client.ts#L117) | Function |  | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`thinkingChoice`](../../../../src/clients/web/client.ts#L118) | Module value | `PiModelOption \| null` | [文字解释](implementation/browser-controller.md) |
+| [`levelNames`](../../../../src/clients/web/client.ts#L119) | Module value | `Record<ThinkingLevel, string>` | [文字解释](implementation/browser-controller.md) |
+| [`modelSession`](../../../../src/clients/web/client.ts#L128) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
+| [`changingModel`](../../../../src/clients/web/client.ts#L129) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
+| [`older`](../../../../src/clients/web/client.ts#L130) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`drafts`](../../../../src/clients/web/client.ts#L147) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`turns`](../../../../src/clients/web/client.ts#L148) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`sessions`](../../../../src/clients/web/client.ts#L149) | Module value | `SessionInfo[]` | [文字解释](implementation/browser-controller.md) |
+| [`selected`](../../../../src/clients/web/client.ts#L150) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
+| [`state`](../../../../src/clients/web/client.ts#L151) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`contextSources`](../../../../src/clients/web/client.ts#L152) | Module value | `ContextSource[]` | [文字解释](implementation/browser-controller.md) |
+| [`contextSourcesTruncated`](../../../../src/clients/web/client.ts#L153) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`entries`](../../../../src/clients/web/client.ts#L154) | Module value | `HistoryEntry[]` | [文字解释](implementation/browser-controller.md) |
+| [`nextCursor`](../../../../src/clients/web/client.ts#L155) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
+| [`controller`](../../../../src/clients/web/client.ts#L156) | Module value | `AbortController \| null` | [文字解释](implementation/browser-controller.md) |
+| [`generation`](../../../../src/clients/web/client.ts#L157) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`authenticated`](../../../../src/clients/web/client.ts#L158) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`reconnectTimer`](../../../../src/clients/web/client.ts#L159) | Module value | `number \| undefined` | [文字解释](implementation/browser-controller.md) |
+| [`pollTimer`](../../../../src/clients/web/client.ts#L159) | Module value | `number \| undefined` | [文字解释](implementation/browser-controller.md) |
+| [`polling`](../../../../src/clients/web/client.ts#L160) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`suspended`](../../../../src/clients/web/client.ts#L161) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`HistoryReadRecovery`](../../../../src/clients/web/client.ts#L162) | Interface |  | [文字解释](implementation/browser-controller.md) |
+| [`historyRecovery`](../../../../src/clients/web/client.ts#L167) | Module value | `Record<"latest" \| "older", HistoryReadRecovery>` | [文字解释](implementation/browser-controller.md) |
+| [`historyContentFailed`](../../../../src/clients/web/client.ts#L171) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`historyCoverageReads`](../../../../src/clients/web/client.ts#L172) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`historyCoverageRun`](../../../../src/clients/web/client.ts#L173) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
+| [`resetHistoryPagination`](../../../../src/clients/web/client.ts#L174) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`historyPending`](../../../../src/clients/web/client.ts#L175) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`sending`](../../../../src/clients/web/client.ts#L176) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`pendingSend`](../../../../src/clients/web/client.ts#L177) | Module value | `{   session: string;   requestId: string;   message: string;   images: ImageContent[]; } \| null` | [文字解释](implementation/browser-controller.md) |
+| [`pendingCreate`](../../../../src/clients/web/client.ts#L183) | Module value | `{   requestId: string;   directory: string; } \| null` | [文字解释](implementation/browser-controller.md) |
+| [`tabSlots`](../../../../src/clients/web/client.ts#L187) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`openingSessions`](../../../../src/clients/web/client.ts#L188) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`closeArmedSession`](../../../../src/clients/web/client.ts#L189) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
+| [`preparingCloseSession`](../../../../src/clients/web/client.ts#L190) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
+| [`closeTarget`](../../../../src/clients/web/client.ts#L191) | Module value | `{   id: string;   activeRunId: string \| null;   nativeExecutionId: string \| null;   attempted: boolean; } \| null` | [文字解释](implementation/browser-controller.md) |
+| [`closingSession`](../../../../src/clients/web/client.ts#L197) | Module value | `string \| null` | [文字解释](implementation/browser-controller.md) |
+| [`closePreparationGeneration`](../../../../src/clients/web/client.ts#L198) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`closeAttemptGeneration`](../../../../src/clients/web/client.ts#L199) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`sessionRefreshGeneration`](../../../../src/clients/web/client.ts#L200) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`sessionStateGeneration`](../../../../src/clients/web/client.ts#L201) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`selectionGeneration`](../../../../src/clients/web/client.ts#L202) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`openIntentGeneration`](../../../../src/clients/web/client.ts#L203) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`authAttempt`](../../../../src/clients/web/client.ts#L204) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`browseAttempt`](../../../../src/clients/web/client.ts#L205) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`modelAttempt`](../../../../src/clients/web/client.ts#L206) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`hostMode`](../../../../src/clients/web/client.ts#L207) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`streamConnected`](../../../../src/clients/web/client.ts#L208) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`imageDialog`](../../../../src/clients/web/client.ts#L209) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`showImage`](../../../../src/clients/web/client.ts#L215) | Function | url, name | [文字解释](implementation/browser-controller.md#dom-contract-coordinator-state) |
+| [`attachments`](../../../../src/clients/web/client.ts#L216) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`attachButton`](../../../../src/clients/web/client.ts#L484) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`imageFiles`](../../../../src/clients/web/client.ts#L485) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`imageCache`](../../../../src/clients/web/client.ts#L523) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`imageQueue`](../../../../src/clients/web/client.ts#L524) | Module value | `Promise<unknown>` | [文字解释](implementation/browser-controller.md) |
+| [`liveOrder`](../../../../src/clients/web/client.ts#L525) | Module value | `{ kind: "message" \| "tool"; id: string }[]` | [文字解释](implementation/browser-controller.md) |
+| [`releaseImages`](../../../../src/clients/web/client.ts#L531) | Function |  | [文字解释](implementation/browser-controller.md#dom-contract-coordinator-state) |
+| [`historyImage`](../../../../src/clients/web/client.ts#L541) | Function | entryId, index, mimeType | [文字解释](implementation/browser-controller.md#conversation-rendering-saved-images) |
+| [`localPreferences`](../../../../src/clients/web/client.ts#L597) | Module value | `Record<string, string>` | [文字解释](implementation/browser-controller.md) |
+| [`savePreference`](../../../../src/clients/web/client.ts#L611) | Function | key, value | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`activeSession`](../../../../src/clients/web/client.ts#L699) | Function |  | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`modelCapabilityKey`](../../../../src/clients/web/client.ts#L702) | Function | provider, model, sessionId | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`requestModelCapabilities`](../../../../src/clients/web/client.ts#L711) | Function | choice, sessionId | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`probeCurrentModel`](../../../../src/clients/web/client.ts#L751) | Function | sessionId | [文字解释](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`label`](../../../../src/clients/web/client.ts#L779) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`runtimeOpen`](../../../../src/clients/web/client.ts#L795) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`nativeRunning`](../../../../src/clients/web/client.ts#L798) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`sessionBusy`](../../../../src/clients/web/client.ts#L801) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`status`](../../../../src/clients/web/client.ts#L804) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`TabStatus`](../../../../src/clients/web/client.ts#L821) | TypeAlias |  | [文字解释](implementation/browser-controller.md) |
+| [`tabStatus`](../../../../src/clients/web/client.ts#L827) | Function | s | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`tabStatusLabel`](../../../../src/clients/web/client.ts#L836) | Function | value | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`SVG_NS`](../../../../src/clients/web/client.ts#L842) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`statusPaths`](../../../../src/clients/web/client.ts#L843) | Module value | `Record<   "ready" \| "working" \| "attention" \| "stopped" \| "opening" \| "close",   string >` | [文字解释](implementation/browser-controller.md) |
+| [`tabSymbol`](../../../../src/clients/web/client.ts#L859) | Function | value | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`synchronizeTabSlots`](../../../../src/clients/web/client.ts#L875) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`openTabIds`](../../../../src/clients/web/client.ts#L887) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`closeBlockedReason`](../../../../src/clients/web/client.ts#L890) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`showError`](../../../../src/clients/web/client.ts#L900) | Function | error | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`clearNotice`](../../../../src/clients/web/client.ts#L908) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`nav`](../../../../src/clients/web/client.ts#L912) | Function | open | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`navigation`](../../../../src/clients/web/client.ts#L921) | Function |  | [文字解释](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`updatedSession`](../../../../src/clients/web/client.ts#L1101) | Function | session | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`neighborAfterClose`](../../../../src/clients/web/client.ts#L1113) | Function | id, previousTabs | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`reconcileClosedRuntime`](../../../../src/clients/web/client.ts#L1128) | Function | id, previousTabs | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`userMessageSnippet`](../../../../src/clients/web/client.ts#L1137) | Function | values | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`showCloseError`](../../../../src/clients/web/client.ts#L1150) | Function | error | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`prepareClose`](../../../../src/clients/web/client.ts#L1154) | Function | id | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`sessionSnapshot`](../../../../src/clients/web/client.ts#L1238) | Function | id | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`turnSnapshot`](../../../../src/clients/web/client.ts#L1244) | Function | id, runId | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`turnIsActive`](../../../../src/clients/web/client.ts#L1250) | Function | turn | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`waitForTurnAndRuntime`](../../../../src/clients/web/client.ts#L1253) | Function | id, runId, authentication | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`finishClose`](../../../../src/clients/web/client.ts#L1278) | Function | id, previousTabs | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`confirmSessionClose`](../../../../src/clients/web/client.ts#L1284) | Function |  | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`openFromSidebar`](../../../../src/clients/web/client.ts#L1396) | Function | id | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`identifyLiveThinking`](../../../../src/clients/web/client.ts#L1432) | Function | message | [文字解释](implementation/browser-controller.md#conversation-rendering-saved-images) |
+| [`renderConversation`](../../../../src/clients/web/client.ts#L1444) | Function |  | [文字解释](implementation/browser-controller.md#conversation-rendering-saved-images) |
+| [`historyProblem`](../../../../src/clients/web/client.ts#L1630) | Function |  | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
+| [`resetHistoryRecovery`](../../../../src/clients/web/client.ts#L1634) | Function | more | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
+| [`uncoveredHistoryRun`](../../../../src/clients/web/client.ts#L1650) | Function |  | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
+| [`scheduleHistoryRecovery`](../../../../src/clients/web/client.ts#L1661) | Function | more | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
+| [`loadHistory`](../../../../src/clients/web/client.ts#L1670) | Function | more | [文字解释](implementation/browser-controller.md#saved-history-recovery) |
+| [`stopStream`](../../../../src/clients/web/client.ts#L1769) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`renderFrame`](../../../../src/clients/web/client.ts#L1767) | Module value | `number \| undefined` | [文字解释](implementation/browser-controller.md) |
+| [`scheduleStreamRender`](../../../../src/clients/web/client.ts#L1775) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`stream`](../../../../src/clients/web/client.ts#L1783) | Function | id, epoch | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`select`](../../../../src/clients/web/client.ts#L1900) | Function | id | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`connection`](../../../../src/clients/web/client.ts#L1938) | Function | text | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`refresh`](../../../../src/clients/web/client.ts#L1941) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`poll`](../../../../src/clients/web/client.ts#L2009) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`disconnect`](../../../../src/clients/web/client.ts#L2031) | Function | reason | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`connect`](../../../../src/clients/web/client.ts#L2057) | Function |  | [文字解释](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`submit`](../../../../src/clients/web/client.ts#L2096) | Function |  | [文字解释](implementation/browser-controller.md#sending-stopping-safe-retry) |
+| [`browse`](../../../../src/clients/web/client.ts#L2199) | Function | path | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`renderModels`](../../../../src/clients/web/client.ts#L2248) | Function |  | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`showModels`](../../../../src/clients/web/client.ts#L2276) | Function |  | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`showThinking`](../../../../src/clients/web/client.ts#L2327) | Function | choice | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`changeModel`](../../../../src/clients/web/client.ts#L2388) | Function | choice, thinkingLevel | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`newSession`](../../../../src/clients/web/client.ts#L2433) | Function |  | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`createSession`](../../../../src/clients/web/client.ts#L2441) | Function |  | [文字解释](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`resetCloseDialog`](../../../../src/clients/web/client.ts#L2548) | Function |  | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`dismissCloseDialog`](../../../../src/clients/web/client.ts#L2561) | Function |  | [文字解释](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`pairingCode`](../../../../src/clients/web/client.ts#L2580) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`viewport`](../../../../src/clients/web/client.ts#L2673) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-controller.md) |
+| [`responsive`](../../../../src/clients/web/client.ts#L2682) | Function |  | [文字解释](implementation/browser-controller.md#event-bindings-page-lifecycle) |
+| [`resume`](../../../../src/clients/web/client.ts#L2704) | Function |  | [文字解释](implementation/browser-controller.md#event-bindings-page-lifecycle) |
+| [`savedHistoryWarning`](../../../../src/clients/web/client.ts#L785) | Function | | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`invalidateSessionNameEditor`](../../../../src/clients/web/client.ts#L622) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
+| [`closeSessionNameEditor`](../../../../src/clients/web/client.ts#L626) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
+| [`openSessionNameEditor`](../../../../src/clients/web/client.ts#L630) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
+| [`saveSessionNameValue`](../../../../src/clients/web/client.ts#L647) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
+| [`sameLibraryReference`](../../../../src/clients/web/client.ts#L221) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`libraryFailure`](../../../../src/clients/web/client.ts#L224) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`renderLibraryReferences`](../../../../src/clients/web/client.ts#L228) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`renderLibraryItems`](../../../../src/clients/web/client.ts#L258) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`renderLibraryReader`](../../../../src/clients/web/client.ts#L277) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`loadLibraryReferences`](../../../../src/clients/web/client.ts#L318) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`loadLatestLibraryItems`](../../../../src/clients/web/client.ts#L351) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`searchLibrary`](../../../../src/clients/web/client.ts#L378) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`readLibraryItem`](../../../../src/clients/web/client.ts#L405) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`changeLibraryReference`](../../../../src/clients/web/client.ts#L435) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+| [`openLibrary`](../../../../src/clients/web/client.ts#L470) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
+
 
 ## src/clients/web/conversation.ts
 
@@ -469,25 +481,25 @@ Local dependencies： [shared/events.ts](../../../../src/shared/events.ts), [sha
 
 文字解释：[browser-rendering](implementation/browser-rendering.md)
 
-[查看源码](../../../../src/clients/web/page.ts) · 897 行
+[查看源码](../../../../src/clients/web/page.ts) · 963 行
 
 | Symbol | 类型 | Parameter 或 type | 文字解释 |
 | --- | --- | --- | --- |
 | [`HOST_PAGE`](../../../../src/clients/web/page.ts#L1) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-rendering.md) |
-| [`STYLE`](../../../../src/clients/web/page.ts#L159) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-rendering.md) |
+| [`STYLE`](../../../../src/clients/web/page.ts#L191) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-rendering.md) |
 
 
 ## src/clients/web/script.ts
 
 文字解释：[browser-rendering](implementation/browser-rendering.md)
 
-[查看源码](../../../../src/clients/web/script.ts) · 38 行
+[查看源码](../../../../src/clients/web/script.ts) · 39 行
 
 | Symbol | 类型 | Parameter 或 type | 文字解释 |
 | --- | --- | --- | --- |
 | [`modules`](../../../../src/clients/web/script.ts#L6) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-rendering.md) |
-| [`BROWSER_ASSETS`](../../../../src/clients/web/script.ts#L26) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-rendering.md) |
-| [`BROWSER_SCRIPT`](../../../../src/clients/web/script.ts#L38) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-rendering.md) |
+| [`BROWSER_ASSETS`](../../../../src/clients/web/script.ts#L27) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-rendering.md) |
+| [`BROWSER_SCRIPT`](../../../../src/clients/web/script.ts#L39) | Module value | 由 initializer 推断 | [文字解释](implementation/browser-rendering.md) |
 
 
 ## src/clients/web/tool-command.ts
@@ -508,7 +520,7 @@ Local dependencies： [shared/events.ts](../../../../src/shared/events.ts), [sha
 
 文字解释：[browser-controller](implementation/browser-controller.md)
 
-[查看源码](../../../../src/clients/web/transport.ts) · 79 行
+[查看源码](../../../../src/clients/web/transport.ts) · 85 行
 
 | Symbol | 类型 | Parameter 或 type | 文字解释 |
 | --- | --- | --- | --- |
@@ -521,7 +533,7 @@ Local dependencies： [shared/events.ts](../../../../src/shared/events.ts), [sha
 | [`headers`](../../../../src/clients/web/transport.ts#L33) | Function |  | [文字解释](implementation/browser-controller.md#browser-http-transport) |
 | [`responseError`](../../../../src/clients/web/transport.ts#L39) | Function | response | [文字解释](implementation/browser-controller.md#browser-http-transport) |
 | [`api`](../../../../src/clients/web/transport.ts#L60) | Function | path, body | [文字解释](implementation/browser-controller.md#browser-http-transport) |
-| [`message`](../../../../src/clients/web/transport.ts#L77) | Function | error | [文字解释](implementation/browser-controller.md#browser-http-transport) |
+| [`message`](../../../../src/clients/web/transport.ts#L83) | Function | error | [文字解释](implementation/browser-controller.md#browser-http-transport) |
 
 
 ## src/local/files.ts
@@ -843,24 +855,25 @@ Local dependencies： [local/files.ts](../../../../src/local/files.ts), [local/p
 
 文字解释：[http](implementation/http.md)
 
-[查看源码](../../../../src/server/http.ts) · 653 行
+[查看源码](../../../../src/server/http.ts) · 788 行
 
 Local dependencies： [clients/web/page.ts](../../../../src/clients/web/page.ts), [clients/web/script.ts](../../../../src/clients/web/script.ts), [local/files.ts](../../../../src/local/files.ts), [local/paths.ts](../../../../src/local/paths.ts), [sessions/service.ts](../../../../src/sessions/service.ts), [shared/protocol.ts](../../../../src/shared/protocol.ts), [shared/sessions.ts](../../../../src/shared/sessions.ts), [shared/thinking.ts](../../../../src/shared/thinking.ts), [shared/turns.ts](../../../../src/shared/turns.ts), [server/access.ts](../../../../src/server/access.ts), [server/auth.ts](../../../../src/server/auth.ts), [server/sse.ts](../../../../src/server/sse.ts).
 
 | Symbol | 类型 | Parameter 或 type | 文字解释 |
 | --- | --- | --- | --- |
-| [`HostOptions`](../../../../src/server/http.ts#L22) | Interface |  | [文字解释](implementation/http.md) |
-| [`RunningHost`](../../../../src/server/http.ts#L32) | Interface |  | [文字解释](implementation/http.md) |
-| [`fail`](../../../../src/server/http.ts#L37) | Function | status, code, message | [文字解释](implementation/http.md#request-validation) |
-| [`cookieToken`](../../../../src/server/http.ts#L40) | Function | request, name | [文字解释](implementation/http.md#request-validation) |
-| [`browserRequest`](../../../../src/server/http.ts#L48) | Function | request, origin | [文字解释](implementation/http.md#request-validation) |
-| [`readJson`](../../../../src/server/http.ts#L53) | Function | request, limit | [文字解释](implementation/http.md#request-validation) |
-| [`send`](../../../../src/server/http.ts#L90) | Function | response, status, body | [文字解释](implementation/http.md#request-validation) |
-| [`parseHistoryCursor`](../../../../src/server/http.ts#L94) | Function | query | [文字解释](implementation/http.md#request-validation) |
-| [`startHost`](../../../../src/server/http.ts#L108) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [文字解释](implementation/http.md#host-lifecycle) |
-| [`startHost.revalidateEventStreams`](../../../../src/server/http.ts#L137) | Nested function |  | [文字解释](implementation/http.md#host-lifecycle) |
-| [`startHost.openEventStream`](../../../../src/server/http.ts#L141) | Nested function | request, response, sessionId, cursor, cookieName | [文字解释](implementation/http.md#host-lifecycle) |
-| [`startHost.handle`](../../../../src/server/http.ts#L174) | Nested function | request, response | [文字解释](implementation/http.md#route-dispatch) |
+| [`HostOptions`](../../../../src/server/http.ts#L24) | Interface |  | [文字解释](implementation/http.md) |
+| [`RunningHost`](../../../../src/server/http.ts#L34) | Interface |  | [文字解释](implementation/http.md) |
+| [`fail`](../../../../src/server/http.ts#L39) | Function | status, code, message | [文字解释](implementation/http.md#request-validation) |
+| [`cookieToken`](../../../../src/server/http.ts#L42) | Function | request, name | [文字解释](implementation/http.md#request-validation) |
+| [`browserRequest`](../../../../src/server/http.ts#L50) | Function | request, origin | [文字解释](implementation/http.md#request-validation) |
+| [`readJson`](../../../../src/server/http.ts#L55) | Function | request, limit | [文字解释](implementation/http.md#request-validation) |
+| [`send`](../../../../src/server/http.ts#L92) | Function | response, status, body | [文字解释](implementation/http.md#request-validation) |
+| [`parseHistoryCursor`](../../../../src/server/http.ts#L96) | Function | query | [文字解释](implementation/http.md#request-validation) |
+| [`startHost`](../../../../src/server/http.ts#L127) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [文字解释](implementation/http.md#host-lifecycle) |
+| [`startHost.revalidateEventStreams`](../../../../src/server/http.ts#L157) | Nested function |  | [文字解释](implementation/http.md#host-lifecycle) |
+| [`startHost.openEventStream`](../../../../src/server/http.ts#L161) | Nested function | request, response, sessionId, cursor, cookieName | [文字解释](implementation/http.md#host-lifecycle) |
+| [`startHost.handle`](../../../../src/server/http.ts#L194) | Nested function | request, response | [文字解释](implementation/http.md#route-dispatch) |
+| [`parseLibraryLatestQuery`](../../../../src/server/http.ts#L110) | Function | | [阅读说明](implementation/storage-integrations.md#library-http-browser) |
 
 
 ## src/server/session-discovery.ts
@@ -1182,112 +1195,116 @@ Local dependencies： [runtime/message-identity.ts](../../../../src/runtime/mess
 
 文字解释：[sessions](implementation/sessions.md)
 
-[查看源码](../../../../src/sessions/service.ts) · 2224 行
+[查看源码](../../../../src/sessions/service.ts) · 2262 行
 
 Local dependencies： [local/files.ts](../../../../src/local/files.ts), [local/paths.ts](../../../../src/local/paths.ts), [runtime/message-identity.ts](../../../../src/runtime/message-identity.ts), [runtime/pi-history.ts](../../../../src/runtime/pi-history.ts), [runtime/pi-process.ts](../../../../src/runtime/pi-process.ts), [runtime/pi-rpc.ts](../../../../src/runtime/pi-rpc.ts), [server/session-discovery.ts](../../../../src/server/session-discovery.ts), [shared/discovery.ts](../../../../src/shared/discovery.ts), [shared/events.ts](../../../../src/shared/events.ts), [shared/history.ts](../../../../src/shared/history.ts), [shared/images.ts](../../../../src/shared/images.ts), [shared/sessions.ts](../../../../src/shared/sessions.ts), [shared/thinking.ts](../../../../src/shared/thinking.ts), [shared/turns.ts](../../../../src/shared/turns.ts), [storage/catalog.ts](../../../../src/storage/catalog.ts), [sessions/events.ts](../../../../src/sessions/events.ts), [sessions/history.ts](../../../../src/sessions/history.ts).
 
 | Symbol | 类型 | Parameter 或 type | 文字解释 |
 | --- | --- | --- | --- |
-| [`SessionError`](../../../../src/sessions/service.ts#L60) | Class |  | [文字解释](implementation/sessions.md) |
-| [`SessionError.status`](../../../../src/sessions/service.ts#L61) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionError.code`](../../../../src/sessions/service.ts#L62) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionError.constructor`](../../../../src/sessions/service.ts#L63) | Constructor | status, code, message | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionServiceOptions`](../../../../src/sessions/service.ts#L70) | Interface |  | [文字解释](implementation/sessions.md) |
-| [`HISTORY_UNAVAILABLE`](../../../../src/sessions/service.ts#L86) | Module value | 由 initializer 推断 | [文字解释](implementation/sessions.md) |
-| [`MAX_OPEN_SESSIONS`](../../../../src/sessions/service.ts#L87) | Module value | 由 initializer 推断 | [文字解释](implementation/sessions.md) |
-| [`turnPayloadIdentity`](../../../../src/sessions/service.ts#L89) | Function | message, images | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`validateStored`](../../../../src/sessions/service.ts#L101) | Function | stored | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`ActiveTurn`](../../../../src/sessions/service.ts#L117) | Interface |  | [文字解释](implementation/sessions.md) |
-| [`HistoryIdentity`](../../../../src/sessions/service.ts#L133) | Interface |  | [文字解释](implementation/sessions.md) |
-| [`NativeExecutionRecord`](../../../../src/sessions/service.ts#L138) | Interface |  | [文字解释](implementation/sessions.md) |
-| [`NativeStateRefreshRequest`](../../../../src/sessions/service.ts#L149) | Interface |  | [文字解释](implementation/sessions.md) |
-| [`NativeStateRefresh`](../../../../src/sessions/service.ts#L154) | Interface |  | [文字解释](implementation/sessions.md) |
-| [`isMessageAfterBaseline`](../../../../src/sessions/service.ts#L159) | Function | key, baseline | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`messageKeysAfterBaseline`](../../../../src/sessions/service.ts#L171) | Function | entries, baseline | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`messageKeyDelta`](../../../../src/sessions/service.ts#L181) | Function | baseline, finalCounts | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`turnView`](../../../../src/sessions/service.ts#L195) | Function | turn | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`active`](../../../../src/sessions/service.ts#L200) | Function | turn | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`truncateUtf8`](../../../../src/sessions/service.ts#L204) | Function | value, maxBytes | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService`](../../../../src/sessions/service.ts#L217) | Class |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#catalog`](../../../../src/sessions/service.ts#L218) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#dataDir`](../../../../src/sessions/service.ts#L219) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#env`](../../../../src/sessions/service.ts#L220) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#extensions`](../../../../src/sessions/service.ts#L221) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#now`](../../../../src/sessions/service.ts#L222) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#runtimes`](../../../../src/sessions/service.ts#L223) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#runtimeObservers`](../../../../src/sessions/service.ts#L224) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#historyIdentity`](../../../../src/sessions/service.ts#L225) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#nativeExecutions`](../../../../src/sessions/service.ts#L226) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#nativeStateRefreshes`](../../../../src/sessions/service.ts#L227) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#turns`](../../../../src/sessions/service.ts#L228) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#storageFaults`](../../../../src/sessions/service.ts#L229) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#events`](../../../../src/sessions/service.ts#L230) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#historyPages`](../../../../src/sessions/service.ts#L231) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#reads`](../../../../src/sessions/service.ts#L235) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#nativeRefreshes`](../../../../src/sessions/service.ts#L236) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#shutdownController`](../../../../src/sessions/service.ts#L237) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#modelDiscovery`](../../../../src/sessions/service.ts#L238) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#modelCapabilityDiscoveries`](../../../../src/sessions/service.ts#L239) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#sessionModelReads`](../../../../src/sessions/service.ts#L240) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#checkpoint`](../../../../src/sessions/service.ts#L241) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#queue`](../../../../src/sessions/service.ts#L243) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#stopping`](../../../../src/sessions/service.ts#L244) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.#shutdown`](../../../../src/sessions/service.ts#L245) | Property |  | [文字解释](implementation/sessions.md) |
-| [`SessionService.constructor`](../../../../src/sessions/service.ts#L247) | Constructor | catalog, dataDir, options | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.create`](../../../../src/sessions/service.ts#L259) | Method | options | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.runtimeCount`](../../../../src/sessions/service.ts#L274) | GetAccessor |  | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.configure`](../../../../src/sessions/service.ts#L278) | Method | configuration | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.listSessions`](../../../../src/sessions/service.ts#L301) | Method |  | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.getSession`](../../../../src/sessions/service.ts#L306) | Method | id | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.listDirectories`](../../../../src/sessions/service.ts#L352) | Method | path | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.listAvailableModels`](../../../../src/sessions/service.ts#L375) | Method |  | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.listSessionModels`](../../../../src/sessions/service.ts#L400) | Method | id | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.getSessionModelCapabilities`](../../../../src/sessions/service.ts#L443) | Method | id, request | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.getModelCapabilities`](../../../../src/sessions/service.ts#L463) | Method | request | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.subscribeEvents`](../../../../src/sessions/service.ts#L502) | Method | id, cursor, listener | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.#publishState`](../../../../src/sessions/service.ts#L533) | Method | id, withTurn | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.#storageFault`](../../../../src/sessions/service.ts#L556) | Method | id | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.createSession`](../../../../src/sessions/service.ts#L566) | Method | request | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.setSessionModel`](../../../../src/sessions/service.ts#L650) | Method | id, request | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.openSession`](../../../../src/sessions/service.ts#L757) | Method | id | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.closeSession`](../../../../src/sessions/service.ts#L761) | Method | id | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.getContext`](../../../../src/sessions/service.ts#L803) | Method | id | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.getHistory`](../../../../src/sessions/service.ts#L815) | Method | id, cursor | [文字解释](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.getHistoryImage`](../../../../src/sessions/service.ts#L933) | Method | id, entryId, imageIndex | [文字解释](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.submitTurn`](../../../../src/sessions/service.ts#L961) | Method | id, request | [文字解释](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.getTurn`](../../../../src/sessions/service.ts#L1037) | Method | id, runId | [文字解释](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.getTurnResult`](../../../../src/sessions/service.ts#L1043) | Method | id, runId | [文字解释](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.abortTurn`](../../../../src/sessions/service.ts#L1095) | Method | id, runId | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.abortNativeExecution`](../../../../src/sessions/service.ts#L1130) | Method | id, executionId | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#storedTurn`](../../../../src/sessions/service.ts#L1174) | Method | id, runId | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#checkStorage`](../../../../src/sessions/service.ts#L1182) | Method | id | [文字解释](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#writeTurn`](../../../../src/sessions/service.ts#L1191) | Method | turn | [文字解释](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#abortRuntime`](../../../../src/sessions/service.ts#L1205) | Method | slot | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#executeTurn`](../../../../src/sessions/service.ts#L1220) | Method | slot, message, images | [文字解释](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.#completeHandledTurn`](../../../../src/sessions/service.ts#L1403) | Method | sessionId, runId, runtime, before, historyWasExpected | [文字解释](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.shutdown`](../../../../src/sessions/service.ts#L1466) | Method |  | [文字解释](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#configuration`](../../../../src/sessions/service.ts#L1539) | Method |  | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#admit`](../../../../src/sessions/service.ts#L1550) | Method |  | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#mutate`](../../../../src/sessions/service.ts#L1555) | Method | operation | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#read`](../../../../src/sessions/service.ts#L1569) | Method | operation | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#stored`](../../../../src/sessions/service.ts#L1599) | Method | id | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#view`](../../../../src/sessions/service.ts#L1607) | Method | stored | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#directory`](../../../../src/sessions/service.ts#L1655) | Method | path | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#prune`](../../../../src/sessions/service.ts#L1671) | Method |  | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#checkHistory`](../../../../src/sessions/service.ts#L1682) | Method | stored | [文字解释](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#savedHistory`](../../../../src/sessions/service.ts#L1787) | Method | stored, options | [文字解释](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#identityForEntries`](../../../../src/sessions/service.ts#L1805) | Method | entries | [文字解释](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#identityForHistory`](../../../../src/sessions/service.ts#L1810) | Method | history | [文字解释](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#observeRuntime`](../../../../src/sessions/service.ts#L1816) | Method | sessionId, runtime | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#nativeExecutionEvent`](../../../../src/sessions/service.ts#L1850) | Method | sessionId, event, startedLate | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#refreshNativeHistory`](../../../../src/sessions/service.ts#L1936) | Method | sessionId, executionId | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#scheduleNativeStateRefresh`](../../../../src/sessions/service.ts#L1967) | Method | sessionId, executionId, runtime | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#refreshNativeSessionState`](../../../../src/sessions/service.ts#L1997) | Method | sessionId, executionId, runtime | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#open`](../../../../src/sessions/service.ts#L2048) | Method | stored, options | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#rememberHistory`](../../../../src/sessions/service.ts#L2199) | Method | stored, runtime | [文字解释](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#recordHistoryCheck`](../../../../src/sessions/service.ts#L1745) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#historyCheckState`](../../../../src/sessions/service.ts#L1776) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.renameSession`](../../../../src/sessions/service.ts#L311) | Method |  | [Read explanation](implementation/sessions.md#sessions-shared-names) |
+| [`SessionError`](../../../../src/sessions/service.ts#L62) | Class |  | [文字解释](implementation/sessions.md) |
+| [`SessionError.status`](../../../../src/sessions/service.ts#L63) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionError.code`](../../../../src/sessions/service.ts#L64) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionError.constructor`](../../../../src/sessions/service.ts#L65) | Constructor | status, code, message | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionServiceOptions`](../../../../src/sessions/service.ts#L72) | Interface |  | [文字解释](implementation/sessions.md) |
+| [`HISTORY_UNAVAILABLE`](../../../../src/sessions/service.ts#L89) | Module value | 由 initializer 推断 | [文字解释](implementation/sessions.md) |
+| [`MAX_OPEN_SESSIONS`](../../../../src/sessions/service.ts#L90) | Module value | 由 initializer 推断 | [文字解释](implementation/sessions.md) |
+| [`turnPayloadIdentity`](../../../../src/sessions/service.ts#L92) | Function | message, images | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`validateStored`](../../../../src/sessions/service.ts#L104) | Function | stored | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`ActiveTurn`](../../../../src/sessions/service.ts#L120) | Interface |  | [文字解释](implementation/sessions.md) |
+| [`HistoryIdentity`](../../../../src/sessions/service.ts#L136) | Interface |  | [文字解释](implementation/sessions.md) |
+| [`NativeExecutionRecord`](../../../../src/sessions/service.ts#L141) | Interface |  | [文字解释](implementation/sessions.md) |
+| [`NativeStateRefreshRequest`](../../../../src/sessions/service.ts#L152) | Interface |  | [文字解释](implementation/sessions.md) |
+| [`NativeStateRefresh`](../../../../src/sessions/service.ts#L157) | Interface |  | [文字解释](implementation/sessions.md) |
+| [`isMessageAfterBaseline`](../../../../src/sessions/service.ts#L162) | Function | key, baseline | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`messageKeysAfterBaseline`](../../../../src/sessions/service.ts#L174) | Function | entries, baseline | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`messageKeyDelta`](../../../../src/sessions/service.ts#L184) | Function | baseline, finalCounts | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`turnView`](../../../../src/sessions/service.ts#L198) | Function | turn | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`active`](../../../../src/sessions/service.ts#L203) | Function | turn | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`truncateUtf8`](../../../../src/sessions/service.ts#L207) | Function | value, maxBytes | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService`](../../../../src/sessions/service.ts#L220) | Class |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#catalog`](../../../../src/sessions/service.ts#L221) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#dataDir`](../../../../src/sessions/service.ts#L223) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#env`](../../../../src/sessions/service.ts#L224) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#extensions`](../../../../src/sessions/service.ts#L225) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#now`](../../../../src/sessions/service.ts#L226) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#runtimes`](../../../../src/sessions/service.ts#L227) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#runtimeObservers`](../../../../src/sessions/service.ts#L228) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#historyIdentity`](../../../../src/sessions/service.ts#L229) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#nativeExecutions`](../../../../src/sessions/service.ts#L230) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#nativeStateRefreshes`](../../../../src/sessions/service.ts#L231) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#turns`](../../../../src/sessions/service.ts#L232) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#storageFaults`](../../../../src/sessions/service.ts#L233) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#events`](../../../../src/sessions/service.ts#L234) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#historyPages`](../../../../src/sessions/service.ts#L235) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#reads`](../../../../src/sessions/service.ts#L239) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#nativeRefreshes`](../../../../src/sessions/service.ts#L240) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#shutdownController`](../../../../src/sessions/service.ts#L241) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#modelDiscovery`](../../../../src/sessions/service.ts#L242) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#modelCapabilityDiscoveries`](../../../../src/sessions/service.ts#L243) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#sessionModelReads`](../../../../src/sessions/service.ts#L244) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#checkpoint`](../../../../src/sessions/service.ts#L245) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#queue`](../../../../src/sessions/service.ts#L247) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#stopping`](../../../../src/sessions/service.ts#L248) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.#shutdown`](../../../../src/sessions/service.ts#L249) | Property |  | [文字解释](implementation/sessions.md) |
+| [`SessionService.constructor`](../../../../src/sessions/service.ts#L251) | Constructor | catalog, dataDir, options | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.create`](../../../../src/sessions/service.ts#L264) | Method | options | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.runtimeCount`](../../../../src/sessions/service.ts#L282) | GetAccessor |  | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.configure`](../../../../src/sessions/service.ts#L286) | Method | configuration | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.listSessions`](../../../../src/sessions/service.ts#L309) | Method |  | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.getSession`](../../../../src/sessions/service.ts#L314) | Method | id | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.listDirectories`](../../../../src/sessions/service.ts#L390) | Method | path | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.listAvailableModels`](../../../../src/sessions/service.ts#L413) | Method |  | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.listSessionModels`](../../../../src/sessions/service.ts#L438) | Method | id | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.getSessionModelCapabilities`](../../../../src/sessions/service.ts#L481) | Method | id, request | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.getModelCapabilities`](../../../../src/sessions/service.ts#L501) | Method | request | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.subscribeEvents`](../../../../src/sessions/service.ts#L540) | Method | id, cursor, listener | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.#publishState`](../../../../src/sessions/service.ts#L571) | Method | id, withTurn | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.#storageFault`](../../../../src/sessions/service.ts#L594) | Method | id | [文字解释](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.createSession`](../../../../src/sessions/service.ts#L604) | Method | request | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.setSessionModel`](../../../../src/sessions/service.ts#L688) | Method | id, request | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.openSession`](../../../../src/sessions/service.ts#L795) | Method | id | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.closeSession`](../../../../src/sessions/service.ts#L799) | Method | id | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.getContext`](../../../../src/sessions/service.ts#L841) | Method | id | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.getHistory`](../../../../src/sessions/service.ts#L853) | Method | id, cursor | [文字解释](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.getHistoryImage`](../../../../src/sessions/service.ts#L971) | Method | id, entryId, imageIndex | [文字解释](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.submitTurn`](../../../../src/sessions/service.ts#L999) | Method | id, request | [文字解释](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.getTurn`](../../../../src/sessions/service.ts#L1075) | Method | id, runId | [文字解释](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.getTurnResult`](../../../../src/sessions/service.ts#L1081) | Method | id, runId | [文字解释](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.abortTurn`](../../../../src/sessions/service.ts#L1133) | Method | id, runId | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.abortNativeExecution`](../../../../src/sessions/service.ts#L1168) | Method | id, executionId | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#storedTurn`](../../../../src/sessions/service.ts#L1212) | Method | id, runId | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#checkStorage`](../../../../src/sessions/service.ts#L1220) | Method | id | [文字解释](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#writeTurn`](../../../../src/sessions/service.ts#L1229) | Method | turn | [文字解释](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#abortRuntime`](../../../../src/sessions/service.ts#L1243) | Method | slot | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#executeTurn`](../../../../src/sessions/service.ts#L1258) | Method | slot, message, images | [文字解释](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.#completeHandledTurn`](../../../../src/sessions/service.ts#L1441) | Method | sessionId, runId, runtime, before, historyWasExpected | [文字解释](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.shutdown`](../../../../src/sessions/service.ts#L1504) | Method |  | [文字解释](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#configuration`](../../../../src/sessions/service.ts#L1577) | Method |  | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#admit`](../../../../src/sessions/service.ts#L1588) | Method |  | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#mutate`](../../../../src/sessions/service.ts#L1593) | Method | operation | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#read`](../../../../src/sessions/service.ts#L1607) | Method | operation | [文字解释](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#stored`](../../../../src/sessions/service.ts#L1637) | Method | id | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#view`](../../../../src/sessions/service.ts#L1645) | Method | stored | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#directory`](../../../../src/sessions/service.ts#L1693) | Method | path | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#prune`](../../../../src/sessions/service.ts#L1709) | Method |  | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#checkHistory`](../../../../src/sessions/service.ts#L1720) | Method | stored | [文字解释](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#savedHistory`](../../../../src/sessions/service.ts#L1825) | Method | stored, options | [文字解释](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#identityForEntries`](../../../../src/sessions/service.ts#L1843) | Method | entries | [文字解释](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#identityForHistory`](../../../../src/sessions/service.ts#L1848) | Method | history | [文字解释](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#observeRuntime`](../../../../src/sessions/service.ts#L1854) | Method | sessionId, runtime | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#nativeExecutionEvent`](../../../../src/sessions/service.ts#L1888) | Method | sessionId, event, startedLate | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#refreshNativeHistory`](../../../../src/sessions/service.ts#L1974) | Method | sessionId, executionId | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#scheduleNativeStateRefresh`](../../../../src/sessions/service.ts#L2005) | Method | sessionId, executionId, runtime | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#refreshNativeSessionState`](../../../../src/sessions/service.ts#L2035) | Method | sessionId, executionId, runtime | [文字解释](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#open`](../../../../src/sessions/service.ts#L2086) | Method | stored, options | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#rememberHistory`](../../../../src/sessions/service.ts#L2237) | Method | stored, runtime | [文字解释](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#recordHistoryCheck`](../../../../src/sessions/service.ts#L1783) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#historyCheckState`](../../../../src/sessions/service.ts#L1814) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.renameSession`](../../../../src/sessions/service.ts#L319) | Method |  | [Read explanation](implementation/sessions.md#sessions-shared-names) |
+| [`SessionService.listLibraryReferences`](../../../../src/sessions/service.ts#L360) | Method | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`SessionService.addLibraryReference`](../../../../src/sessions/service.ts#L366) | Method | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`SessionService.removeLibraryReference`](../../../../src/sessions/service.ts#L381) | Method | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+
 
 ## src/shared/discovery.ts
 
@@ -1497,101 +1514,111 @@ Local dependencies： [shared/images.ts](../../../../src/shared/images.ts).
 
 文字解释：[catalog](implementation/catalog.md)
 
-[查看源码](../../../../src/storage/catalog.ts) · 973 行
+[查看源码](../../../../src/storage/catalog.ts) · 1108 行
 
 Local dependencies： [local/files.ts](../../../../src/local/files.ts), [local/paths.ts](../../../../src/local/paths.ts), [shared/thinking.ts](../../../../src/shared/thinking.ts), [shared/sessions.ts](../../../../src/shared/sessions.ts), [shared/turns.ts](../../../../src/shared/turns.ts).
 
 | Symbol | 类型 | Parameter 或 type | 文字解释 |
 | --- | --- | --- | --- |
-| [`StoredSession`](../../../../src/storage/catalog.ts#L17) | Interface |  | [文字解释](implementation/catalog.md) |
-| [`StoredTurn`](../../../../src/storage/catalog.ts#L37) | Interface |  | [文字解释](implementation/catalog.md) |
+| [`StoredSession`](../../../../src/storage/catalog.ts#L19) | Interface |  | [文字解释](implementation/catalog.md) |
+| [`StoredTurn`](../../../../src/storage/catalog.ts#L39) | Interface |  | [文字解释](implementation/catalog.md) |
 | [`SCHEMA_VERSION`](../../../../src/storage/catalog.ts#L41) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`V1_SCHEMA_VERSION`](../../../../src/storage/catalog.ts#L42) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`V2_SCHEMA_VERSION`](../../../../src/storage/catalog.ts#L43) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`V3_SCHEMA_VERSION`](../../../../src/storage/catalog.ts#L44) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`DATABASE_NAME`](../../../../src/storage/catalog.ts#L47) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`SESSION_COLUMNS`](../../../../src/storage/catalog.ts#L48) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`V3_SESSION_COLUMNS`](../../../../src/storage/catalog.ts#L63) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`CONFIGURATION_SCHEMA`](../../../../src/storage/catalog.ts#L68) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`V2_SESSIONS_SCHEMA`](../../../../src/storage/catalog.ts#L70) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`V3_SESSIONS_SCHEMA`](../../../../src/storage/catalog.ts#L72) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`SESSIONS_SCHEMA`](../../../../src/storage/catalog.ts#L78) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`TURNS_SCHEMA`](../../../../src/storage/catalog.ts#L80) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`ACTIVE_TURN_INDEX`](../../../../src/storage/catalog.ts#L82) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`TURN_COLUMNS`](../../../../src/storage/catalog.ts#L84) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`SESSION_STATUSES`](../../../../src/storage/catalog.ts#L87) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`TURN_STATUSES`](../../../../src/storage/catalog.ts#L88) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`TERMINAL_TURN_STATUSES`](../../../../src/storage/catalog.ts#L97) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`ALLOWED_TURN_TRANSITIONS`](../../../../src/storage/catalog.ts#L103) | Module value | `Readonly<Record<TurnStatus, ReadonlySet<TurnStatus>>>` | [文字解释](implementation/catalog.md) |
-| [`PAYLOAD_IDENTITY`](../../../../src/storage/catalog.ts#L112) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
-| [`isSessionStatus`](../../../../src/storage/catalog.ts#L114) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`isTurnStatus`](../../../../src/storage/catalog.ts#L118) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`invalidCatalog`](../../../../src/storage/catalog.ts#L122) | Function | reason | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`isNonEmptyString`](../../../../src/storage/catalog.ts#L128) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`isNullableNonEmptyString`](../../../../src/storage/catalog.ts#L132) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`isSafeIntegerValue`](../../../../src/storage/catalog.ts#L136) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`isStoredSession`](../../../../src/storage/catalog.ts#L146) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`hasExactKeys`](../../../../src/storage/catalog.ts#L213) | Function | value, expected | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`isStoredTurn`](../../../../src/storage/catalog.ts#L218) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`assertRuntimeConfiguration`](../../../../src/storage/catalog.ts#L266) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`integerFromDatabase`](../../../../src/storage/catalog.ts#L290) | Function | row, column | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`stringFromDatabase`](../../../../src/storage/catalog.ts#L304) | Function | row, column | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`nullableStringFromDatabase`](../../../../src/storage/catalog.ts#L312) | Function | row, column | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`nullableThinkingLevelFromDatabase`](../../../../src/storage/catalog.ts#L324) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`sessionFromDatabase`](../../../../src/storage/catalog.ts#L345) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`entryIdsFromDatabase`](../../../../src/storage/catalog.ts#L376) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`nullableErrorFromDatabase`](../../../../src/storage/catalog.ts#L396) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`turnFromDatabase`](../../../../src/storage/catalog.ts#L411) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`databaseRows`](../../../../src/storage/catalog.ts#L435) | Function | database, sql | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`hasUserSchema`](../../../../src/storage/catalog.ts#L439) | Function | database | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`verifySchema`](../../../../src/storage/catalog.ts#L448) | Function | database, version | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`migrateV2ToV3`](../../../../src/storage/catalog.ts#L489) | Function | database | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`migrateV3ToV4`](../../../../src/storage/catalog.ts#L505) | Function | database | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`initializeSchema`](../../../../src/storage/catalog.ts#L548) | Function | database | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`validateDatabaseFile`](../../../../src/storage/catalog.ts#L611) | Function | path | [文字解释](implementation/catalog.md#catalog-file-safety-and-open) |
-| [`validateRecord`](../../../../src/storage/catalog.ts#L635) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`validateTurnRecord`](../../../../src/storage/catalog.ts#L639) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
-| [`SessionCatalog`](../../../../src/storage/catalog.ts#L643) | Class |  | [文字解释](implementation/catalog.md) |
-| [`SessionCatalog.database`](../../../../src/storage/catalog.ts#L644) | Property |  | [文字解释](implementation/catalog.md) |
-| [`SessionCatalog.constructor`](../../../../src/storage/catalog.ts#L646) | Constructor | database | [文字解释](implementation/catalog.md#catalog-file-safety-and-open) |
-| [`SessionCatalog.open`](../../../../src/storage/catalog.ts#L650) | Method | dataDir | [文字解释](implementation/catalog.md#catalog-file-safety-and-open) |
-| [`SessionCatalog.configuration`](../../../../src/storage/catalog.ts#L688) | Method |  | [文字解释](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.configure`](../../../../src/storage/catalog.ts#L698) | Method | config | [文字解释](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.list`](../../../../src/storage/catalog.ts#L707) | Method |  | [文字解释](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.get`](../../../../src/storage/catalog.ts#L714) | Method | id | [文字解释](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.findRequest`](../../../../src/storage/catalog.ts#L721) | Method | requestId | [文字解释](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.insert`](../../../../src/storage/catalog.ts#L728) | Method | record | [文字解释](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.update`](../../../../src/storage/catalog.ts#L804) | Method | record | [文字解释](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.interruptCreating`](../../../../src/storage/catalog.ts#L833) | Method | now | [文字解释](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.insertTurn`](../../../../src/storage/catalog.ts#L843) | Method | record | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.updateTurn`](../../../../src/storage/catalog.ts#L862) | Method | record | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.getTurn`](../../../../src/storage/catalog.ts#L900) | Method | sessionId, runId | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.findTurnRequest`](../../../../src/storage/catalog.ts#L907) | Method | sessionId, requestId | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.latestTurn`](../../../../src/storage/catalog.ts#L914) | Method | sessionId | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.activeTurn`](../../../../src/storage/catalog.ts#L921) | Method | sessionId | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.listTurns`](../../../../src/storage/catalog.ts#L930) | Method |  | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.markTurnDispatching`](../../../../src/storage/catalog.ts#L937) | Method | record, session | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.interruptTurns`](../../../../src/storage/catalog.ts#L960) | Method | now | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.close`](../../../../src/storage/catalog.ts#L970) | Method |  | [文字解释](implementation/catalog.md#catalog-turn-operations) |
-| [`isHistoryCheckState`](../../../../src/storage/catalog.ts#L140) | Function | | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`nullableHistoryCheckFromDatabase`](../../../../src/storage/catalog.ts#L333) | Function | | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`migrateV4ToV5`](../../../../src/storage/catalog.ts#L521) | Function | | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`migrateV5ToV6`](../../../../src/storage/catalog.ts#L537) | Function |  | [Read explanation](implementation/catalog.md#catalog-session-names) |
-| [`SessionCatalog.rename`](../../../../src/storage/catalog.ts#L756) | Method |  | [Read explanation](implementation/catalog.md#catalog-session-names) |
+| [`V1_SCHEMA_VERSION`](../../../../src/storage/catalog.ts#L44) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`V2_SCHEMA_VERSION`](../../../../src/storage/catalog.ts#L45) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`V3_SCHEMA_VERSION`](../../../../src/storage/catalog.ts#L46) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`DATABASE_NAME`](../../../../src/storage/catalog.ts#L50) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`SESSION_COLUMNS`](../../../../src/storage/catalog.ts#L51) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`V3_SESSION_COLUMNS`](../../../../src/storage/catalog.ts#L66) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`CONFIGURATION_SCHEMA`](../../../../src/storage/catalog.ts#L71) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`V2_SESSIONS_SCHEMA`](../../../../src/storage/catalog.ts#L73) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`V3_SESSIONS_SCHEMA`](../../../../src/storage/catalog.ts#L75) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`SESSIONS_SCHEMA`](../../../../src/storage/catalog.ts#L81) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`TURNS_SCHEMA`](../../../../src/storage/catalog.ts#L83) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`ACTIVE_TURN_INDEX`](../../../../src/storage/catalog.ts#L85) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`TURN_COLUMNS`](../../../../src/storage/catalog.ts#L87) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`SESSION_STATUSES`](../../../../src/storage/catalog.ts#L94) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`TURN_STATUSES`](../../../../src/storage/catalog.ts#L95) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`TERMINAL_TURN_STATUSES`](../../../../src/storage/catalog.ts#L104) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`ALLOWED_TURN_TRANSITIONS`](../../../../src/storage/catalog.ts#L110) | Module value | `Readonly<Record<TurnStatus, ReadonlySet<TurnStatus>>>` | [文字解释](implementation/catalog.md) |
+| [`PAYLOAD_IDENTITY`](../../../../src/storage/catalog.ts#L119) | Module value | 由 initializer 推断 | [文字解释](implementation/catalog.md) |
+| [`isSessionStatus`](../../../../src/storage/catalog.ts#L121) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`isTurnStatus`](../../../../src/storage/catalog.ts#L125) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`invalidCatalog`](../../../../src/storage/catalog.ts#L129) | Function | reason | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`isNonEmptyString`](../../../../src/storage/catalog.ts#L135) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`isNullableNonEmptyString`](../../../../src/storage/catalog.ts#L139) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`isSafeIntegerValue`](../../../../src/storage/catalog.ts#L143) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`isStoredSession`](../../../../src/storage/catalog.ts#L153) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`hasExactKeys`](../../../../src/storage/catalog.ts#L220) | Function | value, expected | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`isStoredTurn`](../../../../src/storage/catalog.ts#L225) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`assertRuntimeConfiguration`](../../../../src/storage/catalog.ts#L273) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`integerFromDatabase`](../../../../src/storage/catalog.ts#L297) | Function | row, column | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`stringFromDatabase`](../../../../src/storage/catalog.ts#L311) | Function | row, column | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`nullableStringFromDatabase`](../../../../src/storage/catalog.ts#L351) | Function | row, column | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`nullableThinkingLevelFromDatabase`](../../../../src/storage/catalog.ts#L363) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`sessionFromDatabase`](../../../../src/storage/catalog.ts#L384) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`entryIdsFromDatabase`](../../../../src/storage/catalog.ts#L415) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`nullableErrorFromDatabase`](../../../../src/storage/catalog.ts#L435) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`turnFromDatabase`](../../../../src/storage/catalog.ts#L450) | Function | row | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`databaseRows`](../../../../src/storage/catalog.ts#L474) | Function | database, sql | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`hasUserSchema`](../../../../src/storage/catalog.ts#L478) | Function | database | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`verifySchema`](../../../../src/storage/catalog.ts#L487) | Function | database, version | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`migrateV2ToV3`](../../../../src/storage/catalog.ts#L538) | Function | database | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`migrateV3ToV4`](../../../../src/storage/catalog.ts#L554) | Function | database | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`initializeSchema`](../../../../src/storage/catalog.ts#L604) | Function | database | [文字解释](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`validateDatabaseFile`](../../../../src/storage/catalog.ts#L678) | Function | path | [文字解释](implementation/catalog.md#catalog-file-safety-and-open) |
+| [`validateRecord`](../../../../src/storage/catalog.ts#L702) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`validateTurnRecord`](../../../../src/storage/catalog.ts#L706) | Function | value | [文字解释](implementation/catalog.md#catalog-records-and-validation) |
+| [`SessionCatalog`](../../../../src/storage/catalog.ts#L710) | Class |  | [文字解释](implementation/catalog.md) |
+| [`SessionCatalog.database`](../../../../src/storage/catalog.ts#L711) | Property |  | [文字解释](implementation/catalog.md) |
+| [`SessionCatalog.constructor`](../../../../src/storage/catalog.ts#L713) | Constructor | database | [文字解释](implementation/catalog.md#catalog-file-safety-and-open) |
+| [`SessionCatalog.open`](../../../../src/storage/catalog.ts#L717) | Method | dataDir | [文字解释](implementation/catalog.md#catalog-file-safety-and-open) |
+| [`SessionCatalog.configuration`](../../../../src/storage/catalog.ts#L756) | Method |  | [文字解释](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.configure`](../../../../src/storage/catalog.ts#L766) | Method | config | [文字解释](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.list`](../../../../src/storage/catalog.ts#L830) | Method |  | [文字解释](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.get`](../../../../src/storage/catalog.ts#L837) | Method | id | [文字解释](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.findRequest`](../../../../src/storage/catalog.ts#L844) | Method | requestId | [文字解释](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.insert`](../../../../src/storage/catalog.ts#L851) | Method | record | [文字解释](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.update`](../../../../src/storage/catalog.ts#L927) | Method | record | [文字解释](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.interruptCreating`](../../../../src/storage/catalog.ts#L956) | Method | now | [文字解释](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.insertTurn`](../../../../src/storage/catalog.ts#L966) | Method | record | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.updateTurn`](../../../../src/storage/catalog.ts#L985) | Method | record | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.getTurn`](../../../../src/storage/catalog.ts#L1023) | Method | sessionId, runId | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.findTurnRequest`](../../../../src/storage/catalog.ts#L1030) | Method | sessionId, requestId | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.latestTurn`](../../../../src/storage/catalog.ts#L1037) | Method | sessionId | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.activeTurn`](../../../../src/storage/catalog.ts#L1044) | Method | sessionId | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.listTurns`](../../../../src/storage/catalog.ts#L1053) | Method |  | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.markTurnDispatching`](../../../../src/storage/catalog.ts#L1060) | Method | record, session | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.interruptTurns`](../../../../src/storage/catalog.ts#L1083) | Method | now | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.close`](../../../../src/storage/catalog.ts#L1105) | Method |  | [文字解释](implementation/catalog.md#catalog-turn-operations) |
+| [`isHistoryCheckState`](../../../../src/storage/catalog.ts#L147) | Function | | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`nullableHistoryCheckFromDatabase`](../../../../src/storage/catalog.ts#L372) | Function | | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`migrateV4ToV5`](../../../../src/storage/catalog.ts#L570) | Function | | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`migrateV5ToV6`](../../../../src/storage/catalog.ts#L586) | Function |  | [Read explanation](implementation/catalog.md#catalog-session-names) |
+| [`SessionCatalog.rename`](../../../../src/storage/catalog.ts#L879) | Method |  | [Read explanation](implementation/catalog.md#catalog-session-names) |
+| [`isCanonicalLibraryRoot`](../../../../src/storage/catalog.ts#L319) | Function | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`libraryBindingFromDatabase`](../../../../src/storage/catalog.ts#L329) | Function | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`libraryReferenceFromDatabase`](../../../../src/storage/catalog.ts#L341) | Function | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`migrateV6ToV7`](../../../../src/storage/catalog.ts#L597) | Function | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`SessionCatalog.bindLibrary`](../../../../src/storage/catalog.ts#L775) | Method | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`SessionCatalog.listLibraryReferences`](../../../../src/storage/catalog.ts#L800) | Method | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`SessionCatalog.addLibraryReference`](../../../../src/storage/catalog.ts#L810) | Method | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`SessionCatalog.removeLibraryReference`](../../../../src/storage/catalog.ts#L820) | Method | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+| [`SessionCatalog.#validateLibraryRows`](../../../../src/storage/catalog.ts#L1093) | Method | | [阅读说明](implementation/storage-integrations.md#library-reference-storage) |
+
 
 ## src/integrations/configuration.ts
 
 文字解释: [storage integrations](implementation/storage-integrations.md#integration-configuration)
 
-[查看源码](../../../../src/integrations/configuration.ts) · 52 行
+[查看源码](../../../../src/integrations/configuration.ts) · 70 行
 
 Local dependencies: [src/local/files.ts](../../../../src/local/files.ts), [src/local/paths.ts](../../../../src/local/paths.ts), [src/runtime/pi-rpc.ts](../../../../src/runtime/pi-rpc.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`IntegrationsConfiguration`](../../../../src/integrations/configuration.ts#L6) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
-| [`absolutePath`](../../../../src/integrations/configuration.ts#L11) | Function | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
-| [`readIntegrations`](../../../../src/integrations/configuration.ts#L15) | Function | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`IntegrationsConfiguration`](../../../../src/integrations/configuration.ts#L7) | Interface | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`absolutePath`](../../../../src/integrations/configuration.ts#L13) | Function | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
+| [`readIntegrations`](../../../../src/integrations/configuration.ts#L17) | Function | | [Read explanation](implementation/storage-integrations.md#integration-configuration) |
 
 ## src/integrations/distill.ts
 
@@ -1642,4 +1669,79 @@ Local dependencies: [src/integrations/distill.ts](../../../../src/integrations/d
 | [`SessionSourceAccess.drain`](../../../../src/sessions/source-access.ts#L111) | Method | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
 | [`SessionSourceAccess.#release`](../../../../src/sessions/source-access.ts#L137) | Method | | [Read explanation](implementation/storage-integrations.md#source-read-coordination) |
 
-已索引 **47 个 source files** 和 **623 个 callable explanations**。
+
+
+## src/integrations/current.ts
+
+[Open source](../../../../src/integrations/current.ts)
+
+| Symbol | Kind | Parameters or type | Explanation |
+| --- | --- | --- | --- |
+| [`record`](../../../../src/integrations/current.ts#L70) | Function | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`isLibraryModule`](../../../../src/integrations/current.ts#L74) | Function | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`isContentLibrary`](../../../../src/integrations/current.ts#L84) | Function | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`clip`](../../../../src/integrations/current.ts#L95) | Function | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`unavailable`](../../../../src/integrations/current.ts#L104) | Function | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibraryError.constructor`](../../../../src/integrations/current.ts#L111) | Constructor | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.constructor`](../../../../src/integrations/current.ts#L124) | Constructor | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.open`](../../../../src/integrations/current.ts#L130) | Method | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.search`](../../../../src/integrations/current.ts#L158) | Method | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.latest`](../../../../src/integrations/current.ts#L172) | Method | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.read`](../../../../src/integrations/current.ts#L183) | Method | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.close`](../../../../src/integrations/current.ts#L202) | Method | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.#call`](../../../../src/integrations/current.ts#L210) | Method | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.#project`](../../../../src/integrations/current.ts#L220) | Method | | [阅读说明](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibraryConfig`](../../../../src/integrations/current.ts#L17) | Interface | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibraryModuleV1`](../../../../src/integrations/current.ts#L23) | Interface | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentContentLibraryV1`](../../../../src/integrations/current.ts#L29) | Interface | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentContentItem`](../../../../src/integrations/current.ts#L43) | Interface | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibraryBatch`](../../../../src/integrations/current.ts#L58) | Interface | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`ERROR_MESSAGES`](../../../../src/integrations/current.ts#L63) | Module value | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibraryError`](../../../../src/integrations/current.ts#L108) | Class | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibraryError.code`](../../../../src/integrations/current.ts#L109) | Property | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary`](../../../../src/integrations/current.ts#L119) | Class | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.binding`](../../../../src/integrations/current.ts#L120) | Property | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.root`](../../../../src/integrations/current.ts#L121) | Property | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+| [`CurrentLibrary.#api`](../../../../src/integrations/current.ts#L122) | Property | | [Read explanation](implementation/storage-integrations.md#current-library-api) |
+
+
+## src/shared/library.ts
+
+[Open source](../../../../src/shared/library.ts)
+
+| Symbol | Kind | Parameters or type | Explanation |
+| --- | --- | --- | --- |
+| [`record`](../../../../src/shared/library.ts#L63) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`exact`](../../../../src/shared/library.ts#L67) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`keysWithOptional`](../../../../src/shared/library.ts#L73) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`text`](../../../../src/shared/library.ts#L82) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`isLibraryBinding`](../../../../src/shared/library.ts#L93) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`source`](../../../../src/shared/library.ts#L97) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`validLimit`](../../../../src/shared/library.ts#L101) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`isLibraryErrorCode`](../../../../src/shared/library.ts#L110) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`isLibrarySearchRequest`](../../../../src/shared/library.ts#L114) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`isLibraryLatestRequest`](../../../../src/shared/library.ts#L124) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`isLibraryReference`](../../../../src/shared/library.ts#L133) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`isLibraryReferencesResponse`](../../../../src/shared/library.ts#L145) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`isLibraryItemView`](../../../../src/shared/library.ts#L154) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`isLibraryItemsResponse`](../../../../src/shared/library.ts#L200) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`isLibraryLatestResponse`](../../../../src/shared/library.ts#L212) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`libraryItemPath`](../../../../src/shared/library.ts#L226) | Function | | [阅读说明](implementation/storage-integrations.md#library-contract-guards) |
+| [`LIBRARY_SEARCH_LIMIT`](../../../../src/shared/library.ts#L1) | Module value | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LIBRARY_EXCERPT_CHARACTERS`](../../../../src/shared/library.ts#L2) | Module value | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LIBRARY_READ_CHARACTERS`](../../../../src/shared/library.ts#L3) | Module value | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LIBRARY_ERROR_CODES`](../../../../src/shared/library.ts#L5) | Module value | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LibraryErrorCode`](../../../../src/shared/library.ts#L12) | Type alias | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LibraryCompleteness`](../../../../src/shared/library.ts#L13) | Type alias | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LibraryReference`](../../../../src/shared/library.ts#L15) | Interface | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LibraryReferencesResponse`](../../../../src/shared/library.ts#L21) | Interface | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LibrarySearchRequest`](../../../../src/shared/library.ts#L25) | Interface | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LibraryLatestRequest`](../../../../src/shared/library.ts#L31) | Interface | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LibraryItemView`](../../../../src/shared/library.ts#L36) | Interface | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LibraryItemsResponse`](../../../../src/shared/library.ts#L50) | Interface | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`LibraryLatestResponse`](../../../../src/shared/library.ts#L55) | Interface | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`UUID`](../../../../src/shared/library.ts#L59) | Module value | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`BINDING`](../../../../src/shared/library.ts#L60) | Module value | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+| [`SOURCE`](../../../../src/shared/library.ts#L61) | Module value | | [Read explanation](implementation/storage-integrations.md#library-contract-guards) |
+
+已索引 **49 个 source files** 和 **677 个 callable explanations**。

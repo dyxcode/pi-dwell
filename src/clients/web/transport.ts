@@ -57,19 +57,25 @@ export async function responseError(response: Response): Promise<ApiError> {
     return new ApiError(response.status, value.error.code, value.error.message);
   return new ApiError(response.status, "http", `The host returned HTTP ${response.status}.`);
 }
-export async function api(path: string, body?: unknown): Promise<unknown> {
+export async function api(
+  path: string,
+  body?: unknown,
+  method: "GET" | "POST" | "DELETE" = body === undefined ? "GET" : "POST",
+): Promise<unknown> {
   const requestHeaders = headers();
   if (body !== undefined) {
     requestHeaders.set("Content-Type", "application/json");
+  }
+  if (method !== "GET") {
     requestHeaders.set("X-Dwell-Request", "1");
   }
   const response = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
+    method,
     headers: requestHeaders,
     credentials: binding() ? "same-origin" : "omit",
     cache: "no-store",
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(body === undefined ? 15_000 : 60_000),
+    signal: AbortSignal.timeout(method === "GET" ? 15_000 : 60_000),
   });
   if (!response.ok) throw await responseError(response);
   return response.json();

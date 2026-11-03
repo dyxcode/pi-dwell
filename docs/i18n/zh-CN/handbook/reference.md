@@ -42,6 +42,7 @@
 | `auth-token` | Data directory | Private local CLI bearer credential |
 | `browser-sessions.json` | Data directory | Browser credential 的 hash 和 expiry |
 | `catalog.sqlite` | Data directory | Runtime configuration、session catalog、durable turn ledger |
+| 可选的 `integrations.json` | Data directory | Distill module/database 与 Current module/root/binding；见 [Guide](guide.md#current-library) |
 | `sessions/<Dwell session ID>/` | Data directory | Pi native JSONL session file |
 | 可选的 `access.json` | Production data directory | 额外的 canonical HTTPS browser origin |
 | Pi authentication、model、setting 与 resource | Host user 下的 Pi native configuration | 由 Pi 管理，用于 hosted execution |

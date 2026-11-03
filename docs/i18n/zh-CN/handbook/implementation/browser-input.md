@@ -23,7 +23,7 @@
 
 私有 [`Attachments.#render`](../../../../../src/clients/web/attachments.ts#L154) 会用文本按钮重建当前 session 的 tray。多个通用 clipboard 图片会添加编号。Preview button 将当前 object URL 和标签交给 preview callback。一般发送工作进行时 remove button 会禁用；点击后按生成 ID 过滤项目、撤销 URL、重绘 tray，并通知 controller。图片 bytes 会留在 draft payload 中，直到 turn 成功或显式清空；编辑 draft 时不会单独上传。
 
-Controller 在 [`client.ts`](../../../../../src/clients/web/client.ts#L197) 中创建 `Attachments`，传入 `change: () => navigation()`、`error: showError`、`preview: showImage`。它根据 authentication、Pi process 是否 ready、运行中的工作、model capability 检查和当前 model 的 `supportsImages` 决定是否允许 intake。Capability 未知或检查失败时不接收新图片；已有附件仍可移除。提交前如果已确认当前 model 不支持图片，controller 会再次拒绝发送。图片 picker 的固定 accept list 定义于 [`page.ts`](../../../../../src/clients/web/page.ts#L74)。
+Controller 在 [`client.ts`](../../../../../src/clients/web/client.ts#L216) 中创建 `Attachments`，传入 `change: () => navigation()`、`error: showError`、`preview: showImage`。它根据 authentication、Pi process 是否 ready、运行中的工作、model capability 检查和当前 model 的 `supportsImages` 决定是否允许 intake。Capability 未知或检查失败时不接收新图片；已有附件仍可移除。提交前如果已确认当前 model 不支持图片，controller 会再次拒绝发送。图片 picker 的固定 accept list 定义于 [`page.ts`](../../../../../src/clients/web/page.ts#L76)。
 
 <a id="composer-sizing-and-viewport-adaptation"></a>
 ## Composer 尺寸与 viewport 适配

@@ -36,6 +36,7 @@ No command arguments defaults to `serve`. `npm start` runs production foreground
 | `auth-token` | Data directory | Private local CLI bearer credential |
 | `browser-sessions.json` | Data directory | Hashed browser credentials and expiries |
 | `catalog.sqlite` | Data directory | Runtime configuration, session catalog, durable turn ledger |
+| Optional `integrations.json` | Data directory | Distill module/database and Current module/root/binding; see [Guide](guide.md#current-library) |
 | `sessions/<Dwell session ID>/` | Data directory | Pi native JSONL session files |
 | Optional `access.json` | Production data directory | Additional canonical HTTPS browser origin |
 | Pi authentication, models, settings and resources | Pi's native configuration under the host user | Owned by Pi; used by hosted execution |

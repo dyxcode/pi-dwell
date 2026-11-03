@@ -4,9 +4,11 @@ import { openDistill, type DistillStorage } from "../integrations/distill.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { HOST_PAGE, STYLE } from "../clients/web/page.ts";
 import { BROWSER_ASSETS } from "../clients/web/script.ts";
+import { CurrentLibrary, CurrentLibraryError } from "../integrations/current.ts";
 import { prepareDataDirectory } from "../local/files.ts";
 import { dataDirectory, type HostMode } from "../local/paths.ts";
 import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
+import type { LibraryLatestRequest } from "../shared/library.ts";
 import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
 import {
   isRuntimeConfiguration,
@@ -105,6 +107,23 @@ function parseHistoryCursor(query: string): string | undefined {
   return cursor;
 }
 
+function parseLibraryLatestQuery(query: string): LibraryLatestRequest {
+  const parameters = new URLSearchParams(query);
+  const source = parameters.getAll("source");
+  const limits = parameters.getAll("limit");
+  if (
+    [...parameters].some(([name]) => name !== "source" && name !== "limit") ||
+    source.length > 1 ||
+    limits.length > 1
+  )
+    fail(400, "invalid_input", "Provide at most one source and limit.");
+  const input: LibraryLatestRequest = {
+    ...(source[0] === undefined ? {} : { source: source[0] }),
+    ...(limits[0] === undefined ? {} : { limit: Number(limits[0]) }),
+  };
+  return input;
+}
+
 export async function startHost({
   port = DEFAULT_PORT,
   mode = "production",
@@ -128,6 +147,7 @@ export async function startHost({
   let auth: LocalAuth | undefined;
   let sessions: SessionService | undefined;
   let distill: DistillStorage | undefined;
+  let library: CurrentLibrary | undefined;
   let url = "";
   let stopping = false;
   let browserOrigin: string | undefined;
@@ -210,9 +230,20 @@ export async function startHost({
       const queryStart = requestTarget.indexOf("?");
       const path = queryStart < 0 ? requestTarget : requestTarget.slice(0, queryStart);
       const historyMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/history$/.exec(path);
+      const libraryLatestPath = path === "/api/v1/library/latest";
+      const librarySearchPath = path === "/api/v1/library/search";
+      const libraryReadMatch =
+        /^\/api\/v1\/library\/([^/]+)\/items\/([^/]+)\/versions\/([^/]+)$/.exec(path);
+      const sessionLibraryReferencesMatch =
+        /^\/api\/v1\/sessions\/([a-f0-9-]+)\/library-references$/.exec(path);
+      const sessionLibraryReferenceMatch =
+        /^\/api\/v1\/sessions\/([a-f0-9-]+)\/library-references\/([^/]+)\/items\/([^/]+)\/versions\/([^/]+)$/.exec(
+          path,
+        );
       const imageMatch =
         /^\/api\/v1\/sessions\/([a-f0-9-]+)\/history\/([^/]+)\/images\/(\d+)$/.exec(path);
       let historyCursor: string | undefined;
+      let libraryLatestRequest: LibraryLatestRequest | undefined;
       let directoryPath: string | undefined;
       if (queryStart >= 0) {
         if (path === "/api/v1/directories") {
@@ -221,6 +252,8 @@ export async function startHost({
             fail(400, "unexpected_query", "Provide one directory path.");
           directoryPath = query.get("path") ?? "";
           if (!directoryPath) fail(400, "invalid_input", "Provide a nonempty directory path.");
+        } else if (libraryLatestPath) {
+          libraryLatestRequest = parseLibraryLatestQuery(requestTarget.slice(queryStart + 1));
         } else {
           if (!historyMatch) fail(400, "unexpected_query", "Query parameters are not supported.");
           historyCursor = parseHistoryCursor(requestTarget.slice(queryStart + 1));
@@ -264,8 +297,15 @@ export async function startHost({
         eventMatch !== null ||
         nativeExecutionMatch !== null ||
         turnMatch !== null;
+      const libraryRoute =
+        libraryLatestPath ||
+        librarySearchPath ||
+        libraryReadMatch !== null ||
+        sessionLibraryReferencesMatch !== null ||
+        sessionLibraryReferenceMatch !== null;
+      const protectedRoute = sessionRoute || libraryRoute;
       let method: string | undefined;
-      if (sessionRoute) {
+      if (protectedRoute) {
         if (
           path === "/api/v1/runtime" ||
           path === "/api/v1/model-capabilities" ||
@@ -277,7 +317,19 @@ export async function startHost({
           sessionMatch?.[2] === "close"
         ) {
           method = "POST";
-        } else if (eventMatch || historyMatch || imageMatch) {
+        } else if (librarySearchPath) {
+          method = "POST";
+        } else if (sessionLibraryReferencesMatch) {
+          method = request.method === "POST" ? "POST" : "GET";
+        } else if (sessionLibraryReferenceMatch) {
+          method = "DELETE";
+        } else if (
+          eventMatch ||
+          historyMatch ||
+          imageMatch ||
+          libraryLatestPath ||
+          libraryReadMatch
+        ) {
           method = "GET";
         } else if (turnMatch) {
           method = turnMatch[2] === undefined || turnMatch[3] === "abort" ? "POST" : "GET";
@@ -296,7 +348,7 @@ export async function startHost({
         response.setHeader("Allow", method);
         fail(405, "method_not_allowed", `Use ${method} for this route.`);
       }
-      if (sessionRoute) {
+      if (protectedRoute) {
         if (!sessions) fail(503, "unavailable", "Session service is starting.");
         const cli = auth.isCli(request.headers.authorization);
         if (
@@ -305,18 +357,24 @@ export async function startHost({
         )
           fail(401, "unauthenticated", "Connect this browser or use a valid local CLI credential.");
         if (
-          method === "GET" &&
+          method !== "POST" &&
           (request.headers["transfer-encoding"] !== undefined ||
             Number(request.headers["content-length"] ?? 0) !== 0)
         )
-          fail(400, "unexpected_body", "GET requests must not contain a body.");
+          fail(
+            400,
+            "unexpected_body",
+            method === "GET"
+              ? "GET requests must not contain a body."
+              : "This request must not contain a body.",
+          );
         if (path === "/api/v1/runtime" && !cli)
           fail(
             403,
             "cli_required",
             "Pi executable configuration requires the local CLI credential.",
           );
-        if (method === "POST" && !cli) browserRequest(request, access.origin);
+        if (method !== "GET" && !cli) browserRequest(request, access.origin);
         const body =
           method === "POST"
             ? await readJson(
@@ -327,7 +385,62 @@ export async function startHost({
         if (stopping) fail(503, "unavailable", "Dwell is stopping.");
         // Body/header deadlines remain bounded; admitted RPC work has its own deadlines.
         request.socket.setTimeout(0);
-        if (path === "/api/v1/runtime") {
+        if (libraryRoute) {
+          if (sessionLibraryReferencesMatch || sessionLibraryReferenceMatch) {
+            if (sessionLibraryReferencesMatch) {
+              const id = sessionLibraryReferencesMatch[1];
+              if (!id) fail(400, "invalid_input", "Invalid session ID.");
+              if (method === "GET") {
+                send(response, 200, { references: sessions.listLibraryReferences(id) });
+              } else {
+                send(response, 200, {
+                  references: await sessions.addLibraryReference(id, body),
+                });
+              }
+            } else {
+              const id = sessionLibraryReferenceMatch?.[1];
+              const binding = sessionLibraryReferenceMatch?.[2];
+              const itemId = sessionLibraryReferenceMatch?.[3];
+              const versionId = sessionLibraryReferenceMatch?.[4];
+              if (!id || !binding || !itemId || !versionId)
+                fail(400, "invalid_input", "Invalid library reference path.");
+              let reference: { binding: string; itemId: string; versionId: string };
+              try {
+                reference = {
+                  binding: decodeURIComponent(binding),
+                  itemId: decodeURIComponent(itemId),
+                  versionId: decodeURIComponent(versionId),
+                };
+              } catch {
+                fail(400, "invalid_input", "Invalid library reference path.");
+              }
+              send(response, 200, {
+                references: await sessions.removeLibraryReference(id, reference),
+              });
+            }
+          } else {
+            if (!library) throw new CurrentLibraryError("library_unavailable");
+            if (librarySearchPath) {
+              send(response, 200, await library.search(body));
+            } else if (libraryLatestPath) {
+              send(response, 200, await library.latest(libraryLatestRequest ?? {}));
+            } else {
+              const encoded = libraryReadMatch;
+              if (!encoded) fail(400, "invalid_input", "Invalid library item path.");
+              let reference: { binding: string; itemId: string; versionId: string };
+              try {
+                reference = {
+                  binding: decodeURIComponent(encoded[1] ?? ""),
+                  itemId: decodeURIComponent(encoded[2] ?? ""),
+                  versionId: decodeURIComponent(encoded[3] ?? ""),
+                };
+              } catch {
+                fail(400, "invalid_input", "Invalid library item path.");
+              }
+              send(response, 200, await library.read(reference));
+            }
+          }
+        } else if (path === "/api/v1/runtime") {
           if (
             !isRuntimeConfiguration(body) ||
             !Object.keys(body).every((key) => key === "executable" || key === "entryPoint")
@@ -564,7 +677,17 @@ export async function startHost({
         return;
       }
       response.setHeader("Connection", "close");
-      if (error instanceof AccessError || error instanceof SessionError) {
+      if (error instanceof CurrentLibraryError) {
+        const status =
+          error.code === "invalid_input"
+            ? 400
+            : error.code === "library_not_found"
+              ? 404
+              : error.code === "library_binding_mismatch"
+                ? 409
+                : 503;
+        send(response, status, { error: { code: error.code, message: error.message } });
+      } else if (error instanceof AccessError || error instanceof SessionError) {
         if (error.status === 429)
           response.setHeader("Retry-After", error.code === "pairing_limit" ? "300" : "60");
         send(response, error.status, { error: { code: error.code, message: error.message } });
@@ -618,10 +741,14 @@ export async function startHost({
             try {
               await auth?.drain();
             } finally {
-              await new Promise<void>((resolve, reject) =>
-                server.close((error) => (error ? reject(error) : resolve())),
-              );
-              server.closeAllConnections();
+              try {
+                await library?.close();
+              } finally {
+                await new Promise<void>((resolve, reject) =>
+                  server.close((error) => (error ? reject(error) : resolve())),
+                );
+                server.closeAllConnections();
+              }
             }
           }
         }
@@ -631,19 +758,27 @@ export async function startHost({
   };
   try {
     const root = await prepareDataDirectory(dataDir);
+    const integrations = await readIntegrations(root);
+    if (integrations.current) {
+      try {
+        library = await CurrentLibrary.open(integrations.current);
+      } catch (error) {
+        if (!(error instanceof CurrentLibraryError)) throw error;
+      }
+    }
     browserOrigin = await readBrowserOrigin(root, mode);
     if (browserOrigin && new URL(browserOrigin).host === new URL(url).host)
       throw new Error(
         "The HTTPS browserOrigin must use a different authority from the local listener.",
       );
     auth = await LocalAuth.open(dataDir, now);
-    const integrations = await readIntegrations(root);
     if (integrations.distill) distill = await openDistill(integrations.distill);
     sessions = await SessionService.create({
       dataDir,
       ...sessionOptions,
       now,
       ...(distill ? { distill } : {}),
+      ...(library === undefined ? {} : { library }),
     });
   } catch (error) {
     await close();

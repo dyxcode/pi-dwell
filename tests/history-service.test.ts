@@ -7,12 +7,12 @@ import {
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { appendFile, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { SessionService } from "../src/sessions/service.ts";
+import { SessionService, type SessionServiceOptions } from "../src/sessions/service.ts";
 import type { StreamFrame } from "../src/shared/events.ts";
 import { isHistoryPage } from "../src/shared/history.ts";
 import { SessionCatalog } from "../src/storage/catalog.ts";
@@ -28,7 +28,10 @@ async function until<T>(read: () => T, matches: (value: T) => boolean): Promise<
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
-async function setup(t: TestContext) {
+async function setup(
+  t: TestContext,
+  historyCheckCheckpoint?: NonNullable<SessionServiceOptions["historyCheckCheckpoint"]>,
+) {
   const env = await createPiEnvironment();
   const gate = join(env.root, "release");
   const options = {
@@ -39,6 +42,7 @@ async function setup(t: TestContext) {
       DWELL_TEST_START_LOG: join(env.root, "starts.log"),
     },
     extensions: [env.extensionPath],
+    ...(historyCheckCheckpoint ? { historyCheckCheckpoint } : {}),
   };
   const service = await SessionService.create(options);
   t.after(async () => {
@@ -67,14 +71,32 @@ async function setup(t: TestContext) {
   return { service, session, options, env, gate, send };
 }
 
+function historyCheck(session: object): unknown {
+  return Reflect.get(session, "historyCheck");
+}
+
+function historyCheckState(session: object): unknown {
+  const check = historyCheck(session);
+  return typeof check === "object" && check !== null ? Reflect.get(check, "state") : undefined;
+}
+
+function historyCheckTime(session: object): unknown {
+  const check = historyCheck(session);
+  return typeof check === "object" && check !== null ? Reflect.get(check, "checkedAt") : undefined;
+}
+
 test("history and native results survive restart without launching Pi", async (t) => {
   const { service, session, options, send, env } = await setup(t);
   assert.equal((await service.getHistory(session.id)).status, "empty");
+  const initial = service.getSession(session.id);
+  assert.equal(historyCheckState(initial), "not-created");
+  assert.equal(Number.isSafeInteger(historyCheckTime(initial)), true);
   const turn = await send("tool");
   const saved = await service.getHistory(session.id);
   assert.equal(isHistoryPage(saved), true);
   assert.equal(saved.coveredTurnId, turn.runId);
   assert.match(JSON.stringify(saved.entries), /Echo complete/);
+  assert.equal(historyCheckState(service.getSession(session.id)), "readable");
   const result = await service.getTurnResult(session.id, turn.runId);
   await service.shutdown();
   const starts = await readFile(join(env.root, "starts.log"), "utf8");
@@ -82,9 +104,27 @@ test("history and native results survive restart without launching Pi", async (t
   t.after(() => restored.shutdown());
   const recovered = await restored.getHistory(session.id);
   assert.deepEqual(recovered.entries, saved.entries);
+  assert.equal(historyCheckState(restored.getSession(session.id)), "readable");
   assert.deepEqual(await restored.getTurnResult(session.id, turn.runId), result);
   assert.equal(restored.runtimeCount, 0);
   assert.equal(await readFile(join(env.root, "starts.log"), "utf8"), starts);
+});
+
+test("closing an idle runtime still releases Pi when its expected history file is missing", async (t) => {
+  const { service, session, options, send } = await setup(t);
+  await send("tool");
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const file = catalog.get(session.id)?.piSessionFile;
+  catalog.close();
+  assert.ok(file);
+  await unlink(file);
+
+  const closed = await service.closeSession(session.id);
+
+  assert.equal(closed.runtimeState, "closed");
+  assert.equal(service.runtimeCount, 0);
+  assert.equal(historyCheckState(service.getSession(session.id)), "missing");
+  assert.equal(service.getSession(session.id).historyState, "unavailable");
 });
 
 test("standalone Pi continues the same native file and Dwell reads external messages without inventing turns", async (t) => {
@@ -131,6 +171,7 @@ test("standalone Pi continues the same native file and Dwell reads external mess
   const after = await service.getHistory(session.id);
   assert.ok(after.entries.length > before.entries.length);
   assert.match(JSON.stringify(after.entries), /standalone continuation/);
+  assert.equal(historyCheckState(service.getSession(session.id)), "readable");
   assert.equal(after.latestTurnId, turn.runId);
   assert.equal(service.runtimeCount, 0);
   await service.openSession(session.id);
@@ -139,6 +180,217 @@ test("standalone Pi continues the same native file and Dwell reads external mess
   const continued = await service.getHistory(session.id);
   assert.match(JSON.stringify(continued.entries), /standalone continuation/);
   assert.match(JSON.stringify(continued.entries), /Echo complete/);
+});
+
+test("malformed JSONL after a valid header is recorded invalid and never starts a replacement session", async (t) => {
+  const { service, session, send, options, env } = await setup(t);
+  const turn = await send("tool");
+  await service.closeSession(session.id);
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const file = catalog.get(session.id)?.piSessionFile;
+  catalog.close();
+  assert.ok(file);
+  const contents = await readFile(file, "utf8");
+  const lines = contents.split("\n");
+  assert.ok(lines.length > 2);
+  lines[1] = "{broken-json";
+  await writeFile(file, lines.join("\n"));
+  const startsBefore = (await readFile(join(env.root, "starts.log"), "utf8"))
+    .trim()
+    .split("\n").length;
+
+  await assert.rejects(service.getHistory(session.id), /invalid|saved session history/i);
+  assert.equal(historyCheckState(service.getSession(session.id)), "invalid");
+  assert.equal(service.getSession(session.id).historyState, "unavailable");
+  assert.equal(
+    service.listSessions().find((value) => value.id === session.id)?.historyState,
+    "unavailable",
+  );
+  await assert.rejects(
+    service.getTurnResult(session.id, turn.runId),
+    /invalid|saved session history/i,
+  );
+  await assert.rejects(
+    service.getHistoryImage(session.id, "missing-entry", 0),
+    /invalid|saved session history/i,
+  );
+  await assert.rejects(service.openSession(session.id), /invalid|saved session history/i);
+  const startsAfter = (await readFile(join(env.root, "starts.log"), "utf8"))
+    .trim()
+    .split("\n").length;
+  assert.equal(startsAfter, startsBefore);
+  assert.match(await readFile(file, "utf8"), /\{broken-json/u);
+});
+
+test("foreign session and cwd headers are recorded invalid", async (t) => {
+  const { service, session, send, options } = await setup(t);
+  await send("tool");
+  await service.closeSession(session.id);
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const file = catalog.get(session.id)?.piSessionFile;
+  catalog.close();
+  assert.ok(file);
+  const lines = (await readFile(file, "utf8")).split("\n");
+  const header = JSON.parse(lines[0] ?? "null") as Record<string, unknown>;
+  header.cwd = `${String(header.cwd)}-foreign`;
+  lines[0] = JSON.stringify(header);
+  await writeFile(file, lines.join("\n"));
+
+  await assert.rejects(service.getHistory(session.id), /invalid|saved session history/i);
+  assert.equal(historyCheckState(service.getSession(session.id)), "invalid");
+});
+
+test("a stale history cursor does not downgrade the last verified readable state", async (t) => {
+  const { service, session, send, options } = await setup(t);
+  await send("tool");
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const file = catalog.get(session.id)?.piSessionFile;
+  catalog.close();
+  assert.ok(file);
+
+  const initial = await service.getHistory(session.id);
+  assert.equal(initial.status, "available");
+  assert.ok(initial.leafId);
+  let parentId: string | null = initial.leafId;
+  const records: string[] = [];
+  for (let index = 0; index < 105; index++) {
+    const id = randomUUID();
+    records.push(
+      JSON.stringify({
+        type: "message",
+        id,
+        parentId,
+        timestamp: new Date(Date.now() + index).toISOString(),
+        message: { role: "user", content: [{ type: "text", text: `external ${index}` }] },
+      }),
+    );
+    parentId = id;
+  }
+  await appendFile(file, `${records.join("\n")}\n`);
+  const paged = await service.getHistory(session.id);
+  assert.ok(paged.nextCursor);
+  const verified = service.getSession(session.id);
+  const verifiedAt = historyCheckTime(verified);
+  assert.equal(historyCheckState(verified), "readable");
+
+  const changed = (await readFile(file, "utf8")).replace('"external 0"', '"external 1"');
+  assert.notEqual(changed, await readFile(file, "utf8"));
+  await writeFile(file, changed);
+  await assert.rejects(service.getHistory(session.id, paged.nextCursor ?? undefined), /changed/i);
+  assert.equal(historyCheckState(service.getSession(session.id)), "readable");
+  assert.equal(historyCheckTime(service.getSession(session.id)), verifiedAt);
+  await service.getHistory(session.id);
+  assert.equal(historyCheckState(service.getSession(session.id)), "readable");
+  assert.notEqual(historyCheckTime(service.getSession(session.id)), verifiedAt);
+});
+
+test("a newer missing-file check is not overwritten by an older completed read", async (t) => {
+  let signalEntered!: () => void;
+  let releaseRead!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    signalEntered = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    releaseRead = resolve;
+  });
+  let delayNextReadableCheck = false;
+  let delayed = false;
+  const env = await createPiEnvironment();
+  const options = {
+    dataDir: join(env.root, "dwell"),
+    env: { ...env.env, DWELL_TEST_START_LOG: join(env.root, "starts.log") },
+    extensions: [env.extensionPath],
+    historyCheckCheckpoint: async (state: string) => {
+      if (delayNextReadableCheck && !delayed && state === "readable") {
+        delayed = true;
+        signalEntered();
+        await release;
+      }
+    },
+  };
+  const service = await SessionService.create(options);
+  t.after(async () => {
+    releaseRead();
+    await service.shutdown();
+    await env.cleanup();
+  });
+  await service.configure({
+    executable: process.execPath,
+    entryPoint: fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry")),
+  });
+  const session = await service.createSession({
+    requestId: randomUUID(),
+    directory: env.cwd,
+    provider: "dwell-test",
+    model: "dwell-test",
+  });
+  const { turn } = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "tool",
+  });
+  await until(
+    () => service.getTurn(session.id, turn.runId),
+    (value) => value.status === "completed" && service.getSession(session.id).activeTurnId === null,
+  );
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const file = catalog.get(session.id)?.piSessionFile;
+  catalog.close();
+  assert.ok(file);
+  delayNextReadableCheck = true;
+  const olderRead = service.getHistory(session.id);
+  const enteredRead = await Promise.race([
+    entered.then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
+  ]);
+  assert.equal(enteredRead, true, "the first successful history check reached its save boundary");
+
+  await unlink(file);
+  await assert.rejects(service.getHistory(session.id), /history.*unavailable/i);
+  assert.equal(historyCheckState(service.getSession(session.id)), "missing");
+  releaseRead();
+  await olderRead;
+  assert.equal(historyCheckState(service.getSession(session.id)), "missing");
+});
+
+test("a close check uses a history observation saved while Pi state was loading", async (t) => {
+  let enteredRuntimeStateRead!: () => void;
+  let releaseRuntimeStateRead!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    enteredRuntimeStateRead = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    releaseRuntimeStateRead = resolve;
+  });
+  let delayRuntimeStateRead = false;
+  const { service, session, options, send } = await setup(t, async (point) => {
+    if (delayRuntimeStateRead && point === "runtime-state-read") {
+      delayRuntimeStateRead = false;
+      enteredRuntimeStateRead();
+      await release;
+    }
+  });
+  t.after(releaseRuntimeStateRead);
+  await send("tool");
+
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const stored = catalog.get(session.id);
+  assert.ok(stored?.piSessionFile);
+  catalog.update({ ...stored, historyExpected: false, historyCheck: null });
+  catalog.close();
+
+  delayRuntimeStateRead = true;
+  const closing = service.closeSession(session.id);
+  await entered;
+  await service.getHistory(session.id);
+  assert.equal(historyCheckState(service.getSession(session.id)), "readable");
+  await unlink(stored.piSessionFile);
+  releaseRuntimeStateRead();
+
+  const closed = await closing;
+
+  assert.equal(closed.runtimeState, "closed");
+  assert.equal(service.runtimeCount, 0);
+  assert.equal(historyCheckState(service.getSession(session.id)), "missing");
 });
 
 test("history plus buffered SSE converges on saved entries across a completion race", async (t) => {

@@ -45,6 +45,7 @@ function session(id: string, updatedAt = 1000): StoredSession {
     piSessionId: id,
     piSessionFile: null,
     historyExpected: false,
+    historyCheck: null,
     status: "ready",
     createdAt: 500,
     updatedAt,

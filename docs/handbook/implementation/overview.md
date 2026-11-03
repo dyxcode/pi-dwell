@@ -28,7 +28,7 @@ Source / verification: [`runCli`](../../../src/clients/cli/main.ts#L9) · [`star
 | Pi | [Pi](runtime.md) | Run the agent loop, model calls, tools and extensions; save conversations | Context in the Pi process and native JSONL session files |
 | Browser | [Web client](browser-controller.md) | Submit user input and render Pi messages, tool results and progress | Drafts, attachment previews, selection and displayed content |
 
-Source / verification: [`LocalAuth`](../../../src/server/auth.ts#L87) · [`SessionService`](../../../src/sessions/service.ts#L205) · [`SessionCatalog`](../../../src/storage/catalog.ts#L541) · [`SessionEvents`](../../../src/sessions/events.ts#L370) · [Web client](../../../src/clients/web/client.ts)
+Source / verification: [`LocalAuth`](../../../src/server/auth.ts#L87) · [`SessionService`](../../../src/sessions/service.ts#L213) · [`SessionCatalog`](../../../src/storage/catalog.ts#L601) · [`SessionEvents`](../../../src/sessions/events.ts#L371) · [Web client](../../../src/clients/web/client.ts)
 
 <a id="processes"></a>
 
@@ -40,7 +40,7 @@ The host runs Pi in independent subprocesses, retaining the Pi CLI's startup flo
 
 At startup, Dwell reads the catalog and starts Pi processes on demand. The [lifecycle workflow](workflow-lifecycle.md) follows session creation, resumption and shutdown through the relevant functions.
 
-Source / verification: [`SessionService.createSession`](../../../src/sessions/service.ts#L506) · [`SessionService.#open`](../../../src/sessions/service.ts#L1912) · [`PiProcess.start`](../../../src/runtime/pi-process.ts#L274)
+Source / verification: [`SessionService.createSession`](../../../src/sessions/service.ts#L519) · [`SessionService.#open`](../../../src/sessions/service.ts#L1985) · [`PiProcess.start`](../../../src/runtime/pi-process.ts#L274)
 
 <a id="boundaries"></a>
 
@@ -54,7 +54,7 @@ During execution, Dwell converts Pi events into bounded SSE updates. It reads sa
 
 Pi extensions can start work without a submitted Dwell request. Dwell tracks that work using a separate native execution ID so it can report progress and target cancellation without attributing it to another request.
 
-Source / verification: [`SessionService.submitTurn`](../../../src/sessions/service.ts#L882) · [`SessionCatalog.markTurnDispatching`](../../../src/storage/catalog.ts#L781) · [`SessionService.getTurnResult`](../../../src/sessions/service.ts#L964) · [`SessionService.#observeRuntime`](../../../src/sessions/service.ts#L1686)
+Source / verification: [`SessionService.submitTurn`](../../../src/sessions/service.ts#L906) · [`SessionCatalog.markTurnDispatching`](../../../src/storage/catalog.ts#L845) · [`SessionService.getTurnResult`](../../../src/sessions/service.ts#L988) · [`SessionService.#observeRuntime`](../../../src/sessions/service.ts#L1753)
 
 <a id="terms"></a>
 

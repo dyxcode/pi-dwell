@@ -27,6 +27,13 @@ export interface NativeExecutionInfo {
   error: string | null;
 }
 
+export type HistoryCheckState = "not-created" | "readable" | "missing" | "invalid";
+
+export interface HistoryCheck {
+  state: HistoryCheckState;
+  checkedAt: number;
+}
+
 export interface SessionInfo {
   id: string;
   directory: string;
@@ -39,6 +46,8 @@ export interface SessionInfo {
   status: "creating" | "ready" | "failed" | "interrupted";
   runtimeState: "closed" | "opening" | "ready" | "failed" | "closing";
   historyState: "empty" | "available" | "unavailable";
+  /** Last complete observation of the native history file; absent means unchecked. */
+  historyCheck?: HistoryCheck;
   error: string | null;
   /** Current or most recent native Pi extension execution; absent on older protocol fixtures. */
   nativeExecution?: NativeExecutionInfo | null;
@@ -94,6 +103,8 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
     "historyState" in value &&
     typeof value.historyState === "string" &&
     ["empty", "available", "unavailable"].includes(value.historyState) &&
+    (!Object.hasOwn(value, "historyCheck") ||
+      ("historyCheck" in value && isHistoryCheck(value.historyCheck))) &&
     "error" in value &&
     (value.error === null || typeof value.error === "string") &&
     (!Object.hasOwn(value, "nativeExecution") ||
@@ -107,6 +118,21 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
       (typeof value.latestTurnId === "string" && SESSION_ID.test(value.latestTurnId))) &&
     (value.status !== "ready" ||
       (typeof value.provider === "string" && typeof value.model === "string"))
+  );
+}
+
+export function isHistoryCheck(value: unknown): value is HistoryCheck {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  return (
+    Object.keys(value).length === 2 &&
+    Object.hasOwn(value, "state") &&
+    Object.hasOwn(value, "checkedAt") &&
+    "state" in value &&
+    typeof value.state === "string" &&
+    ["not-created", "readable", "missing", "invalid"].includes(value.state) &&
+    "checkedAt" in value &&
+    typeof value.checkedAt === "number" &&
+    Number.isSafeInteger(value.checkedAt)
   );
 }
 

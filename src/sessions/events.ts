@@ -285,6 +285,7 @@ function projectSession(value: SessionInfo): { value: SessionInfo; limited: bool
       status: value.status,
       runtimeState: value.runtimeState,
       historyState: value.historyState,
+      ...(value.historyCheck === undefined ? {} : { historyCheck: value.historyCheck }),
       error: error === null ? null : error.value,
       ...(Object.hasOwn(value, "nativeExecution")
         ? {

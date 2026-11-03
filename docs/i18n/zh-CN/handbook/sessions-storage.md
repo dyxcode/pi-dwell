@@ -41,7 +41,9 @@ flowchart TD
 
 ## 持久 catalog
 
-[`SessionCatalog`](../../../../src/storage/catalog.ts) 负责 Dwell 的 SQLite 文件，并验证其 schema 和每条解码后的 record。当前 schema 版本为 4。所有 statements 都使用 Node 的同步 `DatabaseSync`；写入数据时，SQL values 使用 parameterization。
+[`SessionCatalog`](../../../../src/storage/catalog.ts) 负责 Dwell 的 SQLite 文件，并验证其 schema 和每条解码后的 record。当前 schema 版本为 5。所有 statements 都使用 Node 的同步 `DatabaseSync`；写入数据时，SQL values 使用 parameterization。
+
+Schema v5 新增 nullable `history_check_state` 与 `history_checked_at`；旧 session 的 observation 初始为空，由下一次文件读取更新。详见 [catalog migration](implementation/catalog.md#catalog-schema-and-migrations)。
 
 <a id="tables-and-invariants"></a>
 
@@ -89,7 +91,7 @@ Terminal turns 不可再次 transition。`updateTurn()` 会检查 request ID、p
 
 `SessionCatalog.open(dataDir)` 首先调用 `prepareDataDirectory()`，然后在 `catalog.sqlite` 不存在时以 owner-only 权限创建。SQLite 打开前，Dwell 会使用 no-follow/nonblocking open flags 检查数据库是否为当前 user 所有、regular、只有一个 hard link 且 mode 为 `0600`。SQLite 打开时会启用 foreign keys 和 big integer reads，并禁用 extensions。初始化使用 `DELETE` journal mode 和 `synchronous = FULL`。
 
-Schema 初始化使用一个 transaction。只有不存在 user schema 时才接受 version 0，并直接创建当前 version。Versions 1、2 和 3 必须先与各自准确的预期 schema SQL 匹配，再以 transaction 迁移到 version 4。Version 1 先添加 turn table 和 active-turn index，再应用后续迁移。Version 2 先变为 version 3，再升级至 version 4。Version 3 会给 session 增加 nullable 的 `thinking_level` field。迁移会验证最终 schema，并在 commit 前运行 `PRAGMA foreign_key_check`。不支持的 version、不匹配的 schema、违反 turn/session foreign key 的保留 rows，或迁移检查失败都会 rollback 并报告 invalid/unsupported catalog；startup 不会重置文件。
+Schema 初始化使用一个 transaction。只有不存在 user schema 时才接受 version 0，并直接创建当前 version。Versions 1、2、3 和 4 必须先与各自准确的预期 schema SQL 匹配，再以 transaction 迁移到 version 5。Version 1 先添加 turn table 和 active-turn index，再应用后续迁移。Version 2 先变为 version 3，再升级至 version 4。Version 3 会给 session 增加 nullable 的 `thinking_level` field。迁移会验证最终 schema，并在 commit 前运行 `PRAGMA foreign_key_check`。不支持的 version、不匹配的 schema、违反 turn/session foreign key 的保留 rows，或迁移检查失败都会 rollback 并报告 invalid/unsupported catalog；startup 不会重置文件。
 
 `prepareDataDirectory()` 要求 directory 为 owner-only `0700`。Pi native session JSONL 可以保留 Pi 常见的 0644 mode，因为其所在的 Dwell session directory 是 private 的。Catalog 的 SQLite durability 和 Pi 的 JSONL durability 相互独立：一个 transaction 无法原子地 commit 这两个文件。
 
@@ -156,7 +158,7 @@ Child 启动后若出错，会停止进程、移除 observers，并将其从 run
 | --- | --- |
 | `status` | Durable catalog state：`creating`、`ready`、`failed` 或 `interrupted`。 |
 | `runtimeState` | 当前 process map 映射为 `closed`、`opening`、`ready`、`failed` 或 `closing`；running 的 Pi child 对外仍映射成 `ready`。 |
-| `historyState` | 存在已持久化的 missing-history error 时为 `unavailable`；catalog 预期有 native file 时为 `available`；否则为 `empty`。 |
+| `historyState` | 最近 observation 为 missing/invalid 时是 `unavailable`，readable 为 `available`，not-created 为 `empty`；未检查的旧记录使用 expectation/error。 |
 
 View 还会暴露 selected provider/model/thinking level、Pi session ID、当前/最新 Dwell turn IDs，以及当前或最近一次 process-local native execution summary。Turn payload hash 不会出现在这个 public view 中。
 
@@ -243,7 +245,7 @@ Native execution abort 要求提供当前 execution ID，并验证它仍与 `PiP
 
 ## Saved history 与 history projection
 
-Pi 的 v3 session file 是 JSONL：先有 v3 session header，之后 entries 通过 `id` 和 `parentId` 形成 tree。底层 reader 和 file limits 见 [runtime.md](runtime.md#saved-history-file-reads)。[`SessionService.#history()`](../../../../src/sessions/service.ts) 会定位预期 file、确保它位于 Dwell-owned session directory 内，并在 `HistoryPages` 解析前验证 header session ID、project `cwd` 和 version。
+Pi 的 v3 session file 是 JSONL：先有 v3 session header，之后 entries 通过 `id` 和 `parentId` 形成 tree。底层 reader 和 file limits 见 [runtime.md](runtime.md#saved-history-file-reads)。[`SessionFiles.resolve`](../../../../src/sessions/files.ts) 将文件定位在所属 Dwell session directory 内。`SessionService.#checkHistory` 再调用完整 JSONL reader，验证 header session ID、project `cwd`、version 和 entries，并保存 observation。
 
 <a id="page-and-cursor-behavior"></a>
 

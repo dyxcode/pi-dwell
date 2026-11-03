@@ -50,6 +50,7 @@
 | `status` | `creating`、`ready`、`failed`、`interrupted` |
 | `runtimeState` | `closed`、`opening`、`ready`、`failed`、`closing` |
 | `historyState` | `empty`、`available`、`unavailable` |
+| `historyCheck` | 可选 `{ state, checkedAt }`；state 为 `not-created`、`readable`、`missing` 或 `invalid`。 |
 
 Validator 要求 session 和 Pi session ID、directory、provider/model pair、thinking level、timestamps、上述状态字段、error，以及 active/latest turn ID。Provider 和 model 必须同时为 null 或同时非 null；`ready` session 必须让两者都是 string。`nativeExecution` 为兼容旧数据而设为可选，也可以是 null。如果它是 object，必须且只能包含 `id`、`status` 和 `error`；它的 ID 必须符合 session ID shape，status 只能是 running/completed/failed/aborted/interrupted，error 上限为 2 KiB UTF-8。非 null 的 provider/model 值必须是非空 string。Timestamp 必须是 safe integer。`SessionInfo` 的其余字段没有 exact-key 检查；directory 和 error string 没有 shared size limit。
 

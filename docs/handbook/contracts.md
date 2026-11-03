@@ -64,6 +64,7 @@ particular UUID version or variant.
 | `status` | `creating`, `ready`, `failed`, `interrupted` |
 | `runtimeState` | `closed`, `opening`, `ready`, `failed`, `closing` |
 | `historyState` | `empty`, `available`, `unavailable` |
+| `historyCheck` | Optional `{ state, checkedAt }`; state is `not-created`, `readable`, `missing`, or `invalid`. |
 
 The validator requires session and Pi session IDs, directory, provider/model
 pair, thinking level, timestamps, these state fields, error, and active/latest

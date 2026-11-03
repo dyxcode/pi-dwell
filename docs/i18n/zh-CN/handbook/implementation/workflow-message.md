@@ -8,21 +8,23 @@
 
 ## 起始状态与 browser decision
 
-假设 authenticated browser 已选择一个 Dwell session，并准备普通 text 或有效 image drafts。`submit` 先检查 selection 与冲突中的本地操作。如果 Dwell request 或 extension 发起的 Pi work 正在执行，同一控件走对应 stop path，而不创建新 prompt。否则读取 text/images，检查 image readiness/capability，并形成可使用同一 identity retry 的 request。
+假设 authenticated browser 已选择一个 Dwell session，并准备普通 text 或有效 image drafts。`submit` 首先获取当前选中的 session；若没有选中 session、browser 尚未处理完上一次发送或停止请求，或该 session 正在切换 model，则直接返回。如果 Dwell request 或 extension 发起的 Pi work 正在执行，同一控件走对应 stop path，而不创建新 prompt。否则读取 text/images，检查 image readiness/capability，并形成可使用同一 identity retry 的 request。
 
-Transport outcome 不明确时，browser 保留未确认的 pending submission。Retry 重新发送冻结的 pending payload 和 request ID，即使 draft 后来改变；pending attempt 未解决前，其他 session 不能提交。新 ID 将代表新工作。明确的 server rejection 与 admission 后的 network failure 不同。提交内容保留原始空白。Attachments 在提交前只是 drafts，详见 [browser input](browser-input.md)。
+如果 browser 因网络错误或无效 response 无法确认 Host 是否已接受 message，就保留该次提交的 request ID、text 和 images。等待确认期间，该 session 的输入框只读，附件不能修改，其他 sessions 也不能提交。Retry 使用保留的 request ID 和内容重发，让 Host 识别重复请求并返回已有 turn。
 
-Source / verification：[`submit`](../../../../../src/clients/web/client.ts#L1705) · [tests/web-client.test.ts](../../../../../tests/web-client.test.ts) · [tests/images-http.test.ts](../../../../../tests/images-http.test.ts)
+有效的 HTTP success response，或包含相同 session ID 与 request ID 的 SSE update，都可以确认请求已被接受；随后 browser 清除 pending submission、输入框 draft 和附件。收到 408 以外的 4xx rejection 时，browser 解除 pending 状态，保留 draft 供修改，再次提交时生成新的 request ID。401 则会让 browser 返回 pairing，并清理附件 drafts。提交的 text 保留原始空白。附件处理详见 [browser input](browser-input.md)。
+
+Source / verification：[`submit`](../../../../../src/clients/web/client.ts#L1718) · [`navigation`](../../../../../src/clients/web/client.ts#L554) · [`stream`](../../../../../src/clients/web/client.ts#L1412) · [tests/web-client.test.ts](../../../../../tests/web-client.test.ts) · [tests/images-http.test.ts](../../../../../tests/images-http.test.ts)
 
 <a id="admission"></a>
 
 ## HTTP admission 与 durable acceptance
 
-HTTP 在调用 `SessionService.submitTurn` 前检查 authority、authentication 与有界 request body。Shared guard 检查准确 turn keys、UUID、message 和 images。Service 在 mutation queue 中再次验证，从原始 message 加 images 计算 payload identity，并查询该 session 的已有 request。Identity 一致返回原 turn，同一 request ID 对应不同 payload 则返回 request_conflict。
+HTTP 在调用 `SessionService.submitTurn` 前检查 authority、authentication 与有界 request body。HTTP handler 调用共用的 [`isTurnCreateRequest`](../../../../../src/shared/turns.ts#L85)，检查请求是否只包含必填的 `requestId`、`message` 和可选的 `images`。它验证 request ID 是否符合 UUID 格式，检查 message 长度及 slash-command 限制，并验证图片格式、数量和大小。请求必须包含非空白 text 或至少一张 image。Service 在 mutation queue 中再次验证，从原始 message 加 images 计算 payload identity，并查询该 session 的已有 request。Identity 一致返回原 turn，同一 request ID 对应不同 payload 则返回 request_conflict。
 
 新工作必须通过 storage fault、active turn/native execution 和 Pi executable configuration 检查。Service 向 SQLite 插入 accepted turn，预留内存 active slot、publish state，并用 `setImmediate` 安排执行。HTTP 以 202 确认接受新 turn，以 200 返回已有的一致 request。Deduplication 位于 busy checks 之前，因此运行期间仍能找回已经接受的 request。
 
-Source / verification：[`startHost`](../../../../../src/server/http.ts#L102) · [`SessionService.submitTurn`](../../../../../src/sessions/service.ts#L882) · [`turnPayloadIdentity`](../../../../../src/sessions/service.ts#L81) · [tests/turns.test.ts](../../../../../tests/turns.test.ts) · [tests/turns-http.test.ts](../../../../../tests/turns-http.test.ts)
+Source / verification：[`startHost`](../../../../../src/server/http.ts#L102) · [`SessionService.submitTurn`](../../../../../src/sessions/service.ts#L906) · [`turnPayloadIdentity`](../../../../../src/sessions/service.ts#L85) · [tests/turns.test.ts](../../../../../tests/turns.test.ts) · [tests/turns-http.test.ts](../../../../../tests/turns-http.test.ts)
 
 <a id="dispatch"></a>
 
@@ -34,7 +36,7 @@ Catalog transaction 将 turn 设为 dispatching，并记录 history 从此应当
 
 长时间 model run 不被包在 database transaction 或全局 mutation queue 内。Per-session slot 仍阻止重叠 admission，而其他 session operations 可以继续。
 
-Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessions/service.ts#L1139) · [`SessionCatalog.markTurnDispatching`](../../../../../src/storage/catalog.ts#L781) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/history-cancellation.test.ts](../../../../../tests/history-cancellation.test.ts)
+Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessions/service.ts#L1165) · [`SessionCatalog.markTurnDispatching`](../../../../../src/storage/catalog.ts#L845) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/history-cancellation.test.ts](../../../../../tests/history-cancellation.test.ts)
 
 <a id="execution"></a>
 
@@ -44,7 +46,7 @@ Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessi
 
 Started prompt 使 durable turn 进入 running。Handled prompt 可能被 extension 消费而不产生标准 assistant response；service 解除该 turn 的 event observer，并依据 saved evidence 完成 handled path。独立 extension follow-up 作为 native execution 观察，不被改称用户的 durable turn。Browser 也可能在 POST 返回前收到 updates，因此 submission、event 与 refresh paths 分别管理 in-flight 与 observed state；具体顺序见 browser controller 章节。
 
-Source / verification：[`PiProcess.startRun`](../../../../../src/runtime/pi-process.ts#L578) · [`SessionService.#completeHandledTurn`](../../../../../src/sessions/service.ts#L1326) · [tests/runtime.test.ts](../../../../../tests/runtime.test.ts) · [tests/native-executions.test.ts](../../../../../tests/native-executions.test.ts)
+Source / verification：[`PiProcess.startRun`](../../../../../src/runtime/pi-process.ts#L578) · [`SessionService.#completeHandledTurn`](../../../../../src/sessions/service.ts#L1348) · [tests/runtime.test.ts](../../../../../tests/runtime.test.ts) · [tests/native-executions.test.ts](../../../../../tests/native-executions.test.ts)
 
 <a id="results"></a>
 
@@ -56,7 +58,7 @@ Settlement 后，service 等待尚未完成的 abort attempt，记录 Pi history
 
 Browser 通常将 paginated history 与 live projection 一起渲染。Native identities 证明内容已保存时逐项替换 live content，只有建立 saved coverage 才清除剩余 live data。[Observation workflow](workflow-observation.md) 解释为何 settlement 本身不够。
 
-Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessions/service.ts#L1139) · [`SessionService.getTurnResult`](../../../../../src/sessions/service.ts#L964) · [tests/turns.test.ts](../../../../../tests/turns.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
+Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessions/service.ts#L1165) · [`SessionService.getTurnResult`](../../../../../src/sessions/service.ts#L988) · [tests/turns.test.ts](../../../../../tests/turns.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
 
 <a id="failures"></a>
 
@@ -73,4 +75,4 @@ Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessi
 
 例如 tool 可能已经修改文件，随后 Pi 或 Dwell crash，留下 side effect 而没有 final reply。Request deduplication 防止同一 identity 的再次 admission；tool effects 发生在该 transaction 之外。
 
-Source / verification：[`SessionService.abortTurn`](../../../../../src/sessions/service.ts#L1014) · [`SessionService.#storageFault`](../../../../../src/sessions/service.ts#L496) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/turns-http.test.ts](../../../../../tests/turns-http.test.ts)
+Source / verification：[`SessionService.abortTurn`](../../../../../src/sessions/service.ts#L1040) · [`SessionService.#storageFault`](../../../../../src/sessions/service.ts#L509) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/turns-http.test.ts](../../../../../tests/turns-http.test.ts)

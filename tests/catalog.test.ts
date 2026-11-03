@@ -31,6 +31,7 @@ function session(overrides: Partial<StoredSession> = {}): StoredSession {
     piSessionId: "pi-session-a",
     piSessionFile: null,
     historyExpected: false,
+    historyCheck: null,
     status: "creating",
     createdAt: 1000,
     updatedAt: 1000,
@@ -136,6 +137,7 @@ test("version-one catalogs migrate transactionally while preserving sessions and
       piSessionId: "33333333-3333-4333-8333-333333333333",
       piSessionFile: null,
       historyExpected: true,
+      historyCheck: null,
       status: "ready",
       createdAt: 1000,
       updatedAt: 1100,
@@ -145,7 +147,7 @@ test("version-one catalogs migrate transactionally while preserving sessions and
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 4n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 5n);
   assert.equal(
     migrated.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'turns'").get()
       ?.count,
@@ -177,6 +179,7 @@ test("version-two migration preserves sessions, turns, indexes, and foreign keys
     piSessionId: "33333333-3333-4333-8333-333333333333",
     piSessionFile: null,
     historyExpected: false,
+    historyCheck: null,
     status: "ready",
     createdAt: 1000,
     updatedAt: 1100,
@@ -208,7 +211,7 @@ test("version-two migration preserves sessions, turns, indexes, and foreign keys
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 4n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 5n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   const index = migrated
     .prepare("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = ?")
@@ -239,6 +242,7 @@ test("version-three migration preserves sessions and turns while adding thinking
     piSessionId: "33333333-3333-4333-8333-333333333333",
     piSessionFile: "/tmp/pi-session-v3.jsonl",
     historyExpected: true,
+    historyCheck: null,
     status: "ready",
     createdAt: 1000,
     updatedAt: 1100,
@@ -261,7 +265,7 @@ test("version-three migration preserves sessions and turns while adding thinking
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 4n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 5n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   assert.ok(
     migrated
@@ -361,9 +365,14 @@ test("catalog enforces request uniqueness and reopens deterministic list and upd
     updatedAt: 1500,
   };
   catalog.update(ready);
-  assert.deepEqual(catalog.list(), [ready, tied, later]);
-  assert.deepEqual(catalog.get(first.id), ready);
-  assert.deepEqual(catalog.findRequest(first.requestId), ready);
+  const observed = {
+    ...ready,
+    historyCheck: { state: "readable" as const, checkedAt: 1550 },
+  };
+  catalog.update(observed);
+  assert.deepEqual(catalog.list(), [observed, tied, later]);
+  assert.deepEqual(catalog.get(first.id), observed);
+  assert.deepEqual(catalog.findRequest(first.requestId), observed);
   assert.equal(catalog.get("missing"), undefined);
   assert.equal(catalog.findRequest("missing"), undefined);
 
@@ -371,7 +380,7 @@ test("catalog enforces request uniqueness and reopens deterministic list and upd
   active = undefined;
   const reopened = await SessionCatalog.open(dataDir);
   active = reopened;
-  assert.deepEqual(reopened.list(), [ready, tied, later]);
+  assert.deepEqual(reopened.list(), [observed, tied, later]);
 });
 
 test("startup marks only creating sessions interrupted and persists the recovery", async (t) => {

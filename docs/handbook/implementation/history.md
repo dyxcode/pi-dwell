@@ -6,7 +6,7 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/history.md)
 
 [Implementation index](README.md) · [Session service](sessions.md) · [Dwell/Pi integration overview](../runtime.md)
 
-History handling spans four modules. `pi-history.ts` reads and validates Pi's native JSONL session file and pins byte-prefix revisions; `sessions/history.ts` follows the active branch and projects bounded client pages; `message-identity.ts` matches complete assistant messages across saved and live views; `pi-history-budget.ts` limits concurrent file scans.
+History handling spans five modules. `sessions/files.ts` resolves the session's owned file; `pi-history.ts` reads and validates Pi's native JSONL session file and pins byte-prefix revisions; `sessions/history.ts` follows the active branch and projects bounded client pages; `message-identity.ts` matches complete assistant messages across saved and live views; `pi-history-budget.ts` limits concurrent file scans.
 
 <a id="native-jsonl-snapshot-and-validation"></a>
 
@@ -23,6 +23,12 @@ The error constructors keep failure categories stable: [`changed`, `invalid`, `u
 [`readSavedHistorySnapshot`](../../../src/runtime/pi-history.ts#L270) opens with `O_NOFOLLOW | O_NONBLOCK`, checks ownership/link/file identity before reading, and determines the byte boundary. An unpinned read uses the initially observed file size; ordinary appends after that point do not extend the snapshot. A cursor read uses its recorded prefix length and rejects if the file is shorter. The implementation stats after reading; if metadata changed, it reads the same boundary a second time and requires identical bytes and stable identity, then checks the path identity again. It calculates the revision from complete newline-terminated bytes only. For a pinned prefix, the requested boundary must be complete and its revision must still match. Only then are records parsed. An unfinished final line is omitted and marked `incompleteTail`; malformed complete lines are errors. All raw file errors are normalized to `HistoryReadError`, and the handle is closed in `finally`.
 
 [`readSavedHistory`](../../../src/runtime/pi-history.ts#L336) validates an optional prefix, runs the scan under the shared history budget, and translates queue overflow to `history_busy`. This separates scan admission from file parsing and keeps every caller under the same Dwell host-process limit.
+
+<a id="session-file-resolution"></a>
+
+## Resolving the session file
+
+The [`SessionFiles`](../../../src/sessions/files.ts) constructor retains the Dwell sessions directory. `resolve` uses the recorded Pi path; when no path is recorded, it searches the owning Dwell session directory for one JSONL matching the Pi session ID. It also permits discovery when an allocated path has not materialized and history has never been expected or observed. `nestedPath` checks containment; replaced directories, escape and multiple matches raise `SessionFileError`. Missing files return `undefined`, which the service interprets using the saved observation and dispatch expectation. The existing `readSavedHistory` reader validates the complete header, cwd, session ID and JSONL content.
 
 <a id="history-scan-budget"></a>
 

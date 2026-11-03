@@ -77,6 +77,32 @@ function cursorEpoch(cursor: string): string {
   return epoch;
 }
 
+test("session snapshots and updates carry persisted history observations", () => {
+  const hub = new SessionEvents();
+  const first: SessionInfo = {
+    ...session(),
+    historyCheck: { state: "missing", checkedAt: 20 },
+  };
+  const frames: StreamFrame[] = [];
+  const subscription = hub.connect(first, null, null, undefined, (frame) => {
+    frames.push(frame);
+  });
+  const initial = snapshot(subscription.initial);
+  assert.deepEqual(initial.payload.session.historyCheck, first.historyCheck);
+
+  hub.publishSession({
+    ...first,
+    historyCheck: { state: "readable", checkedAt: 21 },
+  });
+  const update = ordinary(frames, "session.updated");
+  assert.ok(isStreamFrame(update));
+  assert.equal(update.type, "session.updated");
+  if (update.type === "session.updated")
+    assert.deepEqual(update.payload.historyCheck, { state: "readable", checkedAt: 21 });
+  subscription.unsubscribe();
+  hub.close();
+});
+
 function ordinary(frames: readonly StreamFrame[], type: string): StreamFrame {
   const frame = frames.find(
     (candidate) => candidate.type === type && candidate.type !== "snapshot",

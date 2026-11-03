@@ -1,10 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
-import { constants } from "node:fs";
-import { open, readdir, realpath, stat } from "node:fs/promises";
-import { isAbsolute, join, relative } from "node:path";
+import { realpath, stat } from "node:fs/promises";
+import { isAbsolute, join } from "node:path";
 import { prepareDataDirectory } from "../local/files.ts";
-import { hasCode } from "../local/paths.ts";
 import { savedMessageKeys } from "../runtime/message-identity.ts";
+import { HistoryReadBudgetError } from "../runtime/pi-history-budget.ts";
 import { HistoryReadError, readSavedHistory, type SavedHistory } from "../runtime/pi-history.ts";
 import {
   type NativeExecutionEvent,
@@ -12,7 +11,7 @@ import {
   PiProcess,
   verifyPiConfiguration,
 } from "../runtime/pi-process.ts";
-import { isRecord, RpcCommandError } from "../runtime/pi-rpc.ts";
+import { RpcCommandError } from "../runtime/pi-rpc.ts";
 import {
   discoverPiModelCapabilities,
   discoverPiModels,
@@ -35,6 +34,8 @@ import {
   type SessionCreateRequest,
   type SessionInfo,
   type SessionModelRequest,
+  type HistoryCheck,
+  type HistoryCheckState,
 } from "../shared/sessions.ts";
 import {
   isModelCapabilitiesRequest,
@@ -51,6 +52,7 @@ import {
   SubscriberLimitError,
 } from "./events.ts";
 import { HistoryPages } from "./history.ts";
+import { SessionFileError, SessionFiles } from "./files.ts";
 
 export class SessionError extends Error {
   readonly status: number;
@@ -73,6 +75,8 @@ export interface SessionServiceOptions {
     point: "accepted" | "dispatching" | "running" | "settled",
     turn: TurnInfo,
   ) => Promise<void>;
+  /** Internal ordering barrier for deterministic history-file race tests. */
+  historyCheckCheckpoint?: (state: HistoryCheckState | "runtime-state-read") => Promise<void>;
 }
 
 const HISTORY_UNAVAILABLE = "Saved session history is unavailable.";
@@ -117,6 +121,10 @@ interface ActiveTurn {
   abortFailed: boolean;
   historyMaterialized: boolean;
 }
+
+type CheckedHistory<T> =
+  | { file: string; state: "readable"; value: T }
+  | { file: undefined; state: "missing" | "not-created"; value: undefined };
 
 interface HistoryIdentity {
   known: boolean;
@@ -217,6 +225,8 @@ export class SessionService {
   readonly #storageFaults = new Set<string>();
   readonly #events = new SessionEvents();
   readonly #historyPages = new HistoryPages();
+  readonly #sessionFiles: SessionFiles;
+  readonly #historyCheckSequences = new Map<string, number>();
   readonly #reads = new Set<Promise<unknown>>();
   readonly #nativeRefreshes = new Set<Promise<void>>();
   readonly #shutdownController = new AbortController();
@@ -224,6 +234,7 @@ export class SessionService {
   readonly #modelCapabilityDiscoveries = new Map<string, Promise<ModelCapabilitiesResponse>>();
   readonly #sessionModelReads = new Map<PiProcess, Promise<PiSessionModelOption[]>>();
   readonly #checkpoint: SessionServiceOptions["turnCheckpoint"];
+  readonly #historyCheckCheckpoint: SessionServiceOptions["historyCheckCheckpoint"];
   #queue: Promise<void> = Promise.resolve();
   #stopping = false;
   #shutdown: Promise<void> | undefined;
@@ -231,10 +242,12 @@ export class SessionService {
   private constructor(catalog: SessionCatalog, dataDir: string, options: SessionServiceOptions) {
     this.#catalog = catalog;
     this.#dataDir = dataDir;
+    this.#sessionFiles = new SessionFiles(dataDir);
     this.#env = { ...(options.env ?? process.env) };
     this.#extensions = options.extensions ?? [];
     this.#now = options.now ?? Date.now;
     this.#checkpoint = options.turnCheckpoint;
+    this.#historyCheckCheckpoint = options.historyCheckCheckpoint;
   }
 
   static async create(options: SessionServiceOptions): Promise<SessionService> {
@@ -561,6 +574,7 @@ export class SessionService {
         piSessionId: randomUUID(),
         piSessionFile: null,
         historyExpected: false,
+        historyCheck: null,
         status: "creating",
         createdAt: now,
         updatedAt: now,
@@ -712,10 +726,15 @@ export class SessionService {
             "session_busy",
             "Abort active work before closing its runtime.",
           );
-        await this.#rememberHistory(stored, runtime);
+        const history = await this.#rememberHistory(stored, runtime);
         const native = this.#nativeExecutions.get(id);
-        if (native && native.info.status !== "running" && native.messageBaseline)
-          await this.#refreshNativeHistory(id, native.info.id);
+        if (
+          history.state === "readable" &&
+          native &&
+          native.info.status !== "running" &&
+          native.messageBaseline
+        )
+          await this.#refreshNativeHistory(id, native.info.id, history.value);
         await runtime.stop();
         this.#runtimeObservers.get(id)?.();
         this.#runtimeObservers.delete(id);
@@ -741,14 +760,24 @@ export class SessionService {
   getHistory(id: string, cursor?: string): Promise<HistoryPage> {
     return this.#read(async (signal) => {
       const stored = this.#stored(id);
-      const file = await this.#history(stored);
-      if (!file) {
-        const slot = this.#turns.get(id);
-        const pending =
-          slot !== undefined &&
-          !slot.historyMaterialized &&
-          active(this.#storedTurn(id, slot.runId));
-        if (stored.historyExpected && !pending)
+      const slot = this.#turns.get(id);
+      const pending =
+        slot !== undefined && !slot.historyMaterialized && active(this.#storedTurn(id, slot.runId));
+      const checked = await this.#checkHistory(
+        stored,
+        (file) =>
+          this.#historyPages.read({
+            sessionId: id,
+            file,
+            piSessionId: stored.piSessionId,
+            directory: stored.directory,
+            ...(cursor === undefined ? {} : { cursor }),
+            signal,
+          }),
+        pending,
+      );
+      if (checked.state !== "readable") {
+        if (checked.state === "missing")
           throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
         if (cursor !== undefined)
           throw new SessionError(400, "invalid_cursor", "No saved history exists for this cursor.");
@@ -768,16 +797,8 @@ export class SessionService {
           contextSourcesTruncated: false,
         };
       }
-      const slot = this.#turns.get(id);
       if (slot) slot.historyMaterialized = true;
-      const slice = await this.#historyPages.read({
-        sessionId: id,
-        file,
-        piSessionId: stored.piSessionId,
-        directory: stored.directory,
-        ...(cursor === undefined ? {} : { cursor }),
-        signal,
-      });
+      const slice = checked.value;
       const session = this.#view(this.#stored(id));
       const latest = this.#catalog.latestTurn(id);
       const covered =
@@ -860,22 +881,25 @@ export class SessionService {
     imageIndex: number,
   ): Promise<{ mimeType: string; data: Buffer } | null> {
     return this.#read(async (signal) => {
+      if (!Number.isSafeInteger(imageIndex) || imageIndex < 0) return null;
       const stored = this.#stored(id);
-      const file = await this.#history(stored);
-      if (!file) {
-        if (stored.historyExpected)
+      const checked = await this.#checkHistory(stored, (file) =>
+        this.#historyPages.image({
+          sessionId: id,
+          file,
+          piSessionId: stored.piSessionId,
+          directory: stored.directory,
+          entryId,
+          imageIndex,
+          signal,
+        }),
+      );
+      if (checked.state !== "readable") {
+        if (checked.state === "missing")
           throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
         return null;
       }
-      return this.#historyPages.image({
-        sessionId: id,
-        file,
-        piSessionId: stored.piSessionId,
-        directory: stored.directory,
-        entryId,
-        imageIndex,
-        signal,
-      });
+      return checked.value;
     });
   }
 
@@ -972,16 +996,18 @@ export class SessionService {
         throw new SessionError(410, "result_unavailable", "Saved turn result is unavailable.");
       }
       const stored = this.#stored(id);
-      const file = await this.#history(stored);
-      if (!file)
+      const checked = await this.#checkHistory(stored, (file) =>
+        readSavedHistory({
+          file,
+          piSessionId: stored.piSessionId,
+          directory: stored.directory,
+          signal,
+          cancelQueuedOnly: true,
+        }),
+      );
+      if (checked.state !== "readable")
         throw new SessionError(410, "result_unavailable", "Saved turn result is unavailable.");
-      const { entries } = await readSavedHistory({
-        file,
-        piSessionId: stored.piSessionId,
-        directory: stored.directory,
-        signal,
-        cancelQueuedOnly: true,
-      });
+      const { entries } = checked.value;
       const byId = new Map(entries.map((entry) => [entry.id, entry]));
       const selected: PiEntry[] = [];
       for (const entryId of turn.entryIds) {
@@ -1170,11 +1196,6 @@ export class SessionService {
       slot.runtime = runtime;
       this.#checkStorage(id);
       const source = this.#stored(id);
-      if (source.historyExpected && !(await this.#history(source))) {
-        this.#catalog.update({ ...source, error: HISTORY_UNAVAILABLE, updatedAt: this.#now() });
-        this.#publishState(id);
-        throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
-      }
       if (images.length > 0 && !(await runtime.supportsImages()))
         throw new SessionError(
           400,
@@ -1241,10 +1262,11 @@ export class SessionService {
         await this.#completeHandledTurn(id, slot.runId, runtime, before, historyWasExpected);
         return;
       }
-      await this.#rememberHistory(this.#stored(id), runtime);
-      const historyAfter = await this.#savedHistory(this.#stored(id));
-      const savedAfter = historyAfter?.entries ?? [];
-      this.#historyIdentity.set(id, this.#identityForHistory(historyAfter));
+      const historyAfter = await this.#rememberHistory(this.#stored(id), runtime);
+      if (historyAfter.state !== "readable")
+        throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+      const savedAfter = historyAfter.value.entries;
+      this.#historyIdentity.set(id, this.#identityForHistory(historyAfter.value));
       const entries = savedAfter.filter((entry) => !before.has(entry.id));
       this.#writeTurn({
         ...this.#storedTurn(id, slot.runId),
@@ -1342,17 +1364,29 @@ export class SessionService {
       model: state.model?.id ?? latest.model,
       thinkingLevel: state.thinkingLevel,
     };
-    const file = await this.#history(withState);
-    if (!file && historyWasExpected)
+    const checked = await this.#checkHistory(
+      { ...withState, historyExpected: historyWasExpected },
+      (file) =>
+        readSavedHistory({
+          file,
+          piSessionId: withState.piSessionId,
+          directory: withState.directory,
+          signal: this.#shutdownController.signal,
+          cancelQueuedOnly: true,
+        }),
+    );
+    if (checked.state === "missing")
       throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
-    const history = file
-      ? await this.#savedHistory({ ...withState, historyExpected: true })
-      : undefined;
+    const history = checked.state === "readable" ? checked.value : undefined;
     const entries = history?.entries.filter((entry) => !before.has(entry.id)) ?? [];
     try {
       this.#catalog.update({
-        ...withState,
-        historyExpected: file !== undefined,
+        ...this.#stored(sessionId),
+        piSessionFile: sessionFile,
+        historyExpected: historyWasExpected,
+        provider: withState.provider,
+        model: withState.model,
+        thinkingLevel: withState.thinkingLevel,
         error: null,
         updatedAt: this.#now(),
       });
@@ -1535,11 +1569,18 @@ export class SessionService {
                 ? "failed"
                 : "closed",
       historyState:
-        stored.error === HISTORY_UNAVAILABLE
+        stored.historyCheck?.state === "missing" || stored.historyCheck?.state === "invalid"
           ? "unavailable"
-          : stored.historyExpected
+          : stored.historyCheck?.state === "readable"
             ? "available"
-            : "empty",
+            : stored.historyCheck?.state === "not-created"
+              ? "empty"
+              : stored.error === HISTORY_UNAVAILABLE
+                ? "unavailable"
+                : stored.historyExpected
+                  ? "available"
+                  : "empty",
+      ...(stored.historyCheck === null ? {} : { historyCheck: stored.historyCheck }),
       error: this.#storageFaults.has(stored.id)
         ? "Turn state could not be saved. Repair storage and restart the host."
         : stored.error,
@@ -1577,81 +1618,125 @@ export class SessionService {
       }
   }
 
-  async #history(stored: StoredSession): Promise<string | undefined> {
-    let source = stored.piSessionFile;
-    if (!stored.historyExpected) {
-      try {
-        const files = (await readdir(join(this.#dataDir, "sessions", stored.id))).filter((name) =>
-          name.endsWith(`_${stored.piSessionId}.jsonl`),
-        );
-        if (files.length > 1)
-          throw new SessionError(
-            409,
-            "invalid_history",
-            "Multiple files claim this session identity.",
-          );
-        if (files[0]) source = join(this.#dataDir, "sessions", stored.id, files[0]);
-      } catch (error) {
-        if (!hasCode(error, "ENOENT")) throw error;
-      }
-    }
-    if (!source) return undefined;
+  async #checkHistory<T>(
+    stored: StoredSession,
+    read: (file: string) => Promise<T>,
+    allowPendingCreation = false,
+  ): Promise<CheckedHistory<T>> {
+    const sequence = (this.#historyCheckSequences.get(stored.id) ?? 0) + 1;
+    this.#historyCheckSequences.set(stored.id, sequence);
+    const latest = this.#stored(stored.id);
+    const current = {
+      ...latest,
+      piSessionFile: stored.piSessionFile,
+      historyExpected: stored.historyExpected,
+      historyCheck: latest.historyCheck,
+    };
+
+    let file: string | undefined;
     try {
-      const path = await realpath(source);
-      const directory = await realpath(join(this.#dataDir, "sessions", stored.id));
-      const nested = relative(directory, path);
-      if (nested.startsWith("..") || isAbsolute(nested))
-        throw new Error("Session history escaped its owning directory.");
-      const handle = await open(
-        path,
-        constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
-      );
-      try {
-        const info = await handle.stat();
-        if (!info.isFile()) throw new Error("Session history is not a regular file.");
-        const buffer = Buffer.alloc(8192);
-        const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-        const firstLine = buffer.subarray(0, bytesRead).toString("utf8").split("\n")[0];
-        const header: unknown = JSON.parse(firstLine ?? "");
-        if (
-          !isRecord(header) ||
-          header.type !== "session" ||
-          header.id !== stored.piSessionId ||
-          header.cwd !== stored.directory ||
-          header.version !== 3
-        )
-          throw new Error("Session history identity is invalid.");
-      } finally {
-        await handle.close();
-      }
-      return path;
+      file = await this.#sessionFiles.resolve(current);
     } catch (error) {
-      if (hasCode(error, "ENOENT")) return undefined;
+      if (error instanceof SessionFileError) {
+        await this.#recordHistoryCheck(current, sequence, "invalid");
+        throw new SessionError(409, "invalid_history", error.message);
+      }
+      throw error;
+    }
+    if (file === undefined) {
+      const previous = this.#stored(stored.id).historyCheck?.state;
+      const previouslyObserved =
+        previous === "readable" || previous === "missing" || previous === "invalid";
+      const expected = previouslyObserved || (current.historyExpected && !allowPendingCreation);
+      const state = expected ? "missing" : "not-created";
+      await this.#recordHistoryCheck(current, sequence, state);
+      return { file: undefined, value: undefined, state };
+    }
+
+    try {
+      const value = await read(file);
+      await this.#recordHistoryCheck(stored, sequence, "readable", file);
+      return { file, value, state: "readable" };
+    } catch (error) {
+      let state = this.#historyCheckState(error);
+      if (error instanceof HistoryReadError && error.code === "history_unavailable") {
+        try {
+          state = (await this.#sessionFiles.resolve(current)) === undefined ? "missing" : "invalid";
+        } catch {
+          state = "invalid";
+        }
+      }
+      if (state !== undefined) await this.#recordHistoryCheck(current, sequence, state, file);
+      if (error instanceof HistoryReadError)
+        throw new SessionError(error.status, error.code, error.message);
+      if (error instanceof HistoryReadBudgetError)
+        throw new SessionError(
+          429,
+          "history_busy",
+          "Two history reads are already active. Try again shortly.",
+        );
+      throw error;
+    }
+  }
+
+  async #recordHistoryCheck(
+    stored: StoredSession,
+    sequence: number,
+    state: HistoryCheckState,
+    file?: string,
+  ): Promise<void> {
+    await this.#historyCheckCheckpoint?.(state);
+    if (this.#historyCheckSequences.get(stored.id) !== sequence) return;
+    const latest = this.#stored(stored.id);
+    const check: HistoryCheck = { state, checkedAt: this.#now() };
+    const updated: StoredSession = {
+      ...latest,
+      historyCheck: check,
+      ...(file === undefined ? {} : { piSessionFile: file }),
+      ...(latest.error === HISTORY_UNAVAILABLE && (state === "readable" || state === "not-created")
+        ? { error: null }
+        : {}),
+    };
+    try {
+      this.#catalog.update(updated);
+    } catch {
+      this.#storageFault(stored.id);
       throw new SessionError(
-        409,
-        "invalid_history",
-        "Saved session history is invalid or belongs to another project.",
+        503,
+        "storage_unavailable",
+        "The session history check could not be saved. Repair storage and restart the host.",
       );
     }
+    this.#publishState(stored.id);
+  }
+
+  #historyCheckState(error: unknown): HistoryCheckState | undefined {
+    if (error instanceof HistoryReadError) {
+      if (error.code === "invalid_history") return "invalid";
+    }
+    if (error instanceof SessionError) {
+      if (error.code === "invalid_history") return "invalid";
+      if (error.code === "history_unavailable") return "missing";
+    }
+    return undefined;
   }
 
   async #savedHistory(
     stored: StoredSession,
     options: { signal?: AbortSignal; cancelQueuedOnly?: boolean } = {},
   ): Promise<SavedHistory | undefined> {
-    const file = await this.#history(stored);
-    if (!file) {
-      if (stored.historyExpected)
-        throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
-      return undefined;
-    }
-    return readSavedHistory({
-      file,
-      piSessionId: stored.piSessionId,
-      directory: stored.directory,
-      ...(options.signal ? { signal: options.signal } : {}),
-      ...(options.cancelQueuedOnly ? { cancelQueuedOnly: true } : {}),
-    });
+    const checked = await this.#checkHistory(stored, (file) =>
+      readSavedHistory({
+        file,
+        piSessionId: stored.piSessionId,
+        directory: stored.directory,
+        ...(options.signal ? { signal: options.signal } : {}),
+        ...(options.cancelQueuedOnly ? { cancelQueuedOnly: true } : {}),
+      }),
+    );
+    if (checked.state === "missing")
+      throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+    return checked.state === "readable" ? checked.value : undefined;
   }
 
   #identityForEntries(entries: readonly PiEntry[]): HistoryIdentity {
@@ -1663,24 +1748,6 @@ export class SessionService {
     if (!history) return { known: true, counts: new Map() };
     if (history.incompleteTail) return { known: false, counts: new Map() };
     return this.#identityForEntries(history.entries);
-  }
-
-  async #captureHistoryIdentity(
-    stored: StoredSession,
-    signal?: AbortSignal,
-  ): Promise<HistoryIdentity> {
-    try {
-      const history = await this.#savedHistory(stored, {
-        signal: signal ?? this.#shutdownController.signal,
-        cancelQueuedOnly: signal === undefined,
-      });
-      if (signal?.aborted) throw signal.reason;
-      return this.#identityForHistory(history);
-    } catch (error) {
-      if (signal?.aborted) throw error;
-      // Without a complete saved baseline, native messages stay unmatched in the client.
-      return { known: false, counts: new Map() };
-    }
   }
 
   #observeRuntime(sessionId: string, runtime: PiProcess): void {
@@ -1803,11 +1870,17 @@ export class SessionService {
     if (runtime) this.#scheduleNativeStateRefresh(sessionId, event.executionId, runtime);
   }
 
-  async #refreshNativeHistory(sessionId: string, executionId: string): Promise<void> {
-    const history = await this.#savedHistory(this.#stored(sessionId), {
-      signal: this.#shutdownController.signal,
-      cancelQueuedOnly: true,
-    });
+  async #refreshNativeHistory(
+    sessionId: string,
+    executionId: string,
+    snapshot?: SavedHistory,
+  ): Promise<void> {
+    const history =
+      snapshot ??
+      (await this.#savedHistory(this.#stored(sessionId), {
+        signal: this.#shutdownController.signal,
+        cancelQueuedOnly: true,
+      }));
     const record = this.#nativeExecutions.get(sessionId);
     if (record?.info.id !== executionId || record.info.status === "running") return;
     if (!this.#runtimeObservers.has(sessionId)) return;
@@ -1930,13 +2003,24 @@ export class SessionService {
         "directory_changed",
         "The saved project directory now resolves to a different location.",
       );
-    const resumeFile = await this.#history(stored);
-    if (stored.historyExpected && !resumeFile) {
-      this.#catalog.update({ ...stored, updatedAt: this.#now(), error: HISTORY_UNAVAILABLE });
-      this.#publishState(stored.id);
+    const history = await this.#checkHistory(
+      stored,
+      (file) =>
+        readSavedHistory({
+          file,
+          piSessionId: stored.piSessionId,
+          directory: stored.directory,
+          signal: options.signal ?? this.#shutdownController.signal,
+          cancelQueuedOnly: options.signal === undefined,
+        }),
+      false,
+    );
+    if (history.state === "missing")
       throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
-    }
-    const historyIdentity = await this.#captureHistoryIdentity(stored, options.signal);
+    const resumeFile = history.state === "readable" ? history.file : undefined;
+    const historyIdentity = this.#identityForHistory(
+      history.state === "readable" ? history.value : undefined,
+    );
     if (options.signal?.aborted) throw options.signal.reason;
     let runtime: PiProcess;
     try {
@@ -1976,6 +2060,24 @@ export class SessionService {
           "runtime_mismatch",
           "Pi did not use the requested session and model selection.",
         );
+      let sessionFile: string;
+      try {
+        sessionFile =
+          (await this.#sessionFiles.resolve({ ...stored, piSessionFile: state.sessionFile })) ??
+          state.sessionFile;
+      } catch {
+        throw new SessionError(
+          503,
+          "runtime_mismatch",
+          "Pi did not use a session file inside this Dwell session.",
+        );
+      }
+      if (resumeFile !== undefined && sessionFile !== resumeFile)
+        throw new SessionError(
+          503,
+          "runtime_mismatch",
+          "Pi did not reopen the validated saved session file.",
+        );
       if (
         resumeFile === undefined &&
         stored.thinkingLevel !== null &&
@@ -1994,16 +2096,17 @@ export class SessionService {
             (stored.model !== null && state.model.id !== stored.model)))
       )
         throw new SessionError(503, "runtime_mismatch", "Pi did not restore the saved session.");
+      const latest = this.#stored(stored.id);
       const ready: StoredSession = {
-        ...stored,
+        ...latest,
         provider: state.model.provider,
         model: state.model.id,
         thinkingLevel: state.thinkingLevel,
         status: "ready",
         updatedAt: this.#now(),
         error: null,
-        piSessionFile: state.sessionFile,
-        historyExpected: stored.historyExpected || resumeFile !== undefined,
+        piSessionFile: sessionFile,
+        historyExpected: latest.historyExpected,
       };
       this.#catalog.update(ready);
       this.#publishState(stored.id);
@@ -2017,31 +2120,29 @@ export class SessionService {
     }
   }
 
-  async #rememberHistory(stored: StoredSession, runtime: PiProcess): Promise<void> {
-    if (runtime.state === "failed" || runtime.state === "exited") return;
-    const state = await runtime.getState();
-    const current = {
-      ...this.#stored(stored.id),
-      piSessionFile: state.sessionFile ?? stored.piSessionFile,
-    };
-    const file = await this.#history(current);
+  async #rememberHistory(
+    stored: StoredSession,
+    runtime: PiProcess,
+  ): Promise<CheckedHistory<SavedHistory>> {
     const latest = this.#stored(stored.id);
-    try {
-      this.#catalog.update({
-        ...latest,
-        piSessionFile: current.piSessionFile,
-        historyExpected: latest.historyExpected || file !== undefined,
-        error: latest.historyExpected && file === undefined ? HISTORY_UNAVAILABLE : latest.error,
-        updatedAt: this.#now(),
-      });
-      this.#publishState(stored.id);
-    } catch {
-      this.#storageFault(stored.id);
-      throw new SessionError(
-        503,
-        "storage_unavailable",
-        "Session history metadata could not be saved.",
-      );
-    }
+    const state =
+      runtime.state === "failed" || runtime.state === "exited"
+        ? undefined
+        : await runtime.getState();
+    const current = {
+      ...latest,
+      piSessionFile: state?.sessionFile ?? latest.piSessionFile,
+    };
+    await this.#historyCheckCheckpoint?.("runtime-state-read");
+    const checked = await this.#checkHistory(current, (file) =>
+      readSavedHistory({
+        file,
+        piSessionId: current.piSessionId,
+        directory: current.directory,
+        signal: this.#shutdownController.signal,
+        cancelQueuedOnly: true,
+      }),
+    );
+    return checked;
   }
 }

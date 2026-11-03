@@ -6,7 +6,7 @@
 
 [实现文档索引](README.md) · [Session service](sessions.md) · [Dwell/Pi integration 概览](../runtime.md)
 
-History 处理由四个 module 协作。`pi-history.ts` 读取并验证 Pi native JSONL session file，固定 byte-prefix revision；`sessions/history.ts` 沿 Pi session 的 active branch 生成有界 client page；`message-identity.ts` 在 saved/live view 间匹配完整 assistant message；`pi-history-budget.ts` 限制并发文件扫描。
+History 处理由五个 module 协作。`sessions/files.ts` 定位 session 所属的文件；`pi-history.ts` 读取并验证 Pi native JSONL session file，固定 byte-prefix revision；`sessions/history.ts` 沿 Pi session 的 active branch 生成有界 client page；`message-identity.ts` 在 saved/live view 间匹配完整 assistant message；`pi-history-budget.ts` 限制并发文件扫描。
 
 <a id="native-jsonl-snapshot-and-validation"></a>
 
@@ -23,6 +23,12 @@ History 处理由四个 module 协作。`pi-history.ts` 读取并验证 Pi nativ
 [`readSavedHistorySnapshot`](../../../../../src/runtime/pi-history.ts#L270) 使用 `O_NOFOLLOW | O_NONBLOCK` 打开文件；读取前检查 owner、hard link 和 file identity，再决定 byte boundary。未 pin 的读取以首次观察到的文件大小为准，期间普通 append 不会扩展本次 snapshot。Cursor read 使用记录的 prefix 长度；若文件变短则认定已变化。读取后再次 stat；如果 metadata 改变，会从同一 boundary 重读，要求内容一致且 identity 稳定，随后再次校验 path identity。Revision 只基于完整 newline-terminated bytes。Pinned prefix 必须落在完整行 boundary 且 revision 仍匹配后才能解析。末尾未完成的一行会忽略并设置 `incompleteTail`；损坏的完整行则报错。底层文件错误统一转换为 `HistoryReadError`，file handle 在 `finally` 关闭。
 
 [`readSavedHistory`](../../../../../src/runtime/pi-history.ts#L336) 验证可选 prefix，在共享 history budget 下执行扫描，并把 queue overflow 转为 `history_busy`。这样 scan admission 与文件解析分离，同时让所有调用受同一个 Dwell host-process 级上限约束。
+
+<a id="session-file-resolution"></a>
+
+## Session file 定位
+
+[`SessionFiles`](../../../../../src/sessions/files.ts) 的 constructor 保存 Dwell sessions directory。`resolve` 使用已记录的 Pi path；path 尚未记录时，只在所属 Dwell session directory 内查找匹配 Pi session ID 的唯一 JSONL。若已记录的 path 尚未生成、且 history 从未被预期或观察到，`resolve` 也允许重新发现 Pi 分配的文件名。`nestedPath` 检查 path 的从属关系；目录替换、逃逸或多个匹配项由 `SessionFileError` 报告。缺失文件返回 `undefined`，由 service 结合已保存的 observation 与 dispatch expectation 判断状态。完整的 header、cwd、session ID 和 JSONL 内容验证由现有 `readSavedHistory` 完成。
 
 <a id="history-scan-budget"></a>
 

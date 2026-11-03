@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { SessionService } from "../src/sessions/service.ts";
+import { SessionService, type SessionServiceOptions } from "../src/sessions/service.ts";
 import { SessionCatalog } from "../src/storage/catalog.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
@@ -17,6 +17,7 @@ async function setup(
   t: TestContext,
   options: {
     extraExtensions?: readonly string[];
+    turnCheckpoint?: SessionServiceOptions["turnCheckpoint"];
     environment?: (
       environment: Awaited<ReturnType<typeof createPiEnvironment>>,
     ) => Record<string, string>;
@@ -27,6 +28,7 @@ async function setup(
     dataDir: join(env.root, "dwell"),
     env: { ...env.env, ...(options.environment?.(env) ?? {}) },
     extensions: [env.extensionPath, ...(options.extraExtensions ?? [])],
+    ...(options.turnCheckpoint ? { turnCheckpoint: options.turnCheckpoint } : {}),
   };
   const service = await SessionService.create(serviceOptions);
   t.after(async () => {
@@ -273,6 +275,118 @@ test("cancel during dispatch preparation preserves an empty session; completion 
     (value) => value.status === "completed",
   );
   assert.equal(completed.cancellationRequested, true);
+});
+
+test("known history remains unavailable when it disappears during a pending first turn", {
+  timeout: 20_000,
+}, async (t) => {
+  let holdDispatch = false;
+  let enteredDispatch!: () => void;
+  let releaseDispatch!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    enteredDispatch = resolve;
+  });
+  const barrier = new Promise<void>((resolve) => {
+    releaseDispatch = resolve;
+  });
+  const { service, session, options } = await setup(t, {
+    turnCheckpoint: async (point) => {
+      if (holdDispatch && point === "dispatching") {
+        holdDispatch = false;
+        enteredDispatch();
+        await barrier;
+      }
+    },
+  });
+  const seed = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await until(
+    () => service.getTurn(session.id, seed.turn.runId),
+    (value) => value.status === "completed",
+  );
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const stored = catalog.get(session.id);
+  assert.ok(stored?.piSessionFile);
+  catalog.update({ ...stored, historyExpected: false });
+  catalog.close();
+
+  holdDispatch = true;
+  const next = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await entered;
+  try {
+    await unlink(stored.piSessionFile);
+    await assert.rejects(service.getHistory(session.id), /unavailable/i);
+    assert.equal(service.getSession(session.id).historyState, "unavailable");
+    await service.abortTurn(session.id, next.turn.runId);
+  } finally {
+    releaseDispatch();
+  }
+  await until(
+    () => service.getSession(session.id),
+    (value) => value.activeTurnId === null,
+  );
+});
+
+test("handled input cannot complete after previously readable history disappears", {
+  timeout: 20_000,
+}, async (t) => {
+  let holdDispatch = false;
+  let enteredDispatch!: () => void;
+  let releaseDispatch!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    enteredDispatch = resolve;
+  });
+  const barrier = new Promise<void>((resolve) => {
+    releaseDispatch = resolve;
+  });
+  const { service, session, options } = await setup(t, {
+    extraExtensions: [handledExtension],
+    turnCheckpoint: async (point) => {
+      if (holdDispatch && point === "dispatching") {
+        holdDispatch = false;
+        enteredDispatch();
+        await barrier;
+      }
+    },
+  });
+  const seed = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await until(
+    () => service.getTurn(session.id, seed.turn.runId),
+    (value) => value.status === "completed",
+  );
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const stored = catalog.get(session.id);
+  assert.ok(stored?.piSessionFile);
+  catalog.update({ ...stored, historyExpected: false });
+  catalog.close();
+
+  holdDispatch = true;
+  const next = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "handled-noop",
+  });
+  await entered;
+  try {
+    await unlink(stored.piSessionFile);
+  } finally {
+    releaseDispatch();
+  }
+
+  const handled = await until(
+    () => service.getTurn(session.id, next.turn.runId),
+    (value) => !["accepted", "dispatching", "running"].includes(value.status),
+  );
+  assert.equal(handled.status, "interrupted");
+  assert.equal(handled.error?.code, "history_unavailable");
+  assert.equal(service.getSession(session.id).historyState, "unavailable");
 });
 
 test("extension-handled input completes without model work and leaves an empty session reopenable", async (t) => {

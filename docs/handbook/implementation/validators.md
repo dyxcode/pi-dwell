@@ -22,9 +22,11 @@ Source / verification: [src/shared/sessions.ts](../../../src/shared/sessions.ts)
 
 `isSessionInfo` checks both UUIDs, directory, paired nullable provider/model, nullable supported thinking level, safe-integer timestamps, lifecycle/runtime/history enums, error, and active/latest turn references. A `ready` session must have a provider and model. The guard permits extra top-level fields. Optional native execution is delegated to `isNativeExecutionInfo`, which instead requires exactly id/status/error, a UUID, an allowed terminal/running state, and at most 2,048 UTF-8 bytes of error text. An ephemeral native execution ID is not a durable turn request ID.
 
+`isHistoryCheck` validates an observation with exactly `state` and `checkedAt`: state is `not-created`, `readable`, `missing`, or `invalid`, and time is a safe integer. `isSessionInfo` permits this field to be absent, meaning unchecked.
+
 `isSessionModelRequest` rejects arrays and unknown keys, requires provider/model of at most 200/300 characters, and optionally accepts a valid thinking level. Explicitly supplied invalid thinking values fail; omission is different from `null`. For example, a request with a provider but no model fails before any model mutation.
 
-Source / verification: [`isSessionInfo`](../../../src/shared/sessions.ts#L61) · [`isSessionModelRequest`](../../../src/shared/sessions.ts#L131) · [tests/session-models.test.ts](../../../tests/session-models.test.ts)
+Source / verification: [`isSessionInfo`](../../../src/shared/sessions.ts#L70) · [`isSessionModelRequest`](../../../src/shared/sessions.ts#L157) · [tests/session-models.test.ts](../../../tests/session-models.test.ts)
 
 <a id="turns"></a>
 
@@ -82,7 +84,7 @@ Source / verification: [`isHistoryPage`](../../../src/shared/history.ts#L167) ·
 
 `isLiveMessageDelta` checks the message UUID, bounded text and optional block descriptor. A thinking delta must leave the ordinary text empty and put content in block.text. `isLiveTool` validates tool identity, optional call/owner/order metadata, bounded name/input/output, status and truncation. `isLiveProjection` combines a nullable message with at most eight tools and an aggregate truncation flag. These guards validate one representation; stream ordering and reconciliation are handled by the event consumer.
 
-Source / verification: [`isLiveMessage`](../../../src/shared/events.ts#L251) · [`isLiveMessageDelta`](../../../src/shared/events.ts#L331) · [tests/events.test.ts](../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../tests/web-events.test.ts)
+Source / verification: [`isLiveMessage`](../../../src/shared/events.ts#L252) · [`isLiveMessageDelta`](../../../src/shared/events.ts#L332) · [tests/events.test.ts](../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../tests/web-events.test.ts)
 
 <a id="stream-frame"></a>
 
@@ -94,7 +96,7 @@ A snapshot validates the session, nullable active/latest turn projections, live 
 
 Ordinary events have sessionId/runId/cursor/type/payload. Session and turn updates cross-check payload identities; message/tool variants delegate to the relevant guards. Projection-limit frames require an allowed scope and a positive safe-integer limit. Projection/stream errors carry bounded code/message. Each non-snapshot frame fits 64 KiB; an unknown type fails. For example, a correctly shaped turn for another session fails the identity cross-check, while a valid resync deliberately cannot be treated as a replayable cursor-bearing event.
 
-Source / verification: [`isStreamFrame`](../../../src/shared/events.ts#L421) · [tests/events.test.ts](../../../tests/events.test.ts) · [tests/events-http.test.ts](../../../tests/events-http.test.ts)
+Source / verification: [`isStreamFrame`](../../../src/shared/events.ts#L422) · [tests/events.test.ts](../../../tests/events.test.ts) · [tests/events-http.test.ts](../../../tests/events-http.test.ts)
 
 <a id="host"></a>
 

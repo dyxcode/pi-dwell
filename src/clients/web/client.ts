@@ -415,6 +415,16 @@ function label(s: SessionInfo): string {
     .filter(Boolean)
     .join(" · ");
 }
+function savedHistoryWarning(s: SessionInfo): string | null {
+  switch (s.historyCheck?.state) {
+    case "missing":
+      return "Saved history is missing";
+    case "invalid":
+      return "Saved history is invalid";
+    default:
+      return null;
+  }
+}
 function runtimeOpen(s: SessionInfo): boolean {
   return s.runtimeState !== "closed";
 }
@@ -450,6 +460,7 @@ type TabStatus = "ready" | "working" | "attention" | "stopped" | "opening";
 function tabStatus(s: SessionInfo): TabStatus {
   const value = status(s);
   if (value === "Working" || value === "Stopping") return "working";
+  if (savedHistoryWarning(s) !== null) return "attention";
   if (value === "Failed" || value === "Interrupted") return "attention";
   if (value === "Stopped") return "stopped";
   if (value === "Opening") return "opening";
@@ -551,8 +562,9 @@ function navigation(): void {
     const row = node("button", "", `name-row${s.id === selected ? " active" : ""}`);
     row.type = "button";
     row.dataset.sessionId = s.id;
-    row.title = label(s);
-    row.setAttribute("aria-label", label(s));
+    const history = savedHistoryWarning(s);
+    row.title = history === null ? label(s) : `${label(s)}\n${history}`;
+    row.setAttribute("aria-label", history === null ? label(s) : `${label(s)}, ${history}`);
     row.setAttribute("aria-current", String(s.id === selected && runtimeOpen(s)));
     row.disabled = !authenticated || attachments.busy || openingSessions.has(s.id);
     row.append(
@@ -570,7 +582,8 @@ function navigation(): void {
       selectedTab = s.id === selected,
       armed = selectedTab && closeArmedSession === s.id,
       symbol = tabStatus(s),
-      description = tabStatusLabel(symbol);
+      description = tabStatusLabel(symbol),
+      history = savedHistoryWarning(s);
     const tab = node(
       "div",
       "",
@@ -581,9 +594,9 @@ function navigation(): void {
     selectButton.type = "button";
     selectButton.setAttribute(
       "aria-label",
-      `Session ${number}, ${description}${selectedTab ? ", selected. Activate to show close." : ""}`,
+      `Session ${number}, ${description}${history === null ? "" : `, ${history}`}${selectedTab ? ", selected. Activate to show close." : ""}`,
     );
-    selectButton.title = `Session ${number} · ${description}\n${s.directory}`;
+    selectButton.title = `Session ${number} · ${description}${history === null ? "" : `\n${history}`}\n${s.directory}`;
     selectButton.setAttribute("aria-current", String(selectedTab));
     selectButton.disabled = attachments.busy || closeDialog.open;
     selectButton.append(node("span", number));

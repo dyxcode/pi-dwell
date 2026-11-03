@@ -8,21 +8,23 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/workflow-messa
 
 ## Starting state and the browser decision
 
-Assume an authenticated browser has selected a Dwell session and composed ordinary text or valid image drafts. `submit` first checks selection and conflicting local operations. If a Dwell request or extension-initiated Pi work is already executing, the same control follows the appropriate stop path instead of creating another prompt. Otherwise it takes the current text/images, checks image readiness/capability, and forms a request that can be retried with the same identity.
+Assume an authenticated browser has selected a Dwell session and composed ordinary text or valid image drafts. `submit` first retrieves the selected session. It returns immediately if no session is selected, the browser is still handling a previous send or stop request, or that session's model is being changed. If a Dwell request or extension-initiated Pi work is already executing, the same control follows the appropriate stop path instead of creating another prompt. Otherwise it takes the current text/images, checks image readiness/capability, and forms a request that can be retried with the same identity.
 
-The browser keeps an unconfirmed pending submission when transport fails ambiguously. Retry resends the frozen pending payload and request ID, even if the draft subsequently changes; a different session cannot submit until that pending attempt is resolved. Making a new ID would represent new work. An explicit server rejection is different from a network failure after admission. Input whitespace is retained in the submitted content. Attachments are drafts until submitted; see [browser input](browser-input.md).
+If a network error or an invalid response prevents the browser from confirming whether the host accepted the message, it retains that submission's request ID, text and images. While confirmation is pending, that session's input is read-only, attachment changes are disabled, and other sessions cannot submit. Retry sends the retained request ID and content so the host can recognize a duplicate and return the existing turn.
 
-Source / verification: [`submit`](../../../src/clients/web/client.ts#L1705) · [tests/web-client.test.ts](../../../tests/web-client.test.ts) · [tests/images-http.test.ts](../../../tests/images-http.test.ts)
+A valid HTTP success response, or an SSE update identifying the same session and request ID, confirms acceptance and clears the pending submission, text draft and attachments. A 4xx rejection other than 408 clears the pending submission; the draft remains available for editing and a later submission gets a new request ID. A 401 instead returns the browser to pairing and disposes attachment drafts. Submitted text retains its original whitespace. See [browser input](browser-input.md) for attachment handling.
+
+Source / verification: [`submit`](../../../src/clients/web/client.ts#L1718) · [`navigation`](../../../src/clients/web/client.ts#L554) · [`stream`](../../../src/clients/web/client.ts#L1412) · [tests/web-client.test.ts](../../../tests/web-client.test.ts) · [tests/images-http.test.ts](../../../tests/images-http.test.ts)
 
 <a id="admission"></a>
 
 ## HTTP admission and durable acceptance
 
-HTTP validates authority, authentication and the bounded request body before calling `SessionService.submitTurn`. The shared guard checks exact turn keys, UUID, message and images. The service revalidates the request within its mutation queue, computes payload identity from the exact message plus images, and looks up an existing request for this session. A matching identity returns the existing turn; a different payload with the same request ID returns request_conflict.
+HTTP validates authority, authentication and the bounded request body before calling `SessionService.submitTurn`. The HTTP handler calls the shared [`isTurnCreateRequest`](../../../src/shared/turns.ts#L85) function to check that the request contains only the required `requestId` and `message` fields and optional `images`. It validates the request ID as a UUID, checks the message length and slash-command restriction, and validates image format, count and size. The request must contain non-whitespace text or at least one image. The service revalidates the request within its mutation queue, computes payload identity from the exact message plus images, and looks up an existing request for this session. A matching identity returns the existing turn; a different payload with the same request ID returns request_conflict.
 
 For new work, the service rejects a storage fault, another active turn or native execution, and missing Pi executable configuration. It inserts an accepted turn into SQLite, reserves an in-memory active slot, publishes state and schedules execution with `setImmediate`. The HTTP route acknowledges acceptance with 202 for a new turn and returns 200 for an existing matching request. Request deduplication comes before busy checks so an accepted request can still be recovered while it is executing.
 
-Source / verification: [`startHost`](../../../src/server/http.ts#L102) · [`SessionService.submitTurn`](../../../src/sessions/service.ts#L882) · [`turnPayloadIdentity`](../../../src/sessions/service.ts#L81) · [tests/turns.test.ts](../../../tests/turns.test.ts) · [tests/turns-http.test.ts](../../../tests/turns-http.test.ts)
+Source / verification: [`startHost`](../../../src/server/http.ts#L102) · [`SessionService.submitTurn`](../../../src/sessions/service.ts#L906) · [`turnPayloadIdentity`](../../../src/sessions/service.ts#L85) · [tests/turns.test.ts](../../../tests/turns.test.ts) · [tests/turns-http.test.ts](../../../tests/turns-http.test.ts)
 
 <a id="dispatch"></a>
 
@@ -34,7 +36,7 @@ The catalog transaction changes the turn to dispatching and records that history
 
 The long model run is not held inside a database transaction or the global mutation queue. The per-session slot still prevents overlapping admitted work while other session operations can proceed.
 
-Source / verification: [`SessionService.#executeTurn`](../../../src/sessions/service.ts#L1139) · [`SessionCatalog.markTurnDispatching`](../../../src/storage/catalog.ts#L781) · [tests/turn-recovery.test.ts](../../../tests/turn-recovery.test.ts) · [tests/history-cancellation.test.ts](../../../tests/history-cancellation.test.ts)
+Source / verification: [`SessionService.#executeTurn`](../../../src/sessions/service.ts#L1165) · [`SessionCatalog.markTurnDispatching`](../../../src/storage/catalog.ts#L845) · [tests/turn-recovery.test.ts](../../../tests/turn-recovery.test.ts) · [tests/history-cancellation.test.ts](../../../tests/history-cancellation.test.ts)
 
 <a id="execution"></a>
 
@@ -44,7 +46,7 @@ Source / verification: [`SessionService.#executeTurn`](../../../src/sessions/ser
 
 Started prompts transition the durable turn to running. Handled prompts may have been consumed by an extension without a standard assistant response; the service detaches that turn's event observer and completes the handled path from saved evidence. Independent extension follow-up work is observed as native execution, not relabeled as the user's durable turn. The browser can receive updates before the original POST returns. Its submission, event and refresh paths therefore maintain separate in-flight and observed state; see the browser controller chapter for their ordering.
 
-Source / verification: [`PiProcess.startRun`](../../../src/runtime/pi-process.ts#L578) · [`SessionService.#completeHandledTurn`](../../../src/sessions/service.ts#L1326) · [tests/runtime.test.ts](../../../tests/runtime.test.ts) · [tests/native-executions.test.ts](../../../tests/native-executions.test.ts)
+Source / verification: [`PiProcess.startRun`](../../../src/runtime/pi-process.ts#L578) · [`SessionService.#completeHandledTurn`](../../../src/sessions/service.ts#L1348) · [tests/runtime.test.ts](../../../tests/runtime.test.ts) · [tests/native-executions.test.ts](../../../tests/native-executions.test.ts)
 
 <a id="results"></a>
 
@@ -56,7 +58,7 @@ After settlement the service waits for any outstanding abort attempt, remembers 
 
 The browser normally renders paginated history together with the live projection. It replaces live content when native identities prove matching saved content, and clears remaining live data only when saved coverage is established. [Observation workflow](workflow-observation.md) explains why settlement alone is not sufficient.
 
-Source / verification: [`SessionService.#executeTurn`](../../../src/sessions/service.ts#L1139) · [`SessionService.getTurnResult`](../../../src/sessions/service.ts#L964) · [tests/turns.test.ts](../../../tests/turns.test.ts) · [tests/history-service.test.ts](../../../tests/history-service.test.ts)
+Source / verification: [`SessionService.#executeTurn`](../../../src/sessions/service.ts#L1165) · [`SessionService.getTurnResult`](../../../src/sessions/service.ts#L988) · [tests/turns.test.ts](../../../tests/turns.test.ts) · [tests/history-service.test.ts](../../../tests/history-service.test.ts)
 
 <a id="failures"></a>
 
@@ -73,4 +75,4 @@ Source / verification: [`SessionService.#executeTurn`](../../../src/sessions/ser
 
 For example, a tool could have modified a file before Pi or Dwell crashed, leaving a side effect without a final reply. Request deduplication prevents a second admission with the same identity; tool effects occur outside that transaction.
 
-Source / verification: [`SessionService.abortTurn`](../../../src/sessions/service.ts#L1014) · [`SessionService.#storageFault`](../../../src/sessions/service.ts#L496) · [tests/turn-recovery.test.ts](../../../tests/turn-recovery.test.ts) · [tests/turns-http.test.ts](../../../tests/turns-http.test.ts)
+Source / verification: [`SessionService.abortTurn`](../../../src/sessions/service.ts#L1040) · [`SessionService.#storageFault`](../../../src/sessions/service.ts#L509) · [tests/turn-recovery.test.ts](../../../tests/turn-recovery.test.ts) · [tests/turns-http.test.ts](../../../tests/turns-http.test.ts)

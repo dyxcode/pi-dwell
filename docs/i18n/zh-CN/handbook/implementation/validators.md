@@ -22,9 +22,11 @@ Source / verification：[src/shared/sessions.ts](../../../../../src/shared/sessi
 
 `isSessionInfo` 检查两个 UUID、directory、成对可空的 provider/model、可空且受支持的 thinking level、safe-integer timestamps、lifecycle/runtime/history enums、error，以及 active/latest turn references。`ready` session 必须有 provider 和 model。该 guard 允许额外 top-level fields。可选 native execution 交给 `isNativeExecutionInfo`：它要求准确的 id/status/error keys、UUID、允许的 running/terminal state，以及最多 2,048 UTF-8 bytes 的 error。Ephemeral native execution ID 不代表 durable turn request。
 
+`isHistoryCheck` 验证恰好包含 `state` 与 `checkedAt` 的 observation：state 为 `not-created`、`readable`、`missing` 或 `invalid`，时间为 safe integer。`isSessionInfo` 允许省略此字段；省略表示尚未检查。
+
 `isSessionModelRequest` 拒绝 arrays 和未知 keys，要求 provider/model 分别不超过 200/300 characters，并允许省略 thinking level。显式传入无效 thinking value 会失败；省略与 `null` 不同。例如只指定 provider 而无 model，会在 model mutation 之前被拒绝。
 
-Source / verification：[`isSessionInfo`](../../../../../src/shared/sessions.ts#L61) · [`isSessionModelRequest`](../../../../../src/shared/sessions.ts#L131) · [tests/session-models.test.ts](../../../../../tests/session-models.test.ts)
+Source / verification：[`isSessionInfo`](../../../../../src/shared/sessions.ts#L70) · [`isSessionModelRequest`](../../../../../src/shared/sessions.ts#L157) · [tests/session-models.test.ts](../../../../../tests/session-models.test.ts)
 
 <a id="turns"></a>
 
@@ -82,7 +84,7 @@ Source / verification：[`isHistoryPage`](../../../../../src/shared/history.ts#L
 
 `isLiveMessageDelta` 检查 message UUID、bounded text 与可选 block descriptor。Thinking delta 必须让普通 text 为空，把内容放在 block.text。`isLiveTool` 检查 tool identity、可选 call/owner/order metadata、bounded name/input/output、status 与 truncation。`isLiveProjection` 组合 nullable message、最多八个 tools 和 aggregate truncation flag。这些 guards 验证单次 representation；stream ordering 与 reconciliation 由 event consumer 处理。
 
-Source / verification：[`isLiveMessage`](../../../../../src/shared/events.ts#L251) · [`isLiveMessageDelta`](../../../../../src/shared/events.ts#L331) · [tests/events.test.ts](../../../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
+Source / verification：[`isLiveMessage`](../../../../../src/shared/events.ts#L252) · [`isLiveMessageDelta`](../../../../../src/shared/events.ts#L332) · [tests/events.test.ts](../../../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
 
 <a id="stream-frame"></a>
 
@@ -94,7 +96,7 @@ Snapshot 验证 session、nullable active/latest turn projections、live content
 
 普通 events 包含 sessionId/runId/cursor/type/payload。Session/turn updates 交叉检查 payload identities；message/tool variants 调用相应 guards。Projection-limit frames 要求允许的 scope 和正 safe-integer limit；projection/stream errors 使用 bounded code/message。每个非 snapshot frame 最多 64 KiB，未知 type 失败。例如另一个 session 的 turn 即使 shape 正确，也无法通过 identity check；合法 resync 则刻意没有可用于 replay 的 cursor。
 
-Source / verification：[`isStreamFrame`](../../../../../src/shared/events.ts#L421) · [tests/events.test.ts](../../../../../tests/events.test.ts) · [tests/events-http.test.ts](../../../../../tests/events-http.test.ts)
+Source / verification：[`isStreamFrame`](../../../../../src/shared/events.ts#L422) · [tests/events.test.ts](../../../../../tests/events.test.ts) · [tests/events-http.test.ts](../../../../../tests/events-http.test.ts)
 
 <a id="host"></a>
 

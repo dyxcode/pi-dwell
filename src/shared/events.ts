@@ -202,6 +202,7 @@ function isSession(value: unknown): value is SessionInfo {
     hasExactKeys(value, [
       ...SESSION_KEYS,
       ...(Object.hasOwn(value, "nativeExecution") ? ["nativeExecution"] : []),
+      ...(Object.hasOwn(value, "historyCheck") ? ["historyCheck"] : []),
     ]) &&
     isSessionInfo(value)
   );

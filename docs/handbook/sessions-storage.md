@@ -37,14 +37,16 @@ flowchart TD
 
 ## The durable catalog
 
-[`SessionCatalog`](../../src/storage/catalog.ts) owns Dwell's SQLite file and validates both its schema and every decoded record. The current schema is version 4. All statements use Node's synchronous `DatabaseSync`; SQL values are parameterized for data writes.
+[`SessionCatalog`](../../src/storage/catalog.ts) owns Dwell's SQLite file and validates both its schema and every decoded record. The current schema is version 5. All statements use Node's synchronous `DatabaseSync`; SQL values are parameterized for data writes.
+
+Schema v5 adds nullable `history_check_state` and `history_checked_at`; migrated sessions remain unchecked until their next read. See [catalog migration](implementation/catalog.md#catalog-schema-and-migrations).
 
 ### Tables and invariants
 
 | Table | Stored values and constraints |
 | --- | --- |
 | `runtime_configuration` | A single optional row (`singleton = 1`) with the canonical Pi executable and optional entry point. |
-| `sessions` | Dwell ID, unique creation request ID, request payload identity, canonical project directory, nullable provider/model pair, optional thinking level, Pi session ID and file, `history_expected`, durable status, timestamps, and an optional error. A `ready` row must have provider and model. |
+| `sessions` | Dwell ID, unique creation request ID, request payload identity, canonical project directory, nullable provider/model pair, optional thinking level, Pi session ID and file, `history_expected`, last history check state/time, durable status, timestamps, and an optional error. A `ready` row must have provider and model. |
 | `turns` | Run, session, and request IDs; SHA-256 payload identity; status; cancellation flag; timestamps; optional paired error code/message; and a JSON array of native entry IDs. `(session_id, request_id)` is unique, and a partial unique index permits at most one `accepted`, `dispatching`, or `running` turn for a session. `session_id` references `sessions(id)`. |
 
 The TypeScript validators require exact object keys for stored sessions and turns. Database decoding rejects wrong SQLite types, unsafe integers, invalid enum values, malformed entry ID JSON, non-SHA-256 turn payload identities, incomplete error pairs, invalid UUID-backed `TurnInfo`, and unknown session or turn states. A validation failure does not coerce data into a plausible record.
@@ -81,7 +83,7 @@ Terminal turns cannot transition again. `updateTurn()` checks that request ID, p
 
 `SessionCatalog.open(dataDir)` first uses `prepareDataDirectory()`, then creates `catalog.sqlite` as an owner-only file if absent. Before SQLite opens it, Dwell checks that the database is a regular, current-user-owned, single-link file with mode `0600`, using no-follow/nonblocking open flags. SQLite opens with foreign keys enabled, big integer reads, and extensions disabled. Initialization uses `DELETE` journal mode and `synchronous = FULL`.
 
-Schema initialization is one transaction. Version 0 is accepted only when there is no user schema, then creates the current version directly. Versions 1, 2, and 3 are checked against their exact expected schema SQL before transactional migration to version 4. Version 1 first adds the turn table and active-turn index, then applies the later migrations. Version 2 becomes version 3 before version 4. Version 3 adds the nullable `thinking_level` session field. Migrations verify the resulting schema and run `PRAGMA foreign_key_check` before commit. Unsupported versions, a mismatched schema, preserved rows that violate the turn/session foreign key, or failed migration checks are rolled back and reported as an invalid/unsupported catalog; startup does not reset the file.
+Schema initialization is one transaction. Version 0 is accepted only when there is no user schema, then creates the current version directly. Versions 1, 2, 3, and 4 are checked against their exact expected schema SQL before transactional migration through version 5. Version 1 first adds the turn table and active-turn index, then applies the later migrations. Version 2 becomes version 3 before version 4. Version 3 adds the nullable `thinking_level` session field. Migrations verify the resulting schema and run `PRAGMA foreign_key_check` before commit. Unsupported versions, a mismatched schema, preserved rows that violate the turn/session foreign key, or failed migration checks are rolled back and reported as an invalid/unsupported catalog; startup does not reset the file.
 
 `prepareDataDirectory()` requires an owner-only `0700` directory. The native Pi session JSONL can keep Pi's usual 0644 mode because its containing Dwell session directory is private. The catalog's SQLite durability and Pi's JSONL durability are separate: a transaction cannot atomically commit both files.
 
@@ -126,7 +128,7 @@ For a new request the service requires a configured Pi runtime, canonicalizes th
 1. Reject an already-aborted request. Return the existing runtime if it is ready; report a busy conflict if it is running.
 2. Prune failed or exited runtimes, enforce the eight-open-session limit, require Pi configuration, and re-resolve the stored directory. If its canonical path changed since creation, opening returns `directory_changed` and leaves the stored project path unchanged.
 3. Locate the known Pi file, or discover at most one file that matches this session's Pi ID. Verify that it remains inside the owning Dwell session directory and that its v3 header identifies the expected Pi session and project.
-4. If `historyExpected` is true but the saved file is missing, opening marks the error and fails with `history_unavailable` (410); the session remains tied to its expected transcript.
+4. If `historyExpected` is true but the saved file is missing, opening records a missing observation and fails with `history_unavailable` (410); the session remains tied to its expected transcript.
 5. Capture a complete assistant-message identity baseline from saved history when possible. An absent or incomplete source makes the identity unknown instead of treating later messages as certainly new.
 6. Start a `PiProcess` against the existing file or the stored Pi session ID, and provide provider/model only for a new session. Attach state, native-execution, and passive record observers.
 7. Verify the returned session ID, selected model, and session file. For a new transcript, apply the stored thinking level if needed, except when an extension already began native work during startup. Read state again after any selection change.
@@ -140,7 +142,7 @@ An error after the child starts stops the process, removes observers, and remove
 | --- | --- |
 | `status` | Durable catalog state: `creating`, `ready`, `failed`, or `interrupted`. |
 | `runtimeState` | Current process map projected to `closed`, `opening`, `ready`, `failed`, or `closing`; a running Pi child still projects as public `ready`. |
-| `historyState` | `unavailable` when a persisted missing-history error is present, `available` when the catalog expects a native file, otherwise `empty`. |
+| `historyState` | Last observation maps missing/invalid to `unavailable`, readable to `available`, and not-created to `empty`; unchecked legacy rows use expectation/error. |
 
 The view also exposes selected provider/model/thinking level, Pi session ID, current/latest Dwell turn IDs, and the current or most recent process-local native execution summary. The turn payload hash is omitted from this public view.
 
@@ -219,7 +221,7 @@ Native execution abort requires the current execution ID and verifies it still m
 
 ## Saved history and history projection
 
-Pi's v3 session file is JSONL with a v3 session header followed by entries forming a tree through `id` and `parentId`. The low-level reader and file limits are documented in [runtime.md](runtime.md#saved-history-file-reads). [`SessionService.#history()`](../../src/sessions/service.ts) locates the expected file, confines it to the Dwell-owned session directory, and verifies header session ID, project `cwd`, and version before `HistoryPages` parses it.
+Pi's v3 session file is JSONL with a v3 session header followed by entries forming a tree through `id` and `parentId`. The low-level reader and file limits are documented in [runtime.md](runtime.md#saved-history-file-reads). [`SessionFiles.resolve`](../../src/sessions/files.ts) locates the file inside its owning Dwell session directory. `SessionService.#checkHistory` then invokes the complete JSONL reader to validate the header session ID, project `cwd`, version and entries, and saves the observation.
 
 ### Page and cursor behavior
 

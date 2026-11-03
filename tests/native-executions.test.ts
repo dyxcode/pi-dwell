@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -125,6 +125,40 @@ test("a native extension execution during session startup is observed without re
   );
   const history = await service.getHistory(session.id);
   assert.equal(history.coveredNativeExecutionId, native.id);
+});
+
+test("closing after native work releases Pi when its expected history file was removed", {
+  timeout: 20_000,
+}, async (t) => {
+  const { environment, service, session } = await serviceWithNativePrompt(t, "native close");
+  const { turn } = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await waitFor(
+    () => Promise.resolve(service.getTurn(session.id, turn.runId)),
+    (value) => value.status === "completed",
+    "the Dwell turn to complete",
+  );
+  const native = await waitFor(
+    () => Promise.resolve(nativeExecution(service.getSession(session.id))),
+    (value) => value?.status === "completed",
+    "the native execution to complete",
+  );
+  assert.ok(native);
+  await service.getHistory(session.id);
+
+  const catalog = await SessionCatalog.open(join(environment.root, "dwell"));
+  const file = catalog.get(session.id)?.piSessionFile;
+  catalog.close();
+  assert.ok(file);
+  await unlink(file);
+
+  const closed = await service.closeSession(session.id);
+
+  assert.equal(closed.runtimeState, "closed");
+  assert.equal(service.runtimeCount, 0);
+  assert.equal(service.getSession(session.id).historyState, "unavailable");
 });
 
 test("extension-handled requests retain asynchronous native follow-ups and permit later turns", {

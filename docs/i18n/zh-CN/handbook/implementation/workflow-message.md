@@ -14,7 +14,7 @@
 
 有效的 HTTP success response，或包含相同 session ID 与 request ID 的 SSE update，都可以确认请求已被接受；随后 browser 清除 pending submission、输入框 draft 和附件。收到 408 以外的 4xx rejection 时，browser 解除 pending 状态，保留 draft 供修改，再次提交时生成新的 request ID。401 则会让 browser 返回 pairing，并清理附件 drafts。提交的 text 保留原始空白。附件处理详见 [browser input](browser-input.md)。
 
-Source / verification：[`submit`](../../../../../src/clients/web/client.ts#L2096) · [`navigation`](../../../../../src/clients/web/client.ts#L921) · [`stream`](../../../../../src/clients/web/client.ts#L1783) · [tests/web-client.test.ts](../../../../../tests/web-client.test.ts) · [tests/images-http.test.ts](../../../../../tests/images-http.test.ts)
+Source / verification：[`submit`](../../../../../src/clients/web/client.ts#L2168) · [`navigation`](../../../../../src/clients/web/client.ts#L968) · [`stream`](../../../../../src/clients/web/client.ts#L1837) · [tests/web-client.test.ts](../../../../../tests/web-client.test.ts) · [tests/images-http.test.ts](../../../../../tests/images-http.test.ts)
 
 <a id="admission"></a>
 
@@ -24,7 +24,7 @@ HTTP 在调用 `SessionService.submitTurn` 前检查 authority、authentication 
 
 新工作必须通过 storage fault、active turn/native execution 和 Pi executable configuration 检查。Service 向 SQLite 插入 accepted turn，预留内存 active slot、publish state，并用 `setImmediate` 安排执行。HTTP 以 202 确认接受新 turn，以 200 返回已有的一致 request。Deduplication 位于 busy checks 之前，因此运行期间仍能找回已经接受的 request。
 
-Source / verification：[`startHost`](../../../../../src/server/http.ts#L127) · [`SessionService.submitTurn`](../../../../../src/sessions/service.ts#L999) · [`turnPayloadIdentity`](../../../../../src/sessions/service.ts#L92) · [tests/turns.test.ts](../../../../../tests/turns.test.ts) · [tests/turns-http.test.ts](../../../../../tests/turns-http.test.ts)
+Source / verification：[`startHost`](../../../../../src/server/http.ts#L127) · [`SessionService.submitTurn`](../../../../../src/sessions/service.ts#L1005) · [`turnPayloadIdentity`](../../../../../src/sessions/service.ts#L97) · [tests/turns.test.ts](../../../../../tests/turns.test.ts) · [tests/turns-http.test.ts](../../../../../tests/turns-http.test.ts)
 
 <a id="dispatch"></a>
 
@@ -36,7 +36,7 @@ Catalog transaction 将 turn 设为 dispatching，并记录 history 从此应当
 
 长时间 model run 不被包在 database transaction 或全局 mutation queue 内。Per-session slot 仍阻止重叠 admission，而其他 session operations 可以继续。
 
-Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessions/service.ts#L1258) · [`SessionCatalog.markTurnDispatching`](../../../../../src/storage/catalog.ts#L1060) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/history-cancellation.test.ts](../../../../../tests/history-cancellation.test.ts)
+Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessions/service.ts#L1264) · [`SessionCatalog.markTurnDispatching`](../../../../../src/storage/catalog.ts#L1189) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/history-cancellation.test.ts](../../../../../tests/history-cancellation.test.ts)
 
 <a id="execution"></a>
 
@@ -46,7 +46,7 @@ Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessi
 
 Started prompt 使 durable turn 进入 running。Handled prompt 可能被 extension 消费而不产生标准 assistant response；service 解除该 turn 的 event observer，并依据 saved evidence 完成 handled path。独立 extension follow-up 作为 native execution 观察，不被改称用户的 durable turn。Browser 也可能在 POST 返回前收到 updates，因此 submission、event 与 refresh paths 分别管理 in-flight 与 observed state；具体顺序见 browser controller 章节。
 
-Source / verification：[`PiProcess.startRun`](../../../../../src/runtime/pi-process.ts#L585) · [`SessionService.#completeHandledTurn`](../../../../../src/sessions/service.ts#L1441) · [tests/runtime.test.ts](../../../../../tests/runtime.test.ts) · [tests/native-executions.test.ts](../../../../../tests/native-executions.test.ts)
+Source / verification：[`PiProcess.startRun`](../../../../../src/runtime/pi-process.ts#L585) · [`SessionService.#completeHandledTurn`](../../../../../src/sessions/service.ts#L1447) · [tests/runtime.test.ts](../../../../../tests/runtime.test.ts) · [tests/native-executions.test.ts](../../../../../tests/native-executions.test.ts)
 
 <a id="results"></a>
 
@@ -58,7 +58,7 @@ Settlement 后，service 等待尚未完成的 abort attempt，记录 Pi history
 
 Browser 通常将 paginated history 与 live projection 一起渲染。Native identities 证明内容已保存时逐项替换 live content，只有建立 saved coverage 才清除剩余 live data。[Observation workflow](workflow-observation.md) 解释为何 settlement 本身不够。
 
-Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessions/service.ts#L1258) · [`SessionService.getTurnResult`](../../../../../src/sessions/service.ts#L1081) · [tests/turns.test.ts](../../../../../tests/turns.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
+Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessions/service.ts#L1264) · [`SessionService.getTurnResult`](../../../../../src/sessions/service.ts#L1087) · [tests/turns.test.ts](../../../../../tests/turns.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
 
 <a id="failures"></a>
 
@@ -75,4 +75,4 @@ Source / verification：[`SessionService.#executeTurn`](../../../../../src/sessi
 
 例如 tool 可能已经修改文件，随后 Pi 或 Dwell crash，留下 side effect 而没有 final reply。Request deduplication 防止同一 identity 的再次 admission；tool effects 发生在该 transaction 之外。
 
-Source / verification：[`SessionService.abortTurn`](../../../../../src/sessions/service.ts#L1133) · [`SessionService.#storageFault`](../../../../../src/sessions/service.ts#L594) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/turns-http.test.ts](../../../../../tests/turns-http.test.ts)
+Source / verification：[`SessionService.abortTurn`](../../../../../src/sessions/service.ts#L1139) · [`SessionService.#storageFault`](../../../../../src/sessions/service.ts#L600) · [tests/turn-recovery.test.ts](../../../../../tests/turn-recovery.test.ts) · [tests/turns-http.test.ts](../../../../../tests/turns-http.test.ts)

@@ -1046,6 +1046,58 @@ test("session events and replacement snapshots preserve the newest shared name r
   assert.equal(state.session?.runtimeState, "closed");
 });
 
+test("a retired session event clears saved history and live transcript projections", () => {
+  const latest = turn(RUN_ID, "completed");
+  const initial = reduceFrame(
+    emptyConversationState(SESSION_ID),
+    snapshotFrame(1, {
+      latestTurn: latest,
+      message: {
+        id: MESSAGE_ID,
+        text: "Synthetic live text",
+        finished: true,
+      },
+    }),
+  );
+  const withHistory = {
+    ...initial,
+    history: {
+      sessionId: SESSION_ID,
+      status: "available" as const,
+      revision: "a".repeat(64),
+      leafId: MESSAGE_ID,
+      entries: [historyEntry(MESSAGE_ID, null)],
+      nextCursor: "synthetic-cursor",
+      incompleteTail: false,
+      activeTurnId: null,
+      latestTurnId: RUN_ID,
+      coveredTurnId: RUN_ID,
+      contextSources: [
+        { path: "/tmp/Synthetic.md", content: "Synthetic context", truncated: false },
+      ],
+      contextSourcesTruncated: false,
+    },
+  };
+  const retired = {
+    sessionId: SESSION_ID,
+    runId: null,
+    cursor: cursor(2),
+    type: "session.updated",
+    payload: session(SESSION_ID, {
+      historyState: "unavailable",
+      historyCheck: { state: "retired", checkedAt: 2 },
+      latestTurnId: RUN_ID,
+    }),
+  } satisfies StreamFrame;
+  const result = reduceFrame(withHistory, retired);
+  assert.equal(result.history, null);
+  assert.deepEqual(result.messages, []);
+  assert.deepEqual(result.tools, []);
+  assert.equal(result.liveRunId, null);
+  assert.equal(result.session?.historyCheck?.state, "retired");
+  assert.equal(result.latestTurn?.runId, RUN_ID);
+});
+
 test("saved native identities take over live content while repeated text stays distinct", () => {
   const key = `${"a".repeat(64)}:1`;
   const nextKey = `${"a".repeat(64)}:2`;

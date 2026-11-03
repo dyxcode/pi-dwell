@@ -429,6 +429,15 @@ export class SessionEvents {
     }
   }
 
+  clearHistory(sessionId: string): void {
+    const stream = this.#streams.get(sessionId);
+    if (!stream) return;
+    stream.replay = [];
+    stream.replayBytes = 0;
+    stream.live = emptyLiveState();
+    this.#touch(stream);
+  }
+
   publishTurn(
     session: SessionInfo,
     activeTurn: TurnInfo | null,

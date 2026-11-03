@@ -1,13 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { DistillStorage } from "../integrations/distill.ts";
-import { type OpeningSource, SessionSourceAccess, SourceAccessError } from "./source-access.ts";
 import { realpath, stat } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
-import { prepareDataDirectory } from "../local/files.ts";
 import { type CurrentLibrary, CurrentLibraryError } from "../integrations/current.ts";
+import type { DistillStorage } from "../integrations/distill.ts";
+import { prepareDataDirectory } from "../local/files.ts";
 import { savedMessageKeys } from "../runtime/message-identity.ts";
-import { HistoryReadBudgetError } from "../runtime/pi-history-budget.ts";
 import { HistoryReadError, readSavedHistory, type SavedHistory } from "../runtime/pi-history.ts";
+import { HistoryReadBudgetError } from "../runtime/pi-history-budget.ts";
 import {
   type NativeExecutionEvent,
   type PiEntry,
@@ -28,9 +27,11 @@ import type {
 } from "../shared/discovery.ts";
 import type { StreamFrame } from "../shared/events.ts";
 import type { HistoryPage } from "../shared/history.ts";
-import { isLibraryReference, type LibraryReference } from "../shared/library.ts";
 import type { ImageContent } from "../shared/images.ts";
+import { isLibraryReference, type LibraryReference } from "../shared/library.ts";
 import {
+  type HistoryCheck,
+  type HistoryCheckState,
   isSessionModelRequest,
   isSessionNameRequest,
   type NativeExecutionInfo,
@@ -39,8 +40,6 @@ import {
   type SessionCreateRequest,
   type SessionInfo,
   type SessionModelRequest,
-  type HistoryCheck,
-  type HistoryCheckState,
 } from "../shared/sessions.ts";
 import {
   isModelCapabilitiesRequest,
@@ -56,8 +55,14 @@ import {
   StreamCapacityError,
   SubscriberLimitError,
 } from "./events.ts";
-import { HistoryPages } from "./history.ts";
 import { SessionFileError, SessionFiles } from "./files.ts";
+import { HistoryPages } from "./history.ts";
+import {
+  type MissingSourceObservation,
+  type OpeningSource,
+  SessionSourceAccess,
+  SourceAccessError,
+} from "./source-access.ts";
 
 export class SessionError extends Error {
   readonly status: number;
@@ -236,6 +241,7 @@ export class SessionService {
   readonly #sessionFiles: SessionFiles;
   readonly #sourceAccess: SessionSourceAccess;
   readonly #historyCheckSequences = new Map<string, number>();
+  readonly #historyCheckSavedSequences = new Map<string, number>();
   readonly #reads = new Set<Promise<unknown>>();
   readonly #nativeRefreshes = new Set<Promise<void>>();
   readonly #shutdownController = new AbortController();
@@ -1668,17 +1674,19 @@ export class SessionService {
                 ? "failed"
                 : "closed",
       historyState:
-        stored.historyCheck?.state === "missing" || stored.historyCheck?.state === "invalid"
-          ? "unavailable"
-          : stored.historyCheck?.state === "readable"
-            ? "available"
-            : stored.historyCheck?.state === "not-created"
-              ? "empty"
-              : stored.error === HISTORY_UNAVAILABLE
-                ? "unavailable"
-                : stored.historyExpected
-                  ? "available"
-                  : "empty",
+        stored.historyCheck?.state === "retired"
+          ? "retired"
+          : stored.historyCheck?.state === "missing" || stored.historyCheck?.state === "invalid"
+            ? "unavailable"
+            : stored.historyCheck?.state === "readable"
+              ? "available"
+              : stored.historyCheck?.state === "not-created"
+                ? "empty"
+                : stored.error === HISTORY_UNAVAILABLE
+                  ? "unavailable"
+                  : stored.historyExpected
+                    ? "available"
+                    : "empty",
       ...(stored.historyCheck === null ? {} : { historyCheck: stored.historyCheck }),
       error: this.#storageFaults.has(stored.id)
         ? "Turn state could not be saved. Repair storage and restart the host."
@@ -1743,31 +1751,87 @@ export class SessionService {
       throw error;
     }
     if (file === undefined) {
-      const previous = this.#stored(stored.id).historyCheck?.state;
-      const previouslyObserved =
-        previous === "readable" || previous === "missing" || previous === "invalid";
-      const expected = previouslyObserved || (current.historyExpected && !allowPendingCreation);
-      const state = expected ? "missing" : "not-created";
-      await this.#recordHistoryCheck(current, sequence, state);
+      const state = await this.#recordMissingHistory(current, sequence, allowPendingCreation);
+      if ((this.#historyCheckSavedSequences.get(stored.id) ?? 0) > sequence)
+        return this.#staleMissingHistory(this.#stored(stored.id), allowPendingCreation);
+      if (state === "retired") throw this.#retiredHistoryError();
       return { file: undefined, value: undefined, state };
     }
 
     try {
-      const value = await this.#sourceAccess.read(stored, file, () => read(file));
-      await this.#recordHistoryCheck(stored, sequence, "readable", file);
-      return { file, value, state: "readable" };
+      const previousObservation = this.#catalog.sourceObservation(stored.id);
+      const observation = await this.#sourceAccess.read(
+        current,
+        file,
+        () => read(file),
+        previousObservation?.generation,
+      );
+      const sourceGeneration =
+        observation.sourceGeneration ?? previousObservation?.generation ?? null;
+      const generationChanged =
+        observation.sourceGeneration !== null &&
+        previousObservation?.generation !== undefined &&
+        observation.sourceGeneration !== previousObservation.generation;
+      const deletionIntent =
+        observation.completedDeletion?.intentId ??
+        (generationChanged ? null : (previousObservation?.deletionIntent ?? null));
+      const recorded = await this.#recordHistoryCheck(
+        current,
+        sequence,
+        "readable",
+        file,
+        sourceGeneration === null && deletionIntent === null
+          ? undefined
+          : { generation: sourceGeneration, deletionIntent },
+      );
+      if (!recorded) {
+        const hasNewerObservation =
+          (this.#historyCheckSavedSequences.get(stored.id) ?? 0) > sequence;
+        if (hasNewerObservation) {
+          const latest = this.#stored(stored.id);
+          const latestState = latest.historyCheck?.state;
+          if (latestState === "retired") throw this.#retiredHistoryError();
+          if (latestState === "missing")
+            throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+          if (latestState === "invalid")
+            throw new SessionError(409, "invalid_history", "Saved session history is invalid.");
+          if (latestState === "not-created" && !latest.historyExpected)
+            return { file: undefined, value: undefined, state: "not-created" };
+        }
+      }
+      return { file, value: observation.value, state: "readable" };
     } catch (error) {
       if (error instanceof SourceAccessError)
         throw new SessionError(503, "source_busy", error.message);
       let state = this.#historyCheckState(error);
       if (error instanceof HistoryReadError && error.code === "history_unavailable") {
+        let resolved: string | undefined;
+        let resolutionFailed = false;
         try {
-          state = (await this.#sessionFiles.resolve(current)) === undefined ? "missing" : "invalid";
+          resolved = await this.#sessionFiles.resolve(current);
         } catch {
-          state = "invalid";
+          resolutionFailed = true;
         }
+        if (!resolutionFailed && resolved === undefined) {
+          const missingState = await this.#recordMissingHistory(
+            current,
+            sequence,
+            allowPendingCreation,
+          );
+          if ((this.#historyCheckSavedSequences.get(stored.id) ?? 0) > sequence) {
+            const checked = this.#staleMissingHistory(
+              this.#stored(stored.id),
+              allowPendingCreation,
+            );
+            if (checked.state === "not-created") return checked;
+          }
+          if (missingState === "retired") throw this.#retiredHistoryError();
+          throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
+        }
+        state = "invalid";
       }
-      if (state !== undefined) await this.#recordHistoryCheck(current, sequence, state, file);
+      if (state !== undefined && state !== "retired")
+        await this.#recordHistoryCheck(current, sequence, state, file);
       if (error instanceof HistoryReadError)
         throw new SessionError(error.status, error.code, error.message);
       if (error instanceof HistoryReadBudgetError)
@@ -1785,21 +1849,22 @@ export class SessionService {
     sequence: number,
     state: HistoryCheckState,
     file?: string,
-  ): Promise<void> {
+    sourceObservation?: { generation: string | null; deletionIntent: string | null },
+  ): Promise<boolean> {
     await this.#historyCheckCheckpoint?.(state);
-    if (this.#historyCheckSequences.get(stored.id) !== sequence) return;
+    if (this.#historyCheckSequences.get(stored.id) !== sequence) return false;
     const latest = this.#stored(stored.id);
     const check: HistoryCheck = { state, checkedAt: this.#now() };
-    const updated: StoredSession = {
-      ...latest,
-      historyCheck: check,
-      ...(file === undefined ? {} : { piSessionFile: file }),
-      ...(latest.error === HISTORY_UNAVAILABLE && (state === "readable" || state === "not-created")
-        ? { error: null }
-        : {}),
-    };
+    const clearError =
+      latest.error === HISTORY_UNAVAILABLE && (state === "readable" || state === "not-created")
+        ? HISTORY_UNAVAILABLE
+        : undefined;
     try {
-      this.#catalog.update(updated);
+      this.#catalog.recordHistoryCheck(stored.id, check, {
+        ...(file === undefined ? {} : { file }),
+        ...(clearError === undefined ? {} : { clearError }),
+        ...(sourceObservation === undefined ? {} : { sourceObservation }),
+      });
     } catch {
       this.#storageFault(stored.id);
       throw new SessionError(
@@ -1808,7 +1873,103 @@ export class SessionService {
         "The session history check could not be saved. Repair storage and restart the host.",
       );
     }
+    this.#historyCheckSavedSequences.set(stored.id, sequence);
+    if (state === "retired") this.#invalidateRetiredHistory(stored.id);
     this.#publishState(stored.id);
+    return true;
+  }
+
+  async #recordMissingHistory(
+    stored: StoredSession,
+    sequence: number,
+    allowPendingCreation: boolean,
+  ): Promise<"missing" | "not-created" | "retired"> {
+    const latest = this.#stored(stored.id);
+    const previousState = latest.historyCheck?.state;
+    const previousObservation = this.#catalog.sourceObservation(stored.id);
+    let accessObservation: MissingSourceObservation | undefined;
+    if (stored.piSessionFile !== null) {
+      try {
+        accessObservation = await this.#sourceAccess.missing(
+          stored,
+          stored.piSessionFile,
+          previousObservation?.generation,
+        );
+      } catch (error) {
+        if (error instanceof SourceAccessError)
+          throw new SessionError(503, "source_busy", error.message);
+        throw error;
+      }
+    }
+    const sourceGeneration =
+      accessObservation?.sourceGeneration ?? previousObservation?.generation ?? null;
+    const generationChanged =
+      accessObservation?.sourceGeneration !== null &&
+      accessObservation?.sourceGeneration !== undefined &&
+      previousObservation?.generation !== undefined &&
+      accessObservation.sourceGeneration !== previousObservation.generation;
+    const priorDeletionIntent = generationChanged
+      ? null
+      : (previousObservation?.deletionIntent ?? null);
+    const receipt = accessObservation?.completedDeletion;
+    const deletionIntent = receipt?.intentId ?? priorDeletionIntent;
+    const previouslyObserved =
+      previousState === "readable" ||
+      previousState === "missing" ||
+      previousState === "invalid" ||
+      previousState === "retired";
+    const expected = previouslyObserved || (stored.historyExpected && !allowPendingCreation);
+    const state: "missing" | "not-created" | "retired" =
+      (previousState === "retired" && !generationChanged) ||
+      (receipt !== undefined && receipt.intentId !== priorDeletionIntent)
+        ? "retired"
+        : expected
+          ? "missing"
+          : "not-created";
+    const sourceObservation =
+      sourceGeneration === null && deletionIntent === null
+        ? previousObservation
+        : { generation: sourceGeneration, deletionIntent };
+    await this.#recordHistoryCheck(
+      stored,
+      sequence,
+      state,
+      stored.piSessionFile ?? undefined,
+      sourceObservation,
+    );
+    return state;
+  }
+
+  #staleMissingHistory(
+    stored: StoredSession,
+    allowPendingCreation: boolean,
+  ): CheckedHistory<never> {
+    const latest = this.#stored(stored.id);
+    const state = latest.historyCheck?.state;
+    if (state === "retired") throw this.#retiredHistoryError();
+    if (state === "invalid")
+      throw new SessionError(409, "invalid_history", "Saved session history is invalid.");
+    const expected =
+      state === "readable" ||
+      state === "missing" ||
+      (latest.historyExpected && !allowPendingCreation);
+    return {
+      file: undefined,
+      value: undefined,
+      state: expected ? "missing" : "not-created",
+    };
+  }
+
+  #retiredHistoryError(): SessionError {
+    return new SessionError(410, "history_retired", "Saved history was deleted by Pi Distill.");
+  }
+
+  #invalidateRetiredHistory(sessionId: string): void {
+    this.#historyIdentity.delete(sessionId);
+    this.#nativeExecutions.delete(sessionId);
+    this.#nativeStateRefreshes.delete(sessionId);
+    this.#historyPages.invalidateSession(sessionId);
+    this.#events.clearHistory(sessionId);
   }
 
   #historyCheckState(error: unknown): HistoryCheckState | undefined {

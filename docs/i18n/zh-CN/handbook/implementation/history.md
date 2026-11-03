@@ -42,11 +42,11 @@ History 处理由五个 module 协作。`sessions/files.ts` 定位 session 所�
 
 ## Signed cursor 与 active-branch pagination
 
-[`HistorySlice` 和 `HistoryPages`](../../../../../src/sessions/history.ts#L326) 定义 page 结果。`HistoryPages` 持有随机生成的内存 HMAC key，因此 cursor 只能由签发它的 Dwell host process 验证，并会在该 host restart 后过期。
+[`HistorySlice` 和 `HistoryPages`](../../../../../src/sessions/history.ts#L326) 定义 page 结果。`HistoryPages` 为每个 session 持有随机生成的内存 HMAC key，因此 cursor 只能由签发它的 Dwell host process 验证，并会在该 host restart 后过期。
 
-[`HistoryPages.#cursor`](../../../../../src/sessions/history.ts#L339) 限制 cursor 长度并要求两个 base64url 部分。它计算 HMAC-SHA256，先检查 signature 长度再进行 constant-time comparison，解析 JSON 后要求 session ID 一致、byte boundary 为正安全整数、revision 为 SHA-256、`before` index 为正安全整数。Malformed、伪造、foreign 或过期 prefix 都会变成 `invalid_cursor`。[`HistoryPages.#encode`](../../../../../src/sessions/history.ts#L375) 将已验证 payload 序列化后签名。
+[`HistoryPages.#cursor`](../../../../../src/sessions/history.ts#L352) 限制 cursor 长度并要求两个 base64url 部分。它计算 HMAC-SHA256，先检查 signature 长度再进行 constant-time comparison，解析 JSON 后要求 session ID 一致、byte boundary 为正安全整数、revision 为 SHA-256、`before` index 为正安全整数。Malformed、伪造、foreign 或过期 prefix 都会变成 `invalid_cursor`。[`HistoryPages.#encode`](../../../../../src/sessions/history.ts#L388) 将已验证 payload 序列化后签名。
 
-[`HistoryPages.read`](../../../../../src/sessions/history.ts#L380) 先验证 cursor，再将其 byte/revision prefix 和可选 cancellation signal 传给 `readSavedHistory`。它按 ID 索引所有 entry，从 Pi persisted leaf 沿 parent ID 向回遍历；parent 缺失时报 `invalid_history`。反转为时间顺序后，它计算 assistant message identity，并将 tool call/result 与所属 assistant message 关联。Cursor 的 `before` 位置必须落在 active branch 内。Context source 从整个 branch 计算；page entries 则从 boundary 向回扫描，直到 100 个 projected entry 或 240 KiB page budget（预留 metadata/context 空间）用满，再恢复为时间顺序。隐藏的 native entry 也会前移 branch index，避免分页重复或跳过。若还有更早的 branch entry，next cursor 会 pin 同一完整 byte prefix/revision 及下一 index。返回的 `branchIds` 供 `SessionService` 判断 turn native entry 是否仍在选中 branch 中。
+[`HistoryPages.read`](../../../../../src/sessions/history.ts#L395) 先验证 cursor，再将其 byte/revision prefix 和可选 cancellation signal 传给 `readSavedHistory`。它按 ID 索引所有 entry，从 Pi persisted leaf 沿 parent ID 向回遍历；parent 缺失时报 `invalid_history`。反转为时间顺序后，它计算 assistant message identity，并将 tool call/result 与所属 assistant message 关联。Cursor 的 `before` 位置必须落在 active branch 内。Context source 从整个 branch 计算；page entries 则从 boundary 向回扫描，直到 100 个 projected entry 或 240 KiB page budget（预留 metadata/context 空间）用满，再恢复为时间顺序。隐藏的 native entry 也会前移 branch index，避免分页重复或跳过。若还有更早的 branch entry，next cursor 会 pin 同一完整 byte prefix/revision 及下一 index。返回的 `branchIds` 供 `SessionService` 判断 turn native entry 是否仍在选中 branch 中。
 
 Page limit 包含每个 projected entry 64 KiB、page body 240 KiB、context-source JSON 96 KiB、最多 32 个 context source，以及总计 256 KiB 的 envelope。Image 只以 entry ID/index/MIME metadata 表示；base64 data 单独读取。
 
@@ -68,7 +68,7 @@ Role projection 后，`project` 将每个 entry 的完整序列化预算限制�
 
 ## 读取已保存图片
 
-[`HistoryPages.image`](../../../../../src/sessions/history.ts#L469) 对无效 image index 返回 `null`，读取有界 native-history snapshot，并从 persisted leaf 构造 active branch。目标 entry 不在 branch、不是 message entry、content 格式错误或图片缺失/不受支持时也返回 `null`。Image index 按目标 native message 中 image block 的出现顺序计算。目标 block 必须通过 `savedImage`；解码结果不得超过 5 MiB，并且重新编码后必须与原 base64 完全一致，之后才返回 MIME type 和 `Buffer`。Browser 用 session、entry ID 和 index 请求图片；server 通过已验证的 native history 定位内容。
+[`HistoryPages.image`](../../../../../src/sessions/history.ts#L484) 对无效 image index 返回 `null`，读取有界 native-history snapshot，并从 persisted leaf 构造 active branch。目标 entry 不在 branch、不是 message entry、content 格式错误或图片缺失/不受支持时也返回 `null`。Image index 按目标 native message 中 image block 的出现顺序计算。目标 block 必须通过 `savedImage`；解码结果不得超过 5 MiB，并且重新编码后必须与原 base64 完全一致，之后才返回 MIME type 和 `Buffer`。Browser 用 session、entry ID 和 index 请求图片；server 通过已验证的 native history 定位内容。
 
 <a id="assistant-message-identity"></a>
 
@@ -79,3 +79,13 @@ Role projection 后，`project` 将每个 entry 的完整序列化预算限制�
 `SessionEvents` 观察 live `message_end` 时使用此 identity；`SessionService` 也用它计算相对现存 transcript 新增的 message。Tool ownership 绑定 assistant identity。Baseline 或有界 diff 不完整，或 message 无法识别时，live 与 saved evidence 都会保留。
 
 相关测试覆盖 [native JSONL validation](../../../../../tests/pi-history.test.ts)、[scan fairness/cancellation](../../../../../tests/pi-history-budget.test.ts)、[history page/projection](../../../../../tests/history.test.ts)、[context snapshot](../../../../../tests/history-context.test.ts) 与 [service-level restart/reconciliation](../../../../../tests/history-service.test.ts)。
+
+<a id="history-retirement-and-restoration"></a>
+
+## Retired history 与文件恢复
+
+Pi native file 缺失时，history 仍保持 `missing`，除非 Dwell 能把一条 completed Distill receipt 与 Pi session ID、当前 file path 及最近观察到的 source generation 精确匹配。成功读取 history 时，Dwell 会保存 generation，并在释放 read lease 前检查 completed receipt。这样，如果 cleanup 恰好在读取完成后才结束，下一次 missing 检查仍能识别它。即使 Distill 已回收 source-registry row，缓存 generation 也能用于查找 receipt。没有精确 receipt 时，手动删除或属于其他 generation 的文件继续显示为 `missing`。
+
+Observation 保存 Dwell 最近看到的 receipt intent。文件恢复并成功读取后，history state 变为 `readable`；保留旧 intent 可避免同一条旧 receipt 在该文件之后被手动删除时再次证明 retirement。不同 generation 的 replacement 不会匹配旧 receipt。如果 Dwell 在文件缺失时观察到新的 generation，且没有对应的 exact receipt，旧的 retired state 会变回 `missing`。当文件仍缺失且观察到的 generation 未变化时，确认过的 `retired` state 会跨 restart 保留，即使 Distill 当前不可用。Pi JSONL 仍是唯一 transcript；Dwell catalog 只保存 identity/state，不建立 transcript archive。[`SessionSourceAccess.read`](../../../../../src/sessions/source-access.ts#L65)、[`SessionSourceAccess.missing`](../../../../../src/sessions/source-access.ts#L99) 与 [`SessionService.#recordMissingHistory`](../../../../../src/sessions/service.ts#L1882) 实现 receipt reconciliation。实际 cleanup regression 覆盖 registry 回收（[retirement integration test](../../../../../tests/history-retirement.test.ts#L133)）；replacement-generation 与 restore 见[retirement integration test](../../../../../tests/history-retirement.test.ts#L382)和[恢复用例](../../../../../tests/history-retirement.test.ts#L411)，后续手动删除见[手动删除用例](../../../../../tests/history-retirement.test.ts#L424)。
+
+`HistoryPages.#key` 为每个 session 延迟创建 signing key；`invalidateSession` 轮换该 key，`#cursor` 和 `#encode` 分别用它验证与生成 cursor。

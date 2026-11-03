@@ -34,6 +34,8 @@ Dwell 托管 Pi 并读取 Pi native session files。配置 Distill binding 后�
 
 Verification：[source access](../../../../../tests/session-source-access.test.ts)、[Pi lifecycle](../../../../../tests/distill-sessions.test.ts)、[Host configuration](../../../../../tests/integrations-host.test.ts)、[adapter contract](../../../../../tests/distill-adapter.test.ts) 与 [spawn/close callback](../../../../../tests/runtime-spawn.test.ts)。实际 Distill acceptance 使用配置的 built module 和 synthetic storage。
 
+`SessionSourceAccess.read` 会一直持有 short read lease，直到 awaited Pi-file read 和 completed-receipt lookup 都结束。`matchingDeletion` 只接受 state 为 `complete`、且 Pi session ID、file path 与 source generation 均相同的 receipt；lookup 同时提供 working directory。`missing` 使用相同的精确 receipt query。Source registry row 被回收后，Dwell 可以使用此前成功读取时保存的 generation 来查询 receipt，但不会把这个缓存值传给 `acquireSourceRead`。Gate 忙时返回 `source_busy`，保留先前 observation。[`matchingDeletion`](../../../../../src/sessions/source-access.ts#L22)、[`read`](../../../../../src/sessions/source-access.ts#L65)、[`missing`](../../../../../src/sessions/source-access.ts#L99)、[`#withReadLease`](../../../../../src/sessions/source-access.ts#L208) 与 [`#releaseRead`](../../../../../src/sessions/source-access.ts#L224) 展示 lookup 顺序和释放行为。
+
 <a id="current-library-api"></a>
 
 ## Optional pi-current library

@@ -102,6 +102,7 @@ Pi RPC 又有所不同。相关联的 Pi response 若包含 `success: false`，�
 | `directory_changed` | 409 | 保存的 project path 现在解析到了不同的 canonical directory。 |
 | `directory_unavailable` | 403 或 500 | 所选目录不可读，或 directory browser 本身发生 failure。 |
 | `discovery_cleanup_failed` | 503 | 无法清理临时隔离的 model-discovery state 或其 Pi process。 |
+| `history_retired` | 410 | Distill 已确认删除该 source；恢复对应 Pi file 后再读取。 |
 | `source_busy` | 503 | Distill source coordination 正被占用；当前 source operation 结束后重试。 |
 | `history_busy` | 429 | 有界 saved-history read queue 已满。 |
 | `history_changed` | 409 | 读取期间 native history file 发生变化。 |

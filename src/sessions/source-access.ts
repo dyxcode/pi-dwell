@@ -1,7 +1,37 @@
-import type { DistillChild, DistillRead, DistillStorage } from "../integrations/distill.ts";
+import type {
+  DistillChild,
+  DistillDeletionReceipt,
+  DistillRead,
+  DistillStorage,
+} from "../integrations/distill.ts";
 import type { StoredSession } from "../storage/catalog.ts";
 
 type SourceSession = Pick<StoredSession, "piSessionId" | "piSessionFile" | "directory">;
+
+export interface SourceReadObservation<T> {
+  readonly value: T;
+  readonly sourceGeneration: string | null;
+  readonly completedDeletion?: DistillDeletionReceipt;
+}
+
+export interface MissingSourceObservation {
+  readonly sourceGeneration: string | null;
+  readonly completedDeletion?: DistillDeletionReceipt;
+}
+
+function matchingDeletion(
+  receipt: DistillDeletionReceipt | undefined,
+  source: SourceSession,
+  file: string,
+  generation: string | undefined,
+): DistillDeletionReceipt | undefined {
+  return receipt?.state === "complete" &&
+    receipt.sessionId === source.piSessionId &&
+    receipt.sessionFile === file &&
+    receipt.sourceGeneration === generation
+    ? receipt
+    : undefined;
+}
 
 export interface OpeningSource {
   onSpawn(pid: number, closed: Promise<void>): void;
@@ -32,38 +62,69 @@ export class SessionSourceAccess {
     }
   }
 
-  async read<T>(source: SourceSession, file: string, read: () => Promise<T>): Promise<T> {
+  async read<T>(
+    source: SourceSession,
+    file: string,
+    read: () => Promise<T>,
+    knownGeneration?: string | null,
+  ): Promise<SourceReadObservation<T>> {
     const storage = this.#storage;
-    if (!storage) return read();
+    if (!storage) return { value: await read(), sourceGeneration: null };
     const lease = storage.acquireSourceRead({
       sessionId: source.piSessionId,
       sessionFile: file,
       cwd: source.directory,
     });
     if (!lease) throw new SourceAccessError();
-    let value: T;
-    try {
-      value = await read();
-    } catch (error) {
-      try {
-        this.#releaseRead(lease);
-      } catch (releaseError) {
-        throw new AggregateError([error, releaseError], "History read and source release failed.");
-      }
-      throw error;
-    }
-    this.#releaseRead(lease);
-    return value;
+    return this.#withReadLease(lease, async () => {
+      const value = await read();
+      const lookupGeneration = lease.sourceGeneration ?? knownGeneration ?? undefined;
+      const candidate = lookupGeneration
+        ? storage.getCompletedDeletion({
+            sessionId: source.piSessionId,
+            sessionFile: file,
+            cwd: source.directory,
+            sourceGeneration: lookupGeneration,
+          })
+        : undefined;
+      const completedDeletion = matchingDeletion(candidate, source, file, lookupGeneration);
+      return {
+        value,
+        sourceGeneration: lease.sourceGeneration,
+        ...(completedDeletion === undefined ? {} : { completedDeletion }),
+      };
+    });
   }
 
-  #releaseRead(lease: DistillRead): void {
-    try {
-      lease.release();
-      this.#reads.delete(lease);
-    } catch (error) {
-      this.#reads.add(lease);
-      throw error;
-    }
+  async missing(
+    source: SourceSession,
+    file: string,
+    knownGeneration?: string | null,
+  ): Promise<MissingSourceObservation> {
+    const storage = this.#storage;
+    if (!storage) return { sourceGeneration: null };
+    const lease = storage.acquireSourceRead({
+      sessionId: source.piSessionId,
+      sessionFile: file,
+      cwd: source.directory,
+    });
+    if (!lease) throw new SourceAccessError();
+    return this.#withReadLease(lease, async () => {
+      const lookupGeneration = lease.sourceGeneration ?? knownGeneration ?? undefined;
+      const candidate = lookupGeneration
+        ? storage.getCompletedDeletion({
+            sessionId: source.piSessionId,
+            sessionFile: file,
+            cwd: source.directory,
+            sourceGeneration: lookupGeneration,
+          })
+        : undefined;
+      const completedDeletion = matchingDeletion(candidate, source, file, lookupGeneration);
+      return {
+        sourceGeneration: lease.sourceGeneration,
+        ...(completedDeletion === undefined ? {} : { completedDeletion }),
+      };
+    });
   }
 
   begin(source: SourceSession): OpeningSource | undefined {
@@ -86,10 +147,11 @@ export class SessionSourceAccess {
         } finally {
           void closed.then(() => {
             this.#children.delete(use.id);
-            this.#releases.set(use.id, () => {
-              if (child) return use.releaseAfterClose(child);
-              return storage.recoverHostUse(use.id, { kind: "opening-abandoned" });
-            });
+            this.#releases.set(use.id, () =>
+              child
+                ? use.releaseAfterClose(child)
+                : storage.recoverHostUse(use.id, { kind: "opening-abandoned" }),
+            );
             try {
               this.#release(use.id);
             } catch {
@@ -141,5 +203,31 @@ export class SessionSourceAccess {
     if (!completed && this.#storage?.listPendingHostUses().some((use) => use.id === id))
       throw new Error("Distill retained a host-use reservation after release.");
     this.#releases.delete(id);
+  }
+
+  async #withReadLease<T>(lease: DistillRead, operation: () => Promise<T>): Promise<T> {
+    let result: T;
+    try {
+      result = await operation();
+    } catch (error) {
+      try {
+        this.#releaseRead(lease);
+      } catch (releaseError) {
+        throw new AggregateError([error, releaseError], "History read and source release failed.");
+      }
+      throw error;
+    }
+    this.#releaseRead(lease);
+    return result;
+  }
+
+  #releaseRead(lease: DistillRead): void {
+    try {
+      lease.release();
+      this.#reads.delete(lease);
+    } catch (error) {
+      this.#reads.add(lease);
+      throw error;
+    }
   }
 }

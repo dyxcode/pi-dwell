@@ -12,7 +12,7 @@
 
 SSE writer 将 JSON 包成带 event IDs 的 frames，发送 heartbeat comments、遵守 output backpressure，并关闭 slow/revoked connections。Browser reducer 跟踪 session、epoch、sequence；过期或重复 frames 不能重复应用 visible changes。属于不同 active run 的 frame 可以推进 cursor，同时丢弃其 live payload，保持 stream position 而不改变 visible projection。Selection generation 防止旧 asynchronous connection 写入新的 selection。
 
-Source / verification：[`SessionService.subscribeEvents`](../../../../../src/sessions/service.ts#L540) · [src/server/sse.ts](../../../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
+Source / verification：[`SessionService.subscribeEvents`](../../../../../src/sessions/service.ts#L546) · [src/server/sse.ts](../../../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
 
 <a id="projection"></a>
 
@@ -32,7 +32,7 @@ History reads 验证 saved file identity、session header 与 directory，并遵
 
 `HistoryPages` 生成有界 display entries、signed cursors 与 context evidence。Cursor 绑定 source/revision、byte prefix 和 page boundary index，branch 改变或文件被替换时不能悄悄沿用旧 view。Append-aware 逻辑在证明旧 page boundary 仍然属于相应内容时可保留稳定的旧页。Caller 根据 result 中的 truncation、incomplete-tail 和 coverage fields 判断完整性。
 
-Source / verification：[`readSavedHistory`](../../../../../src/runtime/pi-history.ts#L336) · [`HistoryPages.read`](../../../../../src/sessions/history.ts#L380) · [tests/pi-history.test.ts](../../../../../tests/pi-history.test.ts) · [tests/history.test.ts](../../../../../tests/history.test.ts)
+Source / verification：[`readSavedHistory`](../../../../../src/runtime/pi-history.ts#L336) · [`HistoryPages.read`](../../../../../src/sessions/history.ts#L395) · [tests/pi-history.test.ts](../../../../../tests/pi-history.test.ts) · [tests/history.test.ts](../../../../../tests/history.test.ts)
 
 <a id="reconcile"></a>
 
@@ -44,7 +44,7 @@ Settlement 后，client 可能仍需读取 history。它保留 uncovered live wo
 
 History 删除或无法确认 result 时，展示 unavailable/partial evidence，并保留已记录的 durable outcome。
 
-Source / verification：[`renderConversation`](../../../../../src/clients/web/client.ts#L1444) · [`loadHistory`](../../../../../src/clients/web/client.ts#L1670) · [`SessionService.getHistory`](../../../../../src/sessions/service.ts#L853) · [tests/session-events.test.ts](../../../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
+Source / verification：[`renderConversation`](../../../../../src/clients/web/client.ts#L1491) · [`loadHistory`](../../../../../src/clients/web/client.ts#L1717) · [`SessionService.getHistory`](../../../../../src/sessions/service.ts#L859) · [tests/session-events.test.ts](../../../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
 
 <a id="reconnect"></a>
 
@@ -54,4 +54,4 @@ Server 支持 reconnect 时携带最后已知 event cursor。Caller 提供 curso
 
 Page wake-up 与 refresh 恢复 connectivity 和 selected-session views，不重放 prompt。Authentication failure 返回 pairing；network outage 保留可恢复本地 state 并 retry observation。迟到 response 按 selection/generation 检查，防止切换 session 后显示旧 session history。Retry observation 与 submit new work 的区别，是 refresh、reconnect、host restart 共同需要保持的 invariant。
 
-Source / verification：[`stream`](../../../../../src/clients/web/client.ts#L1783) · [`resume`](../../../../../src/clients/web/client.ts#L2704) · [src/sessions/events.ts](../../../../../src/sessions/events.ts) · [tests/events.test.ts](../../../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
+Source / verification：[`stream`](../../../../../src/clients/web/client.ts#L1837) · [`resume`](../../../../../src/clients/web/client.ts#L2776) · [src/sessions/events.ts](../../../../../src/sessions/events.ts) · [tests/events.test.ts](../../../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)

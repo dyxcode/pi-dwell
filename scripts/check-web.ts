@@ -92,6 +92,77 @@ class BrowserPage {
 type BrowserMode = "http" | "https";
 const ALTERNATE_MODEL = "dwell-test-alt";
 
+function historyTransitionProbeScript(sessionId: string): string {
+  const eventsPath = `/api/v1/sessions/${sessionId}/events`;
+  const historyPath = `/api/v1/sessions/${sessionId}/history`;
+  return `(()=>{
+    const original=window.fetch.bind(window);
+    const eventsPath=${JSON.stringify(eventsPath)};
+    const historyPath=${JSON.stringify(historyPath)};
+    const targetSession=${JSON.stringify(sessionId)};
+    window.__dwellHistoryMutation=null;
+    window.__dwellHistoryMutationApplied=null;
+    window.__dwellHistoryResponses=0;
+    window.__dwellSessionSelectionClicks=0;
+    window.__restoreDwellHistoryTransitions=()=>window.fetch=original;
+    document.addEventListener("click",event=>{
+      if(event.target instanceof Element && event.target.closest("#session-list .name-row, #status-list .tab-select"))
+        window.__dwellSessionSelectionClicks++;
+    },true);
+    window.fetch=async(input,init)=>{
+      const target=typeof input==="string"?input:input.url;
+      const url=new URL(target,location.href);
+      const response=await original(input,init);
+      if(url.pathname===historyPath) window.__dwellHistoryResponses++;
+      if(url.pathname!==eventsPath||!response.body) return response;
+      const reader=response.body.getReader();
+      const decoder=new TextDecoder();
+      const encoder=new TextEncoder();
+      let buffered="";
+      const body=new ReadableStream({
+        async pull(controller){
+          while(true){
+            const separator=buffered.match(/\\r?\\n\\r?\\n/);
+            if(separator&&separator.index!==undefined){
+              const block=buffered.slice(0,separator.index);
+              buffered=buffered.slice(separator.index+separator[0].length);
+              const newline=separator[0].includes("\\r\\n")?"\\r\\n":"\\n";
+              const lines=block.split(/\\r?\\n/);
+              const event=lines.find(line=>line.startsWith("event: "))?.slice(7);
+              const mutation=window.__dwellHistoryMutation;
+              if(event==="session.updated"&&mutation&&mutation!=="none"){
+                const dataIndex=lines.findIndex(line=>line.startsWith("data: "));
+                if(dataIndex>=0){
+                  const frame=JSON.parse(lines[dataIndex].slice(6));
+                  if(frame.type==="session.updated"&&frame.sessionId===targetSession){
+                    frame.payload.historyCheck={state:mutation,checkedAt:Date.now()};
+                    frame.payload.historyState=mutation==="retired"?"retired":"available";
+                    lines[dataIndex]="data: "+JSON.stringify(frame);
+                    window.__dwellHistoryMutationApplied=mutation;
+                    window.__dwellHistoryMutation=null;
+                  }
+                }
+              }
+              controller.enqueue(encoder.encode(lines.join(newline)+separator[0]));
+              return;
+            }
+            const item=await reader.read();
+            if(item.done){
+              buffered+=decoder.decode();
+              if(buffered) controller.enqueue(encoder.encode(buffered));
+              controller.close();
+              return;
+            }
+            buffered+=decoder.decode(item.value,{stream:true});
+          }
+        },
+        cancel(reason){return reader.cancel(reason);}
+      });
+      return new Response(body,{status:response.status,headers:{"content-type":response.headers.get("content-type")??"text/event-stream"}});
+    };
+  })()`;
+}
+
 async function assertComposerLayout(page: BrowserPage, viewport: string): Promise<void> {
   assert.equal(await page.evaluate("innerWidth > 760"), viewport === "desktop");
   assert.equal(
@@ -3119,10 +3190,19 @@ for (const mode of modes) {
       `${mode} mobile`,
     );
     console.log(`PASS ${mode} history refresh preserves a reader's scroll anchor`);
+    const historyTransitionScript = record(
+      await second.call("Page.addScriptToEvaluateOnNewDocument", {
+        source: historyTransitionProbeScript(String(session.id)),
+      }),
+    );
+    assert.equal(typeof historyTransitionScript.identifier, "string");
     await second.call("Page.reload");
     await second.until(
-      'document.querySelector(".sent-image img")?.naturalWidth===64 && document.querySelector("#thinking-label").textContent.includes("High")',
+      `window.__dwellHistoryMutationApplied===null && document.querySelector("#connection-badge").textContent==="Connected" && document.querySelector(".sent-image img")?.naturalWidth===64 && document.querySelector("#thinking-label").textContent.includes("High") && document.querySelector("#session-list .name-row.active")?.dataset.sessionId===${JSON.stringify(String(session.id))}`,
     );
+    await second.call("Page.removeScriptToEvaluateOnNewDocument", {
+      identifier: historyTransitionScript.identifier,
+    });
     await assertNoPartialOrRecoveryRow(second, `${mode} image-history reload`);
     await assertSidebarLabel(
       second,
@@ -3132,6 +3212,55 @@ for (const mode of modes) {
       "High",
     );
     assert.equal(await second.evaluate('document.querySelectorAll(".image-attachment").length'), 0);
+    await second.click(".sent-image");
+    await second.until(
+      'document.querySelector("#image-dialog").open && document.querySelector("#preview-image").src.startsWith("blob:")',
+    );
+    await second.evaluate(
+      `(()=>{window.__dwellHistoryResponses=0;window.__dwellSessionSelectionClicks=0;window.__dwellHistoryMutation="retired"})()`,
+    );
+    await request(`/sessions/${String(session.id)}/history`);
+    await second.until(
+      `window.__dwellHistoryMutationApplied==="retired" && !document.querySelector("#conversation").textContent.includes("history refresh anchor") && document.querySelector('#session-list .name-row[data-session-id="${String(session.id)}"]')?.title.includes("Saved history was deleted by Pi Distill")`,
+    );
+    assert.equal(
+      await second.evaluate(
+        'document.querySelector("#conversation").textContent.includes("Start a conversation in this directory.")',
+      ),
+      true,
+    );
+    const retiredImagePreview = record(
+      await second.evaluate(
+        '(()=>({open:document.querySelector("#image-dialog").open,hasSource:document.querySelector("#preview-image").hasAttribute("src")}))()',
+      ),
+    );
+    await second.evaluate(
+      `(()=>{window.__dwellHistoryResponses=0;window.__dwellHistoryMutation="readable"})()`,
+    );
+    await request(`/sessions/${String(session.id)}/history`);
+    await second.until(
+      `window.__dwellHistoryMutationApplied==="readable" && Number(window.__dwellHistoryResponses)>0 && document.querySelector("#conversation").textContent.includes("Received: history refresh anchor")`,
+    );
+    await delay(150);
+    assert.equal(
+      await second.evaluate("window.__dwellHistoryResponses"),
+      1,
+      "one accepted retired-to-readable transition starts one saved-history reload",
+    );
+    assert.equal(
+      await second.evaluate(
+        'document.querySelector("#session-list .name-row.active")?.dataset.sessionId',
+      ),
+      String(session.id),
+      "history restoration does not change the selected session",
+    );
+    assert.equal(await second.evaluate("window.__dwellSessionSelectionClicks"), 0);
+    assert.equal(retiredImagePreview.open, false, "retirement closes the saved image viewer");
+    assert.equal(retiredImagePreview.hasSource, false, "retirement removes the preview source");
+    await second.evaluate("window.__restoreDwellHistoryTransitions()");
+    console.log(
+      `PASS ${mode} retired history clears transcript and image preview; restoration reloads in place`,
+    );
     const mobileComposerHeights = record(
       await second.evaluate(`(()=>({
         actions:document.querySelector(".composer-actions").getBoundingClientRect().height,

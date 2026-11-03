@@ -22,7 +22,7 @@ Source / verification：[src/shared/sessions.ts](../../../../../src/shared/sessi
 
 `isSessionInfo` 检查两个 UUID、directory、成对可空的 provider/model、可空且受支持的 thinking level、safe-integer timestamps、lifecycle/runtime/history enums、error，以及 active/latest turn references。`ready` session 必须有 provider 和 model。该 guard 允许额外 top-level fields。可选 native execution 交给 `isNativeExecutionInfo`：它要求准确的 id/status/error keys、UUID、允许的 running/terminal state，以及最多 2,048 UTF-8 bytes 的 error。Ephemeral native execution ID 不代表 durable turn request。
 
-`isHistoryCheck` 验证恰好包含 `state` 与 `checkedAt` 的 observation：state 为 `not-created`、`readable`、`missing` 或 `invalid`，时间为 safe integer。`isSessionInfo` 允许省略此字段；省略表示尚未检查。
+`isHistoryCheck` 验证恰好包含 `state` 与 `checkedAt` 的 observation：state 为 `not-created`、`readable`、`missing`、`invalid` 或 `retired`，时间为 safe integer。`isSessionInfo` 允许省略此字段；省略表示尚未检查。
 
 `mergeSessionMetadata` 在两个 snapshot 指向同一 session 时保留较新的 name 与 revision，其他字段采用 incoming snapshot；不同 session ID 则直接采用 incoming snapshot。这样，HTTP、SSE 与 catalog refresh 的到达顺序不会使 name 回退。
 

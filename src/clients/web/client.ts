@@ -161,6 +161,8 @@ let entries: HistoryEntry[] = [],
 let controller: AbortController | null = null,
   generation = 0,
   authenticated = false;
+let historyGeneration = 0,
+  historyRequest = 0;
 let reconnectTimer: number | undefined, pollTimer: number | undefined;
 let polling = false,
   suspended = false;
@@ -538,11 +540,38 @@ function releaseImages(): void {
   imageGeneration++;
   savedRenderer.clear();
 }
+function clearRetiredHistory(sessionId: string): void {
+  if (selected !== sessionId) return;
+  historyGeneration++;
+  historyRequest++;
+  historyPending = false;
+  older.disabled = false;
+  resetHistoryRecovery();
+  entries = [];
+  nextCursor = null;
+  contextSources = [];
+  contextSourcesTruncated = false;
+  liveOrder = [];
+  resetHistoryPagination = false;
+  if (imageDialog.open) imageDialog.close();
+  el("preview-image", HTMLImageElement).removeAttribute("src");
+  state = {
+    ...state,
+    messages: [],
+    tools: [],
+    liveRunId: null,
+    liveTruncated: false,
+    liveIncomplete: false,
+    history: null,
+  };
+  releaseImages();
+}
 function historyImage(entryId: string, index: number, mimeType: string): HTMLElement {
   const button = node("button", "Loading image…", "sent-image");
   button.type = "button";
   const session = selected,
-    epoch = generation;
+    epoch = generation,
+    imageEpoch = imageGeneration;
   const key = `/api/v1/sessions/${session}/history/${encodeURIComponent(entryId)}/images/${index}`;
   button.dataset.key = `saved-image:${key}`;
   button.dataset.preserve = `${generation}:${imageGeneration}`;
@@ -561,18 +590,32 @@ function historyImage(entryId: string, index: number, mimeType: string): HTMLEle
         throw new Error("Invalid saved image type.");
       const blob = await response.blob();
       if (blob.size > 5 * 1024 * 1024) throw new Error("Saved image exceeds the display limit.");
-      return URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      if (imageEpoch !== imageGeneration) {
+        URL.revokeObjectURL(url);
+        throw new Error("Saved history changed.");
+      }
+      return url;
     });
     imageQueue = pending.catch(() => {});
     imageCache.set(key, pending);
   }
   void pending.then(
     (url) => {
-      if (selected !== session || generation !== epoch) return;
+      if (selected !== session || generation !== epoch || imageEpoch !== imageGeneration) {
+        URL.revokeObjectURL(url);
+        return;
+      }
       const image = node("img");
       image.alt = `Image ${index + 1}`;
       image.onload = () => {
-        if (selected !== session || generation !== epoch || !button.isConnected) return;
+        if (
+          selected !== session ||
+          generation !== epoch ||
+          imageEpoch !== imageGeneration ||
+          !button.isConnected
+        )
+          return;
         const atBottom = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 90;
         button.replaceChildren(image);
         if (atBottom) scroll.scrollTop = scroll.scrollHeight;
@@ -585,7 +628,7 @@ function historyImage(entryId: string, index: number, mimeType: string): HTMLEle
       button.onclick = () => showImage(url, `Image ${index + 1}`);
     },
     (error) => {
-      if (selected === session && generation === epoch) {
+      if (selected === session && generation === epoch && imageEpoch === imageGeneration) {
         button.textContent = "Image unavailable · retry";
         button.onclick = () => {
           imageCache.delete(key);
@@ -594,6 +637,8 @@ function historyImage(entryId: string, index: number, mimeType: string): HTMLEle
           renderConversation();
         };
         if (error instanceof ApiError && error.status === 401) showError(error);
+        if (error instanceof ApiError && error.code === "history_retired" && session)
+          clearRetiredHistory(session);
       }
     },
   );
@@ -784,6 +829,8 @@ function label(s: SessionInfo): string {
 }
 function savedHistoryWarning(s: SessionInfo): string | null {
   switch (s.historyCheck?.state) {
+    case "retired":
+      return "Saved history was deleted by Pi Distill";
     case "missing":
       return "Saved history is missing";
     case "invalid":
@@ -1683,6 +1730,8 @@ async function loadHistory(more = false): Promise<void> {
   }
   const id = selected,
     epoch = generation,
+    historyEpoch = historyGeneration,
+    request = ++historyRequest,
     cursor = more ? nextCursor : null;
   if (more && !cursor) return;
   window.clearTimeout(recovery.timer);
@@ -1698,7 +1747,7 @@ async function loadHistory(more = false): Promise<void> {
     );
     if (!isHistoryPage(result) || result.sessionId !== id)
       throw new Error("Invalid saved-history response.");
-    if (epoch !== generation) return;
+    if (epoch !== generation || historyEpoch !== historyGeneration) return;
     recovery.failures = 0;
     if (!more) historyContentFailed = false;
     if (result.status !== "pending") {
@@ -1741,8 +1790,11 @@ async function loadHistory(more = false): Promise<void> {
     }
     renderConversation();
   } catch (error) {
-    if (epoch !== generation) return;
-    if (error instanceof ApiError && error.code.includes("cursor")) {
+    if (epoch !== generation || historyEpoch !== historyGeneration) return;
+    if (error instanceof ApiError && error.code === "history_retired") {
+      clearRetiredHistory(id);
+      renderConversation();
+    } else if (error instanceof ApiError && error.code.includes("cursor")) {
       resetHistoryPagination = true;
       historyRecovery.latest.queued = true;
     } else if (error instanceof ApiError && error.status === 401) {
@@ -1753,16 +1805,18 @@ async function loadHistory(more = false): Promise<void> {
       renderConversation();
     }
   } finally {
-    historyPending = false;
-    older.disabled = false;
-    const retryButton = conversation.querySelector<HTMLButtonElement>(".history-retry");
-    if (retryButton) retryButton.disabled = false;
-    if (historyRecovery.latest.queued) {
-      historyRecovery.latest.queued = false;
-      void loadHistory();
-    } else if (historyRecovery.older.queued) {
-      historyRecovery.older.queued = false;
-      void loadHistory(true);
+    if (request === historyRequest) {
+      historyPending = false;
+      older.disabled = false;
+      const retryButton = conversation.querySelector<HTMLButtonElement>(".history-retry");
+      if (retryButton) retryButton.disabled = false;
+      if (historyRecovery.latest.queued) {
+        historyRecovery.latest.queued = false;
+        void loadHistory();
+      } else if (historyRecovery.older.queued) {
+        historyRecovery.older.queued = false;
+        void loadHistory(true);
+      }
     }
   }
 }
@@ -1810,6 +1864,8 @@ async function stream(id: string, epoch: number): Promise<void> {
         if (epoch !== generation) return;
         for (const frame of decoder.push(text.decode(part.value, { stream: true }))) {
           if (frame.sessionId !== id) throw new Error("Event stream changed sessions.");
+          const previousState = state;
+          const previousHistoryState = previousState.session?.historyCheck?.state;
           const previousRun = state.liveRunId;
           // Rendering is batched; preserve the confirmed identity before covered history
           // can clear the live projection in a later frame from the same batch.
@@ -1817,6 +1873,21 @@ async function stream(id: string, epoch: number): Promise<void> {
           else if (frame.type === "snapshot" && frame.payload.live.message)
             identifyLiveThinking(frame.payload.live.message);
           state = reduceFrame(state, frame);
+          const accepted = state !== previousState;
+          const historyRestored =
+            accepted &&
+            frame.type === "session.updated" &&
+            previousHistoryState === "retired" &&
+            frame.payload.historyCheck?.state === "readable" &&
+            state.session?.historyCheck?.state === "readable";
+          if (
+            accepted &&
+            ((frame.type === "session.updated" &&
+              frame.payload.historyCheck?.state === "retired") ||
+              (frame.type === "snapshot" &&
+                frame.payload.session.historyCheck?.state === "retired"))
+          )
+            clearRetiredHistory(id);
           if (state.liveRunId !== previousRun) {
             liveOrder = [];
             resetHistoryRecovery(false);
@@ -1867,6 +1938,7 @@ async function stream(id: string, epoch: number): Promise<void> {
           }
           if (frame.type === "stream.error") throw new Error(frame.payload.message);
           if (
+            historyRestored ||
             frame.type === "snapshot" ||
             frame.type === "resync" ||
             (frame.type === "session.updated" &&

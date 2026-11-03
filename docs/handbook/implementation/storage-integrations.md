@@ -34,6 +34,8 @@ Dwell hosts Pi and reads Pi's native session files. An optional Distill binding 
 
 Verification: [source access](../../../tests/session-source-access.test.ts), [Pi lifecycle](../../../tests/distill-sessions.test.ts), [Host configuration](../../../tests/integrations-host.test.ts), [adapter contract](../../../tests/distill-adapter.test.ts), and [spawn/close callback](../../../tests/runtime-spawn.test.ts). Actual Distill acceptance uses a configured built module and synthetic storage.
 
+`SessionSourceAccess.read` holds the short read lease through both the awaited Pi-file read and the completed-receipt lookup. `matchingDeletion` accepts only a `complete` receipt with the same Pi session ID, file path and source generation; the lookup also supplies the working directory. `missing` uses the same exact receipt query. After registry collection, Dwell may use the generation saved by an earlier successful read for receipt lookup only; it does not pass that cached value to `acquireSourceRead`. A failed gate returns `source_busy` and leaves the prior observation intact. [`matchingDeletion`](../../../src/sessions/source-access.ts#L22), [`read`](../../../src/sessions/source-access.ts#L65), [`missing`](../../../src/sessions/source-access.ts#L99), [`#withReadLease`](../../../src/sessions/source-access.ts#L208), and [`#releaseRead`](../../../src/sessions/source-access.ts#L224) show the ordering and release behavior.
+
 <a id="current-library-api"></a>
 
 ## Optional pi-current library

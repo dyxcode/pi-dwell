@@ -38,7 +38,7 @@ test("source reads hold only a short gate and release it on success and error", 
     return "read";
   });
   finish();
-  assert.equal(await pending, "read");
+  assert.equal((await pending).value, "read");
   await assert.rejects(
     access.read(source, source.piSessionFile, async () => {
       throw new Error("read failed");

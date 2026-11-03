@@ -28,7 +28,7 @@ Source / verification：[`runCli`](../../../../../src/clients/cli/main.ts#L9) ·
 | Pi | [Pi](runtime.md) | 执行 agent loop、model calls、tools 与 extensions，保存对话 | Pi process 中的 context，以及原生 JSONL session files |
 | Browser | [Web client](browser-controller.md) | 提交用户输入，展示 Pi messages、tool results 与进度 | Drafts、attachment previews、selection 与显示内容 |
 
-Source / verification：[`LocalAuth`](../../../../../src/server/auth.ts#L87) · [`SessionService`](../../../../../src/sessions/service.ts#L220) · [`SessionCatalog`](../../../../../src/storage/catalog.ts#L710) · [`SessionEvents`](../../../../../src/sessions/events.ts#L373) · [Web client](../../../../../src/clients/web/client.ts)
+Source / verification：[`LocalAuth`](../../../../../src/server/auth.ts#L87) · [`SessionService`](../../../../../src/sessions/service.ts#L225) · [`SessionCatalog`](../../../../../src/storage/catalog.ts#L773) · [`SessionEvents`](../../../../../src/sessions/events.ts#L373) · [Web client](../../../../../src/clients/web/client.ts)
 
 <a id="processes"></a>
 
@@ -40,7 +40,7 @@ Host 以独立 subprocess 运行 Pi，沿用 Pi CLI 的启动流程、进程环�
 
 Dwell 启动时读取 catalog，并按需启动 Pi processes。[Lifecycle workflow](workflow-lifecycle.md) 沿相关 functions 解释 session 创建、恢复和 shutdown。
 
-Source / verification：[`SessionService.createSession`](../../../../../src/sessions/service.ts#L604) · [`SessionService.#open`](../../../../../src/sessions/service.ts#L2086) · [`PiProcess.start`](../../../../../src/runtime/pi-process.ts#L276)
+Source / verification：[`SessionService.createSession`](../../../../../src/sessions/service.ts#L610) · [`SessionService.#open`](../../../../../src/sessions/service.ts#L2247) · [`PiProcess.start`](../../../../../src/runtime/pi-process.ts#L276)
 
 <a id="boundaries"></a>
 
@@ -54,7 +54,7 @@ Host 在发送 prompt 前先向 SQLite 记录 `dispatching`。Database write 与
 
 Pi extensions 可以在没有 Dwell request 的情况下发起工作。Dwell 使用独立的 native execution ID 跟踪这些工作，以报告进度、定位取消目标，并与其他请求区分。
 
-Source / verification：[`SessionService.submitTurn`](../../../../../src/sessions/service.ts#L999) · [`SessionCatalog.markTurnDispatching`](../../../../../src/storage/catalog.ts#L1060) · [`SessionService.getTurnResult`](../../../../../src/sessions/service.ts#L1081) · [`SessionService.#observeRuntime`](../../../../../src/sessions/service.ts#L1854)
+Source / verification：[`SessionService.submitTurn`](../../../../../src/sessions/service.ts#L1005) · [`SessionCatalog.markTurnDispatching`](../../../../../src/storage/catalog.ts#L1189) · [`SessionService.getTurnResult`](../../../../../src/sessions/service.ts#L1087) · [`SessionService.#observeRuntime`](../../../../../src/sessions/service.ts#L2015)
 
 <a id="terms"></a>
 

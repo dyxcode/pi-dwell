@@ -42,6 +42,128 @@ function session(overrides: Partial<StoredSession> = {}): StoredSession {
   };
 }
 
+function createV7Catalog(path: string, stored: StoredSession, libraryRoot: string): void {
+  const database = new DatabaseSync(path);
+  database.exec(
+    "CREATE TABLE runtime_configuration (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), executable TEXT NOT NULL CHECK (length(executable) > 0), entry_point TEXT CHECK (entry_point IS NULL OR length(entry_point) > 0)) STRICT;" +
+      "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, thinking_level TEXT CHECK (thinking_level IS NULL OR thinking_level IN ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')), history_check_state TEXT CHECK (history_check_state IS NULL OR history_check_state IN ('not-created', 'readable', 'missing', 'invalid')), history_checked_at INTEGER, display_name TEXT CHECK (display_name IS NULL OR (length(display_name) BETWEEN 1 AND 80 AND instr(display_name, char(0)) = 0)), metadata_revision INTEGER NOT NULL DEFAULT 0 CHECK (metadata_revision >= 0), CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT;" +
+      "CREATE TABLE turns (run_id TEXT NOT NULL PRIMARY KEY CHECK (length(run_id) > 0), session_id TEXT NOT NULL REFERENCES sessions(id), request_id TEXT NOT NULL CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) = 64), status TEXT NOT NULL CHECK (status IN ('accepted', 'dispatching', 'running', 'completed', 'failed', 'aborted', 'interrupted')), cancellation_requested INTEGER NOT NULL CHECK (cancellation_requested IN (0, 1)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error_code TEXT, error_message TEXT, entry_ids TEXT NOT NULL CHECK (json_valid(entry_ids)), UNIQUE (session_id, request_id), CHECK ((error_code IS NULL AND error_message IS NULL) OR (length(error_code) > 0 AND length(error_message) > 0))) STRICT;" +
+      "CREATE UNIQUE INDEX one_active_turn_per_session ON turns(session_id) WHERE status IN ('accepted', 'dispatching', 'running');" +
+      "CREATE TABLE library_bindings (binding TEXT NOT NULL PRIMARY KEY CHECK (length(binding) BETWEEN 1 AND 64 AND instr(binding, char(0)) = 0), root TEXT NOT NULL CHECK (length(root) > 0 AND instr(root, char(0)) = 0)) STRICT;" +
+      "CREATE TABLE session_library_references (session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, binding TEXT NOT NULL REFERENCES library_bindings(binding), item_id TEXT NOT NULL CHECK (length(item_id) = 36), version_id TEXT NOT NULL CHECK (length(version_id) = 36), PRIMARY KEY (session_id, binding, item_id, version_id)) STRICT;",
+  );
+  database.prepare("INSERT INTO runtime_configuration VALUES (1, ?, NULL)").run("/usr/bin/false");
+  database
+    .prepare(
+      "INSERT INTO sessions (id, request_id, payload_identity, directory, provider, model, pi_session_id, pi_session_file, history_expected, status, created_at, updated_at, error, thinking_level, history_check_state, history_checked_at, display_name, metadata_revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .run(
+      stored.id,
+      stored.requestId,
+      stored.payloadIdentity,
+      stored.directory,
+      stored.provider,
+      stored.model,
+      stored.piSessionId,
+      stored.piSessionFile,
+      stored.historyExpected ? 1 : 0,
+      stored.status,
+      stored.createdAt,
+      stored.updatedAt,
+      stored.error,
+      stored.thinkingLevel,
+      stored.historyCheck?.state ?? null,
+      stored.historyCheck?.checkedAt ?? null,
+      stored.displayName,
+      stored.metadataRevision,
+    );
+  database
+    .prepare("INSERT INTO turns VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(
+      "44444444-4444-4444-8444-444444444444",
+      stored.id,
+      "55555555-5555-4555-8555-555555555555",
+      "a".repeat(64),
+      "completed",
+      0,
+      1000,
+      1100,
+      null,
+      null,
+      '["synthetic-entry"]',
+    );
+  database
+    .prepare("INSERT INTO library_bindings VALUES (?, ?)")
+    .run("synthetic-library", libraryRoot);
+  database
+    .prepare("INSERT INTO session_library_references VALUES (?, ?, ?, ?)")
+    .run(
+      stored.id,
+      "synthetic-library",
+      "66666666-6666-4666-8666-666666666666",
+      "77777777-7777-4777-8777-777777777777",
+    );
+  database.exec("PRAGMA user_version = 7");
+  database.close();
+}
+
+test("schema-seven migration preserves turns and exact library references", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "dwell-catalog-v7-retirement-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const dataDir = join(root, "data");
+  const libraryRoot = join(root, "library");
+  await mkdir(dataDir, { mode: 0o700 });
+  await mkdir(libraryRoot);
+  const record = session({
+    id: "11111111-1111-4111-8111-111111111111",
+    requestId: "22222222-2222-4222-8222-222222222222",
+    piSessionId: "33333333-3333-4333-8333-333333333333",
+    status: "ready",
+    provider: "test-provider",
+    model: "test-model",
+    displayName: "Catalog migration",
+    metadataRevision: 7,
+  });
+  const turn = {
+    runId: "44444444-4444-4444-8444-444444444444",
+    sessionId: record.id,
+    requestId: "55555555-5555-4555-8555-555555555555",
+    payloadIdentity: "a".repeat(64),
+    status: "completed" as const,
+    cancellationRequested: false,
+    createdAt: 1000,
+    updatedAt: 1100,
+    error: null,
+    entryIds: ["synthetic-entry"],
+  };
+  const reference = {
+    binding: "synthetic-library",
+    itemId: "66666666-6666-4666-8666-666666666666",
+    versionId: "77777777-7777-4777-8777-777777777777",
+  };
+  const databasePath = join(dataDir, "catalog.sqlite");
+  createV7Catalog(databasePath, record, libraryRoot);
+  await chmod(databasePath, 0o600);
+  const before = new DatabaseSync(databasePath);
+  assert.equal(before.prepare("PRAGMA user_version").get()?.user_version, 7);
+  before.close();
+  const migrated = await SessionCatalog.open(dataDir);
+  t.after(() => migrated.close());
+  const version = new DatabaseSync(databasePath);
+  assert.equal(version.prepare("PRAGMA user_version").get()?.user_version, 8);
+  assert.ok(
+    version
+      .prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'source_observations'")
+      .get(),
+  );
+  assert.deepEqual(version.prepare("PRAGMA foreign_key_check").all(), []);
+  version.close();
+  assert.deepEqual(migrated.get(record.id), record);
+  assert.deepEqual(migrated.getTurn(record.id, turn.runId), turn);
+  assert.deepEqual(migrated.listLibraryReferences(record.id), [reference]);
+  assert.equal(migrated.bindLibrary("synthetic-library", libraryRoot), true);
+});
+
 function createV2Catalog(path: string, orphanTurn = false): void {
   const database = new DatabaseSync(path, { enableForeignKeyConstraints: false });
   database.exec(
@@ -166,7 +288,7 @@ test("version-one catalogs migrate transactionally while preserving sessions and
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 7n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 8n);
   assert.equal(
     migrated.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'turns'").get()
       ?.count,
@@ -232,7 +354,7 @@ test("version-two migration preserves sessions, turns, indexes, and foreign keys
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 7n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 8n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   const index = migrated
     .prepare("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = ?")
@@ -288,7 +410,7 @@ test("version-three migration preserves sessions and turns while adding thinking
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 7n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 8n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   assert.ok(
     migrated
@@ -345,7 +467,7 @@ test("version-five migration adds shared names without changing sessions or turn
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 7n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 8n);
   migrated.close();
 });
 

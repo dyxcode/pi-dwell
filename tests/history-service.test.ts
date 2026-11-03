@@ -1,9 +1,3 @@
-import {
-  emptyConversationState,
-  reduceFrame,
-  reconcileHistory,
-  visibleLiveContent,
-} from "../src/clients/web/events.ts";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -12,7 +6,17 @@ import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { SessionService, type SessionServiceOptions } from "../src/sessions/service.ts";
+import {
+  emptyConversationState,
+  reconcileHistory,
+  reduceFrame,
+  visibleLiveContent,
+} from "../src/clients/web/events.ts";
+import {
+  SessionError,
+  SessionService,
+  type SessionServiceOptions,
+} from "../src/sessions/service.ts";
 import type { StreamFrame } from "../src/shared/events.ts";
 import { isHistoryPage } from "../src/shared/history.ts";
 import { SessionCatalog } from "../src/storage/catalog.ts";
@@ -348,7 +352,11 @@ test("a newer missing-file check is not overwritten by an older completed read",
   await assert.rejects(service.getHistory(session.id), /history.*unavailable/i);
   assert.equal(historyCheckState(service.getSession(session.id)), "missing");
   releaseRead();
-  await olderRead;
+  await assert.rejects(olderRead, (error: unknown) => {
+    assert.ok(error instanceof SessionError);
+    assert.equal(error.code, "history_unavailable");
+    return true;
+  });
   assert.equal(historyCheckState(service.getSession(session.id)), "missing");
 });
 

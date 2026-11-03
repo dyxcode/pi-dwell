@@ -31,7 +31,7 @@ Session、turn、run、native execution、event sequence 和 history cursor 分�
 | **Pi session ID (`session.piSessionId`)** | 记录在 Pi JSONL session file 中的 native session UUID。Dwell 用它验证候选文件是否属于此 Pi conversation。它不能与 Dwell session ID 互换使用。 |
 | **Session status** | 持久化的创建结果：`creating`、`ready`、`failed` 或 `interrupted`。描述 Dwell session record。 |
 | **Runtime state (`runtimeState`)** | 当前 process lifecycle projection：`closed`、`opening`、`ready`、`failed` 或 `closing`。描述 live Pi child；session 为 `ready` 时，其 runtime 仍可因未打开而处于 `closed`。 |
-| **History state (`historyState`)** | Dwell 对 saved transcript 可用性的判断：`empty`、`available` 或 `unavailable`。仅凭此状态无法判断 Pi process 是否已打开。 |
+| **History state (`historyState`)** | Dwell 对 saved transcript 可用性的判断：`empty`、`available`、`unavailable` 或 `retired`。仅凭此状态无法判断 Pi process 是否已打开。 |
 | **Turn** | 一次由 Dwell 持久化提交的 prompt operation，包含 `requestId`、生成的 `runId`、status、可选 error，以及归属该 operation 的 saved native entry IDs。一个 turn 不是整个 session transcript。 |
 | **Run ID (`runId`)** | 标识持久化 turn record 的生成 UUID。Routes 使用它读取 result 或请求 abort。它与调用方的 `requestId` 和 Pi-native execution ID 都不同。 |
 | **Request ID (`requestId`)** | Client 提供的 UUID，用于让 session creation 和 turn submission 具备 idempotency。相同 ID 和相同 payload 的重复请求会取回原 operation；若 settings/content 已变，则返回 `request_conflict`。它不是 run ID。 |

@@ -63,6 +63,18 @@ test("history pages retain their saved revision across appends and paginate with
   await assert.rejects(pages.read({ ...source, cursor: first.nextCursor }), /changed|revision/i);
 });
 
+test("retiring one session invalidates its saved-history cursor", async (t) => {
+  const source = await fixture(t, 130);
+  const pages = new HistoryPages();
+  const first = await pages.read(source);
+  assert.ok(first.nextCursor);
+  pages.invalidateSession(source.sessionId);
+  await assert.rejects(
+    pages.read({ ...source, cursor: first.nextCursor }),
+    (error: unknown) => error instanceof Error && /cursor/i.test(error.message),
+  );
+});
+
 test("saved branch projection preserves old text, hides private state and explains context edits", async (t) => {
   const source = await fixture(t, 2);
   const stamp = new Date(0).toISOString();

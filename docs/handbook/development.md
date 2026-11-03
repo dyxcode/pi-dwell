@@ -99,3 +99,5 @@ Run `npm run check:docs` to validate both handbook file sets, local links and an
 Actual Distill integration tests use `DWELL_TEST_DISTILL_MODULE=/absolute/path/to/pi-distill/dist/host-storage.js npm run check` after building that API. Without this variable the cross-product cases are explicitly skipped; standalone checks still run. Fixtures use temporary synthetic databases and Pi sessions.
 
 Set `DWELL_TEST_CURRENT_MODULE` to the absolute built `pi-current/library` JavaScript entry to run actual Current adapter, HTTP, and reference tests. `npm run check:web -- --http` also uses it for Library browser acceptance. It may be combined with `DWELL_TEST_DISTILL_MODULE`. Tests use temporary synthetic storage.
+
+The retirement fixture also loads the matching Distill checkout's `src/` modules to perform actual cleanup; point `DWELL_TEST_DISTILL_MODULE` at that checkout's built `dist/host-storage.js`. Dwell production loads only the public storage API.

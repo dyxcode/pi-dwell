@@ -257,6 +257,18 @@ function copyHistory(value: HistoryPage): HistoryPage {
   };
 }
 
+function clearRetiredProjection(state: ConversationState): ConversationState {
+  return {
+    ...state,
+    messages: [],
+    tools: [],
+    liveRunId: null,
+    liveTruncated: false,
+    liveIncomplete: false,
+    history: null,
+  };
+}
+
 /** Preserves only the previously loaded branch prefix that connects to a latest page. */
 export function mergeHistoryEntries(
   previous: readonly HistoryEntry[],
@@ -485,7 +497,7 @@ function snapshotState(
     incomingCursor !== null &&
     previousCursor.epoch !== incomingCursor.epoch;
 
-  return {
+  const next: ConversationState = {
     sessionId: frame.sessionId,
     lastCursor: frame.cursor,
     cursor: frame.cursor,
@@ -519,6 +531,7 @@ function snapshotState(
     resyncReason: null,
     error: null,
   };
+  return payload.session.historyCheck?.state === "retired" ? clearRetiredProjection(next) : next;
 }
 
 function upsertMessage(
@@ -714,7 +727,9 @@ export function reduceFrame(state: ConversationState, frame: StreamFrame): Conve
         ...(native ? { liveRunId: native.id, activeTurn: null } : {}),
         ...(newRun ? { messages: [], tools: [], liveTruncated: false, liveIncomplete: gap } : {}),
       };
-      return applyCoveredHistory(next);
+      return frame.payload.historyCheck?.state === "retired"
+        ? clearRetiredProjection(next)
+        : applyCoveredHistory(next);
     }
     case "turn.updated": {
       const newRun = next.liveRunId !== frame.payload.runId;

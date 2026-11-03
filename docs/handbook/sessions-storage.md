@@ -37,7 +37,7 @@ flowchart TD
 
 ## The durable catalog
 
-[`SessionCatalog`](../../src/storage/catalog.ts) owns Dwell's SQLite file and validates both its schema and every decoded record. The current schema is version 7. All statements use Node's synchronous `DatabaseSync`; SQL values are parameterized for data writes.
+[`SessionCatalog`](../../src/storage/catalog.ts) owns Dwell's SQLite file and validates both its schema and every decoded record. The current schema is version 8. All statements use Node's synchronous `DatabaseSync`; SQL values are parameterized for data writes.
 
 Schema v6 adds shared display names and metadata revisions; [name updates](implementation/catalog.md#catalog-session-names) compare revisions atomically. Schema v5 adds nullable `history_check_state` and `history_checked_at`; migrated sessions remain unchecked until their next read. See [catalog migration](implementation/catalog.md#catalog-schema-and-migrations).
 
@@ -83,7 +83,7 @@ Terminal turns cannot transition again. `updateTurn()` checks that request ID, p
 
 `SessionCatalog.open(dataDir)` first uses `prepareDataDirectory()`, then creates `catalog.sqlite` as an owner-only file if absent. Before SQLite opens it, Dwell checks that the database is a regular, current-user-owned, single-link file with mode `0600`, using no-follow/nonblocking open flags. SQLite opens with foreign keys enabled, big integer reads, and extensions disabled. Initialization uses `DELETE` journal mode and `synchronous = FULL`.
 
-Schema initialization is one transaction. Version 0 is accepted only when there is no user schema, then creates the current version directly. Versions 1, 2, 3, 4, 5, and 6 are checked against their exact expected schema SQL before transactional migration through version 7. Version 1 first adds the turn table and active-turn index, then applies the later migrations. Version 2 becomes version 3 before version 4. Version 3 adds the nullable `thinking_level` session field. Migrations verify the resulting schema and run `PRAGMA foreign_key_check` before commit. Unsupported versions, a mismatched schema, preserved rows that violate the turn/session foreign key, or failed migration checks are rolled back and reported as an invalid/unsupported catalog; startup does not reset the file.
+Schema initialization is one transaction. Version 0 is accepted only when there is no user schema, then creates the current version directly. Versions 1, 2, 3, 4, 5, 6, and 7 are checked against their exact expected schema SQL before transactional migration through version 8. Version 1 first adds the turn table and active-turn index, then applies the later migrations. Version 2 becomes version 3 before version 4. Version 3 adds the nullable `thinking_level` session field. Migrations verify the resulting schema and run `PRAGMA foreign_key_check` before commit. Unsupported versions, a mismatched schema, preserved rows that violate the turn/session foreign key, or failed migration checks are rolled back and reported as an invalid/unsupported catalog; startup does not reset the file.
 
 `prepareDataDirectory()` requires an owner-only `0700` directory. The native Pi session JSONL can keep Pi's usual 0644 mode because its containing Dwell session directory is private. The catalog's SQLite durability and Pi's JSONL durability are separate: a transaction cannot atomically commit both files.
 
@@ -142,7 +142,7 @@ An error after the child starts stops the process, removes observers, and remove
 | --- | --- |
 | `status` | Durable catalog state: `creating`, `ready`, `failed`, or `interrupted`. |
 | `runtimeState` | Current process map projected to `closed`, `opening`, `ready`, `failed`, or `closing`; a running Pi child still projects as public `ready`. |
-| `historyState` | Last observation maps missing/invalid to `unavailable`, readable to `available`, and not-created to `empty`; unchecked legacy rows use expectation/error. |
+| `historyState` | A matching deletion receipt maps to `retired`; the last observation maps missing/invalid to `unavailable`, readable to `available`, and not-created to `empty`; unchecked legacy rows use expectation/error. |
 
 The view also exposes selected provider/model/thinking level, Pi session ID, current/latest Dwell turn IDs, and the current or most recent process-local native execution summary. The turn payload hash is omitted from this public view.
 

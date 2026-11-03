@@ -170,3 +170,9 @@ Replace both paths with the absolute paths on this host. Keep the same binding f
 Open **Library** to browse latest items, search, and read an exact version. With a session selected, use **Attach to session** to save its reference. This leaves the Pi prompt unchanged. Saved references remain available for listing and removal while Current is unavailable.
 
 `current` and `distill` may share one version 1 configuration. See [storage integrations](implementation/storage-integrations.md).
+
+<a id="retired-history"></a>
+
+## History deleted by Distill
+
+A matching completed deletion receipt displays **Saved history was deleted by Pi Distill**. Dwell retains the session name, turn metadata and library references, and clears cached history content. Restoring and successfully reading the Pi file makes its history available again. Ordinary file absence displays **Saved history is missing**.

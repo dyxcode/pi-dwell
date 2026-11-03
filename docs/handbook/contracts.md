@@ -65,8 +65,8 @@ particular UUID version or variant.
 | `metadataRevision` | Nonnegative safe integer used for name updates. |
 | `status` | `creating`, `ready`, `failed`, `interrupted` |
 | `runtimeState` | `closed`, `opening`, `ready`, `failed`, `closing` |
-| `historyState` | `empty`, `available`, `unavailable` |
-| `historyCheck` | Optional `{ state, checkedAt }`; state is `not-created`, `readable`, `missing`, or `invalid`. |
+| `historyState` | `empty`, `available`, `unavailable`, `retired` |
+| `historyCheck` | Optional `{ state, checkedAt }`; state is `not-created`, `readable`, `missing`, `invalid`, or `retired`. |
 
 The validator requires session and Pi session IDs, directory, provider/model
 pair, thinking level, timestamps, these state fields, error, and active/latest

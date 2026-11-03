@@ -334,7 +334,20 @@ export interface HistorySlice {
 
 /** Stateless signed cursors pin a byte prefix; no retained transcript cache or database. */
 export class HistoryPages {
-  readonly #key = randomBytes(32);
+  readonly #keys = new Map<string, Buffer>();
+
+  invalidateSession(sessionId: string): void {
+    this.#keys.set(sessionId, randomBytes(32));
+  }
+
+  #key(sessionId: string): Buffer {
+    let key = this.#keys.get(sessionId);
+    if (!key) {
+      key = randomBytes(32);
+      this.#keys.set(sessionId, key);
+    }
+    return key;
+  }
 
   #cursor(value: string, sessionId: string): Cursor {
     if (!value || value.length > 1536 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value))
@@ -342,7 +355,7 @@ export class HistoryPages {
     const [payload, signature] = value.split(".");
     if (!payload || !signature)
       throw new HistoryReadError(400, "invalid_cursor", "Invalid history cursor.");
-    const expected = createHmac("sha256", this.#key).update(payload).digest();
+    const expected = createHmac("sha256", this.#key(sessionId)).update(payload).digest();
     const actual = Buffer.from(signature, "base64url");
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected))
       throw new HistoryReadError(
@@ -374,7 +387,9 @@ export class HistoryPages {
 
   #encode(cursor: Cursor): string {
     const payload = Buffer.from(JSON.stringify(cursor)).toString("base64url");
-    return `${payload}.${createHmac("sha256", this.#key).update(payload).digest("base64url")}`;
+    return `${payload}.${createHmac("sha256", this.#key(cursor.sessionId))
+      .update(payload)
+      .digest("base64url")}`;
   }
 
   async read(options: {

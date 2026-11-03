@@ -388,6 +388,83 @@ test("native extension model and thinking changes refresh the session catalog af
   );
 });
 
+test("a pending newer history check does not hide the saved entries from turn settlement", {
+  timeout: 20_000,
+}, async (t) => {
+  const environment = await createPiEnvironment();
+  const dataDir = join(environment.root, "dwell");
+  let readableChecks = 0;
+  let announceFirstCheck!: () => void;
+  let announceSecondCheck!: () => void;
+  let releaseFirstCheck!: () => void;
+  let releaseSecondCheck!: () => void;
+  const firstCheckEntered = new Promise<void>((resolve) => {
+    announceFirstCheck = resolve;
+  });
+  const secondCheckEntered = new Promise<void>((resolve) => {
+    announceSecondCheck = resolve;
+  });
+  const firstCheckReleased = new Promise<void>((resolve) => {
+    releaseFirstCheck = resolve;
+  });
+  const secondCheckReleased = new Promise<void>((resolve) => {
+    releaseSecondCheck = resolve;
+  });
+  const service = await SessionService.create({
+    dataDir,
+    env: environment.env,
+    extensions: [environment.extensionPath],
+    historyCheckCheckpoint: async (state) => {
+      if (state !== "readable") return;
+      readableChecks++;
+      if (readableChecks === 1) {
+        announceFirstCheck();
+        await firstCheckReleased;
+      } else if (readableChecks === 2) {
+        announceSecondCheck();
+        await secondCheckReleased;
+      }
+    },
+  });
+  t.after(async () => {
+    releaseFirstCheck();
+    releaseSecondCheck();
+    await service.shutdown();
+    await environment.cleanup();
+  });
+  await service.configure({
+    executable: process.execPath,
+    entryPoint: fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry")),
+  });
+  const session = await service.createSession({
+    requestId: randomUUID(),
+    directory: environment.cwd,
+    provider: "dwell-test",
+    model: "dwell-test",
+  });
+  assert.equal(service.getSession(session.id).historyCheck?.state, "not-created");
+
+  const { turn } = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await firstCheckEntered;
+  const concurrentHistory = service.getHistory(session.id);
+  await secondCheckEntered;
+  releaseFirstCheck();
+
+  const settled = await waitFor(
+    () => Promise.resolve(service.getTurn(session.id, turn.runId)),
+    (value) => !["accepted", "dispatching", "running"].includes(value.status),
+    "the turn to settle while the newer history check is pending",
+  );
+  assert.equal(settled.status, "completed");
+
+  releaseSecondCheck();
+  assert.equal((await concurrentHistory).status, "available");
+  assert.equal(readableChecks, 2);
+});
+
 test("host restart reconciles stale session model metadata from the saved Pi transcript", {
   timeout: 20_000,
 }, async (t) => {

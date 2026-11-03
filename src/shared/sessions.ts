@@ -34,7 +34,7 @@ export interface NativeExecutionInfo {
   error: string | null;
 }
 
-export type HistoryCheckState = "not-created" | "readable" | "missing" | "invalid";
+export type HistoryCheckState = "not-created" | "readable" | "missing" | "invalid" | "retired";
 
 export interface HistoryCheck {
   state: HistoryCheckState;
@@ -54,7 +54,7 @@ export interface SessionInfo {
   updatedAt: number;
   status: "creating" | "ready" | "failed" | "interrupted";
   runtimeState: "closed" | "opening" | "ready" | "failed" | "closing";
-  historyState: "empty" | "available" | "unavailable";
+  historyState: "empty" | "available" | "unavailable" | "retired";
   /** Last complete observation of the native history file; absent means unchecked. */
   historyCheck?: HistoryCheck;
   error: string | null;
@@ -127,7 +127,7 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
     ["closed", "opening", "ready", "failed", "closing"].includes(value.runtimeState) &&
     "historyState" in value &&
     typeof value.historyState === "string" &&
-    ["empty", "available", "unavailable"].includes(value.historyState) &&
+    ["empty", "available", "unavailable", "retired"].includes(value.historyState) &&
     (!Object.hasOwn(value, "historyCheck") ||
       ("historyCheck" in value && isHistoryCheck(value.historyCheck))) &&
     "error" in value &&
@@ -186,7 +186,7 @@ export function isHistoryCheck(value: unknown): value is HistoryCheck {
     Object.hasOwn(value, "checkedAt") &&
     "state" in value &&
     typeof value.state === "string" &&
-    ["not-created", "readable", "missing", "invalid"].includes(value.state) &&
+    ["not-created", "readable", "missing", "invalid", "retired"].includes(value.state) &&
     "checkedAt" in value &&
     typeof value.checkedAt === "number" &&
     Number.isSafeInteger(value.checkedAt)

@@ -22,7 +22,7 @@ Source / verification: [src/shared/sessions.ts](../../../src/shared/sessions.ts)
 
 `isSessionInfo` checks both UUIDs, directory, paired nullable provider/model, nullable supported thinking level, safe-integer timestamps, lifecycle/runtime/history enums, error, and active/latest turn references. A `ready` session must have a provider and model. The guard permits extra top-level fields. Optional native execution is delegated to `isNativeExecutionInfo`, which instead requires exactly id/status/error, a UUID, an allowed terminal/running state, and at most 2,048 UTF-8 bytes of error text. An ephemeral native execution ID is not a durable turn request ID.
 
-`isHistoryCheck` validates an observation with exactly `state` and `checkedAt`: state is `not-created`, `readable`, `missing`, or `invalid`, and time is a safe integer. `isSessionInfo` permits this field to be absent, meaning unchecked.
+`isHistoryCheck` validates an observation with exactly `state` and `checkedAt`: state is `not-created`, `readable`, `missing`, `invalid`, or `retired`, and time is a safe integer. `isSessionInfo` permits this field to be absent, meaning unchecked.
 
 `mergeSessionMetadata` keeps the newer name and revision when two snapshots identify the same session, while taking all other fields from the incoming snapshot. A different session ID uses the incoming snapshot unchanged. This makes HTTP, SSE and catalog-refresh ordering independent of name freshness.
 

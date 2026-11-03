@@ -127,3 +127,9 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 打开 **Library** 可查看 latest items、搜索和读取 exact version。选中 session 后，使用 **Attach to session** 保存 reference；该操作不会改变 Pi prompt。已保存的 reference 可在 Current 暂不可用时继续查看和移除。
 
 `current` 和 `distill` 可放在同一个 version 1 configuration 中。详见 [storage integrations](implementation/storage-integrations.md)。
+
+<a id="retired-history"></a>
+
+## Distill 已删除的 history
+
+匹配的 completed deletion receipt 会让 session 显示 **Saved history was deleted by Pi Distill**。Dwell 保留 session name、turn metadata 和 library references，并清除该 history 的缓存内容。恢复原 Pi file 并成功读取后，history 会重新显示；普通文件缺失显示 **Saved history is missing**。

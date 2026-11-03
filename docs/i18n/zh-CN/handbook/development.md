@@ -115,3 +115,5 @@ Source 和 test atlases 是当前 declaration 和 test name 的 snapshot。代�
 构建 Distill API 后，使用 `DWELL_TEST_DISTILL_MODULE=/absolute/path/to/pi-distill/dist/host-storage.js npm run check` 执行实际 integration tests。未设置该变量时，跨产品 cases 会明确 skip，standalone checks 仍会运行。Fixtures 使用临时 synthetic databases 与 Pi sessions。
 
 设置 `DWELL_TEST_CURRENT_MODULE` 为 built `pi-current/library` JavaScript entry 的 absolute path，可运行真实 Current adapter、HTTP 和 reference 测试；`npm run check:web -- --http` 也使用该变量运行 Library browser acceptance。可以同时设置 `DWELL_TEST_DISTILL_MODULE`。测试使用临时 synthetic storage。
+
+Retirement fixture 还会加载同一 Distill checkout 的 `src/` modules 来执行实际 cleanup；请将 `DWELL_TEST_DISTILL_MODULE` 指向该 checkout 构建的 `dist/host-storage.js`。Dwell production 只加载 public storage API。

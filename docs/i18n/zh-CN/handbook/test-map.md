@@ -35,20 +35,20 @@
 
 ## tests/catalog.test.ts
 
-验证 SQLite catalog 的 schema、migration、权限、数据完整性与启动恢复；错误状态不会被静默重置。
+[查看测试](../../../../tests/catalog.test.ts)
 
-[查看源码](../../../../tests/catalog.test.ts)
-
-- [catalog configuration and private SQLite storage survive reopening](../../../../tests/catalog.test.ts#L72)
-- [version-one catalogs migrate transactionally while preserving sessions and configuration](../../../../tests/catalog.test.ts#L107)
-- [version-two migration preserves sessions, turns, indexes, and foreign keys](../../../../tests/catalog.test.ts#L157)
-- [version-three migration preserves sessions and turns while adding thinking level](../../../../tests/catalog.test.ts#L220)
-- [version-two migration rolls back if preserved turns violate the session foreign key](../../../../tests/catalog.test.ts#L274)
-- [version-one schema rejection leaves the original catalog version and tables intact](../../../../tests/catalog.test.ts#L304)
-- [catalog enforces request uniqueness and reopens deterministic list and updates](../../../../tests/catalog.test.ts#L335)
-- [startup marks only creating sessions interrupted and persists the recovery](../../../../tests/catalog.test.ts#L377)
-- [corrupt, unversioned, and future catalog files fail closed without resetting bytes](../../../../tests/catalog.test.ts#L409)
-- [catalog refuses database symlinks, hard links, and unsafe permissions](../../../../tests/catalog.test.ts#L445)
+- [schema-seven migration preserves turns and exact library references](../../../../tests/catalog.test.ts#L110)
+- [catalog configuration and private SQLite storage survive reopening](../../../../tests/catalog.test.ts#L212)
+- [version-one catalogs migrate transactionally while preserving sessions and configuration](../../../../tests/catalog.test.ts#L247)
+- [version-two migration preserves sessions, turns, indexes, and foreign keys](../../../../tests/catalog.test.ts#L300)
+- [version-three migration preserves sessions and turns while adding thinking level](../../../../tests/catalog.test.ts#L366)
+- [version-five migration adds shared names without changing sessions or turns](../../../../tests/catalog.test.ts#L423)
+- [version-two migration rolls back if preserved turns violate the session foreign key](../../../../tests/catalog.test.ts#L474)
+- [version-one schema rejection leaves the original catalog version and tables intact](../../../../tests/catalog.test.ts#L504)
+- [catalog enforces request uniqueness and reopens deterministic list and updates](../../../../tests/catalog.test.ts#L535)
+- [startup marks only creating sessions interrupted and persists the recovery](../../../../tests/catalog.test.ts#L582)
+- [corrupt, unversioned, and future catalog files fail closed without resetting bytes](../../../../tests/catalog.test.ts#L614)
+- [catalog refuses database symlinks, hard links, and unsafe permissions](../../../../tests/catalog.test.ts#L650)
 
 ## tests/cli.test.ts
 
@@ -237,30 +237,33 @@
 
 ## tests/history-service.test.ts
 
-验证 saved history/result 在重启和 sequential Pi handoff 后的连续性，以及缺失、损坏或尚未保存的 source。
+[查看测试](../../../../tests/history-service.test.ts)
 
-[查看源码](../../../../tests/history-service.test.ts)
-
-- [history and native results survive restart without launching Pi](../../../../tests/history-service.test.ts#L70)
-- [standalone Pi continues the same native file and Dwell reads external messages without inventing turns](../../../../tests/history-service.test.ts#L90)
-- [history plus buffered SSE converges on saved entries across a completion race](../../../../tests/history-service.test.ts#L144)
-- [deleted history remains unavailable even with a live runtime and corruption never overwrites source](../../../../tests/history-service.test.ts#L178)
-- [deep native result content reports a response limit while projected history stays readable](../../../../tests/history-service.test.ts#L193)
-- [a first admitted turn has pending history before dispatch and read admission drains at shutdown](../../../../tests/history-service.test.ts#L211)
-- [active saved tool records take over live output across a multi-step reconnect](../../../../tests/history-service.test.ts#L258)
+- [history and native results survive restart without launching Pi](../../../../tests/history-service.test.ts#L92)
+- [closing an idle runtime still releases Pi when its expected history file is missing](../../../../tests/history-service.test.ts#L117)
+- [standalone Pi continues the same native file and Dwell reads external messages without inventing turns](../../../../tests/history-service.test.ts#L134)
+- [malformed JSONL after a valid header is recorded invalid and never starts a replacement session](../../../../tests/history-service.test.ts#L189)
+- [foreign session and cwd headers are recorded invalid](../../../../tests/history-service.test.ts#L229)
+- [a stale history cursor does not downgrade the last verified readable state](../../../../tests/history-service.test.ts#L247)
+- [a newer missing-file check is not overwritten by an older completed read](../../../../tests/history-service.test.ts#L291)
+- [a close check uses a history observation saved while Pi state was loading](../../../../tests/history-service.test.ts#L363)
+- [history plus buffered SSE converges on saved entries across a completion race](../../../../tests/history-service.test.ts#L404)
+- [deleted history remains unavailable even with a live runtime and corruption never overwrites source](../../../../tests/history-service.test.ts#L438)
+- [deep native result content reports a response limit while projected history stays readable](../../../../tests/history-service.test.ts#L453)
+- [a first admitted turn has pending history before dispatch and read admission drains at shutdown](../../../../tests/history-service.test.ts#L471)
+- [active saved tool records take over live output across a multi-step reconnect](../../../../tests/history-service.test.ts#L518)
 
 ## tests/history.test.ts
 
-验证 native branch projection、signed cursor、page/entry budget、tool/image block 与 unsupported content 的展示。
-
-[查看源码](../../../../tests/history.test.ts)
+[查看测试](../../../../tests/history.test.ts)
 
 - [history pages retain their saved revision across appends and paginate without repeats](../../../../tests/history.test.ts#L37)
-- [saved branch projection preserves old text, hides private state and explains context edits](../../../../tests/history.test.ts#L66)
-- [tool references survive projection while images and oversized text remain bounded](../../../../tests/history.test.ts#L144)
-- [history page validation rejects untrusted or inconsistent protocol values](../../../../tests/history.test.ts#L188)
-- [oversized tool metadata is explicitly marked as truncated](../../../../tests/history.test.ts#L217)
-- [deep saved tool input gets a bounded placeholder instead of failing history](../../../../tests/history.test.ts#L227)
+- [retiring one session invalidates its saved-history cursor](../../../../tests/history.test.ts#L66)
+- [saved branch projection preserves old text, hides private state and explains context edits](../../../../tests/history.test.ts#L78)
+- [tool references survive projection while images and oversized text remain bounded](../../../../tests/history.test.ts#L156)
+- [history page validation rejects untrusted or inconsistent protocol values](../../../../tests/history.test.ts#L200)
+- [oversized tool metadata is explicitly marked as truncated](../../../../tests/history.test.ts#L229)
+- [deep saved tool input gets a bounded placeholder instead of failing history](../../../../tests/history.test.ts#L239)
 
 ## tests/host.test.ts
 
@@ -300,17 +303,17 @@
 
 ## tests/native-executions.test.ts
 
-验证 native execution 与 durable turn 的独立 identity、startup/follow-up execution、abort 和 saved-history coverage。
-
-[查看源码](../../../../tests/native-executions.test.ts)
+[查看测试](../../../../tests/native-executions.test.ts)
 
 - [a native extension execution during session startup is observed without rejecting Pi](../../../../tests/native-executions.test.ts#L110)
-- [extension-handled requests retain asynchronous native follow-ups and permit later turns](../../../../tests/native-executions.test.ts#L130)
-- [startup native execution preserves Pi thinking when the saved Dwell setting differs](../../../../tests/native-executions.test.ts#L214)
-- [native extension model and thinking changes refresh the session catalog after settlement](../../../../tests/native-executions.test.ts#L281)
-- [host restart reconciles stale session model metadata from the saved Pi transcript](../../../../tests/native-executions.test.ts#L357)
-- [native extension runs stay outside the turn ledger and reconcile live events with saved history](../../../../tests/native-executions.test.ts#L438)
-- [native execution abort requires its current execution ID and preserves RPC until settlement](../../../../tests/native-executions.test.ts#L534)
+- [closing after native work releases Pi when its expected history file was removed](../../../../tests/native-executions.test.ts#L130)
+- [extension-handled requests retain asynchronous native follow-ups and permit later turns](../../../../tests/native-executions.test.ts#L164)
+- [startup native execution preserves Pi thinking when the saved Dwell setting differs](../../../../tests/native-executions.test.ts#L248)
+- [native extension model and thinking changes refresh the session catalog after settlement](../../../../tests/native-executions.test.ts#L315)
+- [a pending newer history check does not hide the saved entries from turn settlement](../../../../tests/native-executions.test.ts#L391)
+- [host restart reconciles stale session model metadata from the saved Pi transcript](../../../../tests/native-executions.test.ts#L468)
+- [native extension runs stay outside the turn ledger and reconcile live events with saved history](../../../../tests/native-executions.test.ts#L549)
+- [native execution abort requires its current execution ID and preserves RPC until settlement](../../../../tests/native-executions.test.ts#L645)
 
 ## tests/pi-history-budget.test.ts
 
@@ -586,31 +589,31 @@
 
 ## tests/web-events.test.ts
 
-验证 SSE decoder、immutable reducer、cursor/resync、live accumulation、saved/native identity reconciliation 与 client budget。
+[查看测试](../../../../tests/web-events.test.ts)
 
-[查看源码](../../../../tests/web-events.test.ts)
-
-- [SSEDecoder accepts fragmented CRLF frames and ignores heartbeat blocks](../../../../tests/web-events.test.ts#L205)
-- [SSEDecoder permits multiline data fields but validates the JSON protocol frame](../../../../tests/web-events.test.ts#L217)
-- [SSEDecoder counts fragmented Unicode as UTF-8 bytes](../../../../tests/web-events.test.ts#L226)
-- [SSEDecoder reports malformed JSON, invalid frames, and mismatched event metadata](../../../../tests/web-events.test.ts#L239)
-- [stream frame guards validate block text spans and thinking-only deltas](../../../../tests/web-events.test.ts#L259)
-- [SSEDecoder bounds an unfinished frame](../../../../tests/web-events.test.ts#L324)
-- [reduceFrame accumulates multiple assistant messages and updates tool output](../../../../tests/web-events.test.ts#L330)
-- [reduceFrame retains ordered text spans and thinking deltas through snapshot resync](../../../../tests/web-events.test.ts#L406)
-- [reduceFrame leaves previous state and frame payloads untouched](../../../../tests/web-events.test.ts#L496)
-- [reduceFrame ignores duplicate and older cursors, and marks sequence gaps incomplete](../../../../tests/web-events.test.ts#L511)
-- [resync preserves live state and a same-run snapshot merges its bounded projection](../../../../tests/web-events.test.ts#L547)
-- [reconcileHistory clears only the matching covered terminal live run](../../../../tests/web-events.test.ts#L648)
-- [mergeHistoryEntries keeps a loaded older prefix without duplicating overlap](../../../../tests/web-events.test.ts#L706)
-- [mergeHistoryEntries drops the old fork suffix and retains its shared parent](../../../../tests/web-events.test.ts#L727)
-- [mergeHistoryEntries replaces unrelated branches and clears on an empty latest page](../../../../tests/web-events.test.ts#L744)
-- [new runs reset live items and a fresh session state accepts its snapshot](../../../../tests/web-events.test.ts#L755)
-- [resync rejects stale cursors but accepts a lower sequence from a new epoch](../../../../tests/web-events.test.ts#L843)
-- [live message and tool accumulation stay within client item and byte limits](../../../../tests/web-events.test.ts#L911)
-- [reduceFrame ignores frames from another session and handles epoch replacement snapshots](../../../../tests/web-events.test.ts#L974)
-- [saved native identities take over live content while repeated text stays distinct](../../../../tests/web-events.test.ts#L997)
-- [native execution observation is separate from Dwell turns and waits for saved coverage](../../../../tests/web-events.test.ts#L1048)
+- [SSEDecoder accepts fragmented CRLF frames and ignores heartbeat blocks](../../../../tests/web-events.test.ts#L207)
+- [SSEDecoder permits multiline data fields but validates the JSON protocol frame](../../../../tests/web-events.test.ts#L219)
+- [SSEDecoder counts fragmented Unicode as UTF-8 bytes](../../../../tests/web-events.test.ts#L228)
+- [SSEDecoder reports malformed JSON, invalid frames, and mismatched event metadata](../../../../tests/web-events.test.ts#L241)
+- [stream frame guards validate block text spans and thinking-only deltas](../../../../tests/web-events.test.ts#L261)
+- [SSEDecoder bounds an unfinished frame](../../../../tests/web-events.test.ts#L326)
+- [reduceFrame accumulates multiple assistant messages and updates tool output](../../../../tests/web-events.test.ts#L332)
+- [reduceFrame retains ordered text spans and thinking deltas through snapshot resync](../../../../tests/web-events.test.ts#L408)
+- [reduceFrame leaves previous state and frame payloads untouched](../../../../tests/web-events.test.ts#L498)
+- [reduceFrame ignores duplicate and older cursors, and marks sequence gaps incomplete](../../../../tests/web-events.test.ts#L513)
+- [resync preserves live state and a same-run snapshot merges its bounded projection](../../../../tests/web-events.test.ts#L549)
+- [reconcileHistory clears only the matching covered terminal live run](../../../../tests/web-events.test.ts#L650)
+- [mergeHistoryEntries keeps a loaded older prefix without duplicating overlap](../../../../tests/web-events.test.ts#L708)
+- [mergeHistoryEntries drops the old fork suffix and retains its shared parent](../../../../tests/web-events.test.ts#L729)
+- [mergeHistoryEntries replaces unrelated branches and clears on an empty latest page](../../../../tests/web-events.test.ts#L746)
+- [new runs reset live items and a fresh session state accepts its snapshot](../../../../tests/web-events.test.ts#L757)
+- [resync rejects stale cursors but accepts a lower sequence from a new epoch](../../../../tests/web-events.test.ts#L845)
+- [live message and tool accumulation stay within client item and byte limits](../../../../tests/web-events.test.ts#L913)
+- [reduceFrame ignores frames from another session and handles epoch replacement snapshots](../../../../tests/web-events.test.ts#L976)
+- [session events and replacement snapshots preserve the newest shared name revision](../../../../tests/web-events.test.ts#L999)
+- [a retired session event clears saved history and live transcript projections](../../../../tests/web-events.test.ts#L1049)
+- [saved native identities take over live content while repeated text stays distinct](../../../../tests/web-events.test.ts#L1101)
+- [native execution observation is separate from Dwell turns and waits for saved coverage](../../../../tests/web-events.test.ts#L1152)
 
 ## tests/web.test.ts
 
@@ -622,13 +625,11 @@
 - [native browser compilation exposes a fixed set of credential-safe modules](../../../../tests/web.test.ts#L16)
 - [creation asks only for a directory and model selection sits above the composer](../../../../tests/web.test.ts#L44)
 
-
 ## tests/integrations.test.ts
 
 [查看测试](../../../../tests/integrations.test.ts)
 
 - optional integrations use explicit local modules and storage paths
-
 
 ## tests/integrations-host.test.ts
 
@@ -637,20 +638,17 @@
 - host loads configured Distill and closes children before its adapter
 - invalid configured integration fails host startup explicitly
 
-
 ## tests/distill-adapter.test.ts
 
 [查看测试](../../../../tests/distill-adapter.test.ts)
 
 - the built Distill API coordinates Dwell reads and durable child use
 
-
 ## tests/distill-sessions.test.ts
 
 [查看测试](../../../../tests/distill-sessions.test.ts)
 
 - configured Distill use follows fresh Pi startup, close and reopen
-
 
 ## tests/runtime-spawn.test.ts
 
@@ -659,14 +657,15 @@
 - onSpawn receives the live Pi PID and its close promise resolves after stop
 - an onSpawn failure rejects startup after stopping and closing the child
 
-
 ## tests/session-source-access.test.ts
 
 [查看测试](../../../../tests/session-source-access.test.ts)
 
-- source reads hold only a short gate and release it on success and error
-- fresh session use is reserved before spawn and released only after child close
-- only a known unspawned opening is abandoned automatically
+- [source reads hold only a short gate and release it on success and error](../../../../tests/session-source-access.test.ts#L15)
+- [fresh session use is reserved before spawn and released only after child close](../../../../tests/session-source-access.test.ts#L54)
+- [only a known unspawned opening is abandoned automatically](../../../../tests/session-source-access.test.ts#L97)
+- [a refused child release remains available for shutdown retry](../../../../tests/session-source-access.test.ts#L121)
+- [drain attempts pending host-use releases after a SQLite read-release failure](../../../../tests/session-source-access.test.ts#L172)
 
 ## tests/current-library.test.ts
 
@@ -690,10 +689,10 @@
 
 ## tests/library-references.test.ts
 
-[Open source](../../../../tests/library-references.test.ts)
+[查看测试](../../../../tests/library-references.test.ts)
 
-- [library references persist exact versions without changing turns or Pi context](../../../../tests/library-references.test.ts#L30)
-- [catalog schema v6 migrates to v7 without dropping existing session rows](../../../../tests/library-references.test.ts#L167)
+- [library references persist exact versions without changing turns or Pi context](../../../../tests/library-references.test.ts#L31)
+- [catalog schema v6 migrates to v8 and keeps names, turns, and usable references](../../../../tests/library-references.test.ts#L231)
 
 ## tests/library-web.test.ts
 
@@ -708,3 +707,10 @@
 [Open source](../../../../tests/storage-composition.test.ts)
 
 四个配置组合：standalone、Distill only、Current only、both。覆盖 native turn、history、shared name、restart、exact-version reference、Pi context 保持独立，以及 source-read/child reservation 的释放。
+
+## tests/history-retirement.test.ts
+
+[查看测试](../../../../tests/history-retirement.test.ts)
+
+- [actual Distill cleanup retires the exact cached source and restored files clear retirement](../../../../tests/history-retirement.test.ts#L133)
+- [concurrent history reads settle and manual removal remains missing without a receipt](../../../../tests/history-retirement.test.ts#L448)

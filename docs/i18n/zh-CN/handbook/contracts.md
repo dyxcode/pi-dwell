@@ -47,6 +47,8 @@
 
 | Field | Values |
 | --- | --- |
+| `displayName` | Null 或已经 trim、最多 80 个 Unicode code points、不含 NUL 的 name。 |
+| `metadataRevision` | Name update 使用的非负 safe integer。 |
 | `status` | `creating`、`ready`、`failed`、`interrupted` |
 | `runtimeState` | `closed`、`opening`、`ready`、`failed`、`closing` |
 | `historyState` | `empty`、`available`、`unavailable` |

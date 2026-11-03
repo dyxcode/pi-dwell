@@ -138,6 +138,8 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const CURSOR = /^([a-f0-9-]{36}):([a-f0-9-]{36}):(0|[1-9][0-9]*)$/;
 const SESSION_KEYS = [
   "id",
+  "displayName",
+  "metadataRevision",
   "directory",
   "provider",
   "model",

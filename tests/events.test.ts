@@ -20,6 +20,8 @@ const REQUEST_ID = "44444444-4444-4444-8444-444444444444";
 function session(id = SESSION_ID, updatedAt = 10): SessionInfo {
   return {
     id,
+    displayName: null,
+    metadataRevision: 0,
     directory: "/tmp/project",
     provider: "synthetic",
     model: "offline-test",

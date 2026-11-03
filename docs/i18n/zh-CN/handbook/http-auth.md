@@ -69,6 +69,7 @@
 | `GET /sessions/:id/context` | Either | 当前 Pi context projection；必要时会打开或重新打开 runtime |
 | `GET /sessions/:id/models` | Either | Session-scoped model registry，包括 extension models |
 | `POST /sessions/:id/model-capabilities` | Either | Provider/model → session-scoped capability metadata |
+| `POST /sessions/:id/name` | Either | `{displayName, expectedRevision}` → 更新后的 SessionInfo；null 表示 reset，旧 revision 返回 409 `metadata_conflict` |
 | `POST /sessions/:id/model` | Either | Provider/model 和可选 thinkingLevel → 生效后的 SessionInfo |
 | `GET /sessions/:id/history[?cursor=…]` | Either | native branch history 的分页 projection |
 | `GET /sessions/:id/history/:entry/images/:index` | Either | 验证后的 native saved image bytes，附 MIME type 和长度 |

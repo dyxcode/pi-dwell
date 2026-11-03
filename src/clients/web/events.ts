@@ -8,7 +8,7 @@ import {
   type TurnProjection,
 } from "../../shared/events.ts";
 import { type HistoryEntry, type HistoryPage, isHistoryPage } from "../../shared/history.ts";
-import type { SessionInfo } from "../../shared/sessions.ts";
+import { mergeSessionMetadata, type SessionInfo } from "../../shared/sessions.ts";
 
 export const MAX_SSE_FRAME_BYTES = 256 * 1024;
 const MAX_LIVE_MESSAGES = 64;
@@ -489,7 +489,9 @@ function snapshotState(
     sessionId: frame.sessionId,
     lastCursor: frame.cursor,
     cursor: frame.cursor,
-    session: { ...payload.session },
+    session: previousState.session
+      ? mergeSessionMetadata(previousState.session, payload.session)
+      : { ...payload.session },
     activeTurn: copyTurn(payload.activeTurn),
     latestTurn: copyTurn(payload.latestTurn),
     metadataTruncated: payload.metadataTruncated,
@@ -706,7 +708,9 @@ export function reduceFrame(state: ConversationState, frame: StreamFrame): Conve
       const newRun = native && next.liveRunId !== native.id;
       next = {
         ...next,
-        session: { ...frame.payload },
+        session: next.session
+          ? mergeSessionMetadata(next.session, frame.payload)
+          : { ...frame.payload },
         ...(native ? { liveRunId: native.id, activeTurn: null } : {}),
         ...(newRun ? { messages: [], tools: [], liveTruncated: false, liveIncomplete: gap } : {}),
       };

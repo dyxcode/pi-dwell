@@ -61,6 +61,8 @@ particular UUID version or variant.
 
 | Field | Values |
 | --- | --- |
+| `displayName` | Null or a trimmed name of at most 80 Unicode code points, excluding NUL. |
+| `metadataRevision` | Nonnegative safe integer used for name updates. |
 | `status` | `creating`, `ready`, `failed`, `interrupted` |
 | `runtimeState` | `closed`, `opening`, `ready`, `failed`, `closing` |
 | `historyState` | `empty`, `available`, `unavailable` |

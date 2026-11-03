@@ -52,3 +52,25 @@ test("creation asks only for a directory and model selection sits above the comp
   assert.match(row, /id="composer-directory"/);
   assert.match(row, /id="choose-model"/);
 });
+
+test("shared session names have explicit rename, reset and browser-name import controls", () => {
+  for (const id of [
+    "edit-session-name",
+    "session-name-dialog",
+    "session-name-input",
+    "save-session-name",
+    "reset-session-name",
+    "import-local-name",
+  ])
+    assert.match(HOST_PAGE, new RegExp(`id="${id}"`));
+  assert.match(HOST_PAGE, /Import this browser's saved name/);
+  const composerContext = HOST_PAGE.slice(
+    HOST_PAGE.indexOf('id="composer-context"'),
+    HOST_PAGE.indexOf('id="composer"'),
+  );
+  assert.match(composerContext, /id="edit-session-name"/);
+  assert.match(BROWSER_SCRIPT, /metadataRevision/);
+  assert.match(BROWSER_SCRIPT, /displayName/);
+  assert.match(BROWSER_SCRIPT, /s\.displayName \?\? directory/);
+  assert.doesNotMatch(BROWSER_SCRIPT, /names\.get\(s\.id\)/);
+});

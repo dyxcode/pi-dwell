@@ -14,7 +14,7 @@ The entry point passes arguments to `runCli`; `parseCommand` selects foreground 
 
 Session service startup opens and validates the catalog, reconciles interrupted records and starts Pi processes on demand. A ready listener establishes service availability. Provider credentials are exercised during model calls, and saved sessions are checked when reopened.
 
-Source / verification: [`runCli`](../../../src/clients/cli/main.ts#L9) · [`startHost`](../../../src/server/http.ts#L102) · [`SessionService.create`](../../../src/sessions/service.ts#L253) · [tests/host.test.ts](../../../tests/host.test.ts)
+Source / verification: [`runCli`](../../../src/clients/cli/main.ts#L9) · [`startHost`](../../../src/server/http.ts#L106) · [`SessionService.create`](../../../src/sessions/service.ts#L254) · [tests/host.test.ts](../../../tests/host.test.ts)
 
 <a id="pairing"></a>
 
@@ -36,7 +36,7 @@ For a new request, the service canonicalizes the directory, prunes exited childr
 
 A new Pi session may use Pi's configured defaults. Once native history exists, reopening uses its identity and effective model/thinking state. Explicit new-session model flags are not repeatedly forced over a resumed transcript. The Pi process chapter explains readiness verification and startup resource discovery.
 
-Source / verification: [`SessionService.createSession`](../../../src/sessions/service.ts#L519) · [`SessionService.#open`](../../../src/sessions/service.ts#L1985) · [tests/sessions.test.ts](../../../tests/sessions.test.ts) · [tests/session-models.test.ts](../../../tests/session-models.test.ts)
+Source / verification: [`SessionService.createSession`](../../../src/sessions/service.ts#L561) · [`SessionService.#open`](../../../src/sessions/service.ts#L2031) · [tests/sessions.test.ts](../../../tests/sessions.test.ts) · [tests/session-models.test.ts](../../../tests/session-models.test.ts)
 
 <a id="model"></a>
 
@@ -46,7 +46,7 @@ The model picker fetches models from the selected live session's registry so ext
 
 Image drafts remain in browser memory, associated with their session. Intake checks file size/type and reads canonical content; preview resources are released when drafts are removed or cleared. Turn admission validates the JSON-safe images again, and execution verifies the selected model supports images. Saved images stay in Pi's native JSONL and are served through authenticated entry/index references.
 
-Source / verification: [`SessionService.setSessionModel`](../../../src/sessions/service.ts#L601) · [`changeModel`](../../../src/clients/web/client.ts#L2010) · [src/clients/web/attachments.ts](../../../src/clients/web/attachments.ts) · [tests/session-models.test.ts](../../../tests/session-models.test.ts) · [tests/images-http.test.ts](../../../tests/images-http.test.ts)
+Source / verification: [`SessionService.setSessionModel`](../../../src/sessions/service.ts#L645) · [`changeModel`](../../../src/clients/web/client.ts#L2104) · [src/clients/web/attachments.ts](../../../src/clients/web/attachments.ts) · [tests/session-models.test.ts](../../../tests/session-models.test.ts) · [tests/images-http.test.ts](../../../tests/images-http.test.ts)
 
 <a id="close"></a>
 
@@ -56,7 +56,7 @@ Stopping work targets an active durable turn or a specific native execution. Clo
 
 Reopening starts Pi using the recorded session identity and file. Known missing or invalid history produces an unavailable/error boundary instead of creating a replacement empty conversation with the same apparent identity. Reading saved history does not need a Pi process, but reading current model context can open one.
 
-Source / verification: [`SessionService.closeSession`](../../../src/sessions/service.ts#L712) · [`SessionService.getContext`](../../../src/sessions/service.ts#L748) · [`prepareClose`](../../../src/clients/web/client.ts#L783) · [`confirmSessionClose`](../../../src/clients/web/client.ts#L913) · [tests/history-service.test.ts](../../../tests/history-service.test.ts)
+Source / verification: [`SessionService.closeSession`](../../../src/sessions/service.ts#L756) · [`SessionService.getContext`](../../../src/sessions/service.ts#L792) · [`prepareClose`](../../../src/clients/web/client.ts#L875) · [`confirmSessionClose`](../../../src/clients/web/client.ts#L1005) · [tests/history-service.test.ts](../../../tests/history-service.test.ts)
 
 <a id="shutdown"></a>
 
@@ -66,4 +66,4 @@ The host close promise is shared across repeated calls. It closes streams and re
 
 The catalog stays open until tracked turn finalization, reads and discovery/refresh operations have settled. Restart reconciles unfinished durable work to interrupted rather than invoking it again.
 
-Source / verification: [`startHost`](../../../src/server/http.ts#L102) · [`SessionService.shutdown`](../../../src/sessions/service.ts#L1411) · [`PiProcess.stop`](../../../src/runtime/pi-process.ts#L682) · [tests/turn-recovery.test.ts](../../../tests/turn-recovery.test.ts) · [tests/host.test.ts](../../../tests/host.test.ts)
+Source / verification: [`startHost`](../../../src/server/http.ts#L106) · [`SessionService.shutdown`](../../../src/sessions/service.ts#L1455) · [`PiProcess.stop`](../../../src/runtime/pi-process.ts#L682) · [tests/turn-recovery.test.ts](../../../tests/turn-recovery.test.ts) · [tests/host.test.ts](../../../tests/host.test.ts)

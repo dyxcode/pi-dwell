@@ -8,6 +8,10 @@ import { startHost } from "../src/server/http.ts";
 import { isSessionInfo } from "../src/shared/sessions.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+}
+
 async function setup(t: TestContext) {
   const environment = await createPiEnvironment();
   const options = {
@@ -149,6 +153,136 @@ test("paired browsers can read sessions but cannot configure executables or bypa
     body: JSON.stringify({ requestId: randomUUID(), message: "hello" }),
   });
   assert.equal(turnDenied.status, 403);
+});
+
+test("paired browsers share session names, detect stale revisions and retain them across restart", async (t) => {
+  const { request, configure, body, host, options } = await setup(t);
+  await configure();
+  const createdResponse = await request("/sessions", body);
+  assert.equal(createdResponse.status, 201);
+  const created: unknown = await createdResponse.json();
+  assert.ok(isSessionInfo(created));
+
+  const pair = async (key: string) => {
+    const pairing: unknown = await (await request("/auth/pairings", {})).json();
+    assert.equal(typeof field(pairing, "code"), "string");
+    const browserKey = key.repeat(64);
+    const redeemed = await fetch(`${host.url}/api/v1/auth/pair`, {
+      method: "POST",
+      headers: {
+        Origin: host.url,
+        "X-Dwell-Request": "1",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code: field(pairing, "code"), browserKey }),
+    });
+    assert.equal(redeemed.status, 200);
+    const cookie = redeemed.headers.get("set-cookie")?.split(";", 1)[0];
+    assert.ok(cookie);
+    const headers = { Cookie: cookie, "X-Dwell-Browser": browserKey };
+    return {
+      headers,
+      mutationHeaders: { ...headers, Origin: host.url, "X-Dwell-Request": "1" },
+    };
+  };
+  const first = await pair("a");
+  const second = await pair("b");
+  const requestFrom = (url: string, browser: typeof first, name: string, body?: unknown) =>
+    fetch(`${url}/api/v1/sessions/${created.id}${name}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: {
+        ...browser.headers,
+        ...(body === undefined
+          ? {}
+          : {
+              ...browser.mutationHeaders,
+              Origin: url,
+              "Content-Type": "application/json",
+            }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+
+  const initial = await requestFrom(host.url, first, "");
+  const initialOther = await requestFrom(host.url, second, "");
+  assert.equal(initial.status, 200);
+  assert.equal(initialOther.status, 200);
+  assert.equal(field(await initial.json(), "displayName"), null);
+  assert.equal(field(await initialOther.json(), "metadataRevision"), 0);
+  const mutationWithoutGuard = await fetch(`${host.url}/api/v1/sessions/${created.id}/name`, {
+    method: "POST",
+    headers: { ...first.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ displayName: "Shared", expectedRevision: 0 }),
+  });
+  assert.equal(mutationWithoutGuard.status, 403);
+
+  const invalid = await fetch(`${host.url}/api/v1/sessions/${created.id}/name`, {
+    method: "POST",
+    headers: { ...first.mutationHeaders, "Content-Type": "application/json" },
+    body: JSON.stringify({ displayName: "   ", expectedRevision: 0 }),
+  });
+  assert.equal(invalid.status, 400);
+  for (const invalidBody of [
+    { displayName: "x".repeat(81), expectedRevision: 0 },
+    { displayName: "🧪".repeat(81), expectedRevision: 0 },
+    { displayName: "bad\u0000name", expectedRevision: 0 },
+    { displayName: "Valid", expectedRevision: -1 },
+    { displayName: "Valid", expectedRevision: 0, extra: true },
+  ]) {
+    const response: Response = await fetch(`${host.url}/api/v1/sessions/${created.id}/name`, {
+      method: "POST",
+      headers: { ...first.mutationHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify(invalidBody),
+    });
+    assert.equal(response.status, 400);
+  }
+  const renamed = await requestFrom(host.url, first, "/name", {
+    displayName: "Shared research",
+    expectedRevision: 0,
+  });
+  assert.equal(renamed.status, 200);
+  const renameBody: unknown = await renamed.json();
+  assert.equal(field(renameBody, "displayName"), "Shared research");
+  assert.equal(field(renameBody, "metadataRevision"), 1);
+
+  const unicodeName = "🧪".repeat(80);
+  const unicodeRename = await requestFrom(host.url, first, "/name", {
+    displayName: unicodeName,
+    expectedRevision: 1,
+  });
+  assert.equal(unicodeRename.status, 200);
+  assert.equal(field(await unicodeRename.json(), "metadataRevision"), 2);
+
+  const conflict = await requestFrom(host.url, second, "/name", {
+    displayName: "Stale edit",
+    expectedRevision: 0,
+  });
+  assert.equal(conflict.status, 409);
+  assert.equal(field(field(await conflict.json(), "error"), "code"), "metadata_conflict");
+  const synchronized = await requestFrom(host.url, second, "");
+  const shared: unknown = await synchronized.json();
+  assert.equal(field(shared, "displayName"), unicodeName);
+  assert.equal(field(shared, "metadataRevision"), 2);
+
+  const reset = await requestFrom(host.url, second, "/name", {
+    displayName: null,
+    expectedRevision: 2,
+  });
+  assert.equal(reset.status, 200);
+  const resetBody: unknown = await reset.json();
+  assert.equal(field(resetBody, "displayName"), null);
+  assert.equal(field(resetBody, "metadataRevision"), 3);
+
+  await host.close();
+  const restarted = await startHost(options);
+  t.after(() => restarted.close());
+  const afterRestart = await fetch(`${restarted.url}/api/v1/sessions/${created.id}`, {
+    headers: first.headers,
+  });
+  const persisted: unknown = await afterRestart.json();
+  assert.equal(afterRestart.status, 200);
+  assert.equal(field(persisted, "displayName"), null);
+  assert.equal(field(persisted, "metadataRevision"), 3);
 });
 
 test("HTTP create/list/open/close/context preserve one session across host restart", async (t) => {

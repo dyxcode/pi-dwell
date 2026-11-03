@@ -33,6 +33,8 @@ const SECOND_TOOL_ID = "44444444-4444-4444-8444-444444444444";
 function session(id = SESSION_ID, overrides: Partial<SessionInfo> = {}): SessionInfo {
   return {
     id,
+    displayName: null,
+    metadataRevision: 0,
     directory: "/tmp/project",
     provider: "test-provider",
     model: "test-model",
@@ -992,6 +994,56 @@ test("reduceFrame ignores frames from another session and handles epoch replacem
   const changed = reduceFrame(initial, replacement);
   assert.equal(changed.cursor, cursor(1, OTHER_EPOCH));
   assert.equal(changed.liveIncomplete, true);
+});
+
+test("session events and replacement snapshots preserve the newest shared name revision", () => {
+  let state = reduceFrame(
+    emptyConversationState(SESSION_ID),
+    snapshotFrame(1, {
+      session: session(SESSION_ID, { displayName: "Initial name", metadataRevision: 1 }),
+    }),
+  );
+  state = reduceFrame(state, {
+    type: "session.updated",
+    sessionId: SESSION_ID,
+    runId: null,
+    cursor: cursor(2),
+    payload: session(SESSION_ID, {
+      displayName: "New shared name",
+      metadataRevision: 2,
+      provider: "newer-provider",
+    }),
+  });
+
+  state = reduceFrame(state, {
+    type: "session.updated",
+    sessionId: SESSION_ID,
+    runId: null,
+    cursor: cursor(3),
+    payload: session(SESSION_ID, {
+      displayName: "Delayed name",
+      metadataRevision: 1,
+      provider: "older-provider",
+    }),
+  });
+  assert.equal(state.session?.displayName, "New shared name");
+  assert.equal(state.session?.metadataRevision, 2);
+  assert.equal(state.session?.provider, "older-provider");
+
+  state = reduceFrame(
+    state,
+    snapshotFrame(1, {
+      epoch: OTHER_EPOCH,
+      session: session(SESSION_ID, {
+        displayName: "Old snapshot name",
+        metadataRevision: 1,
+        runtimeState: "closed",
+      }),
+    }),
+  );
+  assert.equal(state.session?.displayName, "New shared name");
+  assert.equal(state.session?.metadataRevision, 2);
+  assert.equal(state.session?.runtimeState, "closed");
 });
 
 test("saved native identities take over live content while repeated text stays distinct", () => {

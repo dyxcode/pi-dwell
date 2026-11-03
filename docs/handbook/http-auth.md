@@ -61,6 +61,7 @@ All API paths below are relative to `/api/v1`. **Either** means local bearer aut
 | `GET /sessions/:id/context` | Either | Current Pi context projection; opens/reopens the runtime as needed |
 | `GET /sessions/:id/models` | Either | Session-scoped model registry, including extension models |
 | `POST /sessions/:id/model-capabilities` | Either | Provider/model → session-scoped capability metadata |
+| `POST /sessions/:id/name` | Either | `{displayName, expectedRevision}` → updated SessionInfo; null resets, stale revision returns 409 `metadata_conflict` |
 | `POST /sessions/:id/model` | Either | Provider/model, optional thinkingLevel → effective SessionInfo |
 | `GET /sessions/:id/history[?cursor=…]` | Either | Page of projected native branch history |
 | `GET /sessions/:id/history/:entry/images/:index` | Either | Validated native saved image bytes with MIME type and length |

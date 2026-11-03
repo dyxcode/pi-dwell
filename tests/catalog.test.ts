@@ -22,6 +22,8 @@ import { SessionCatalog, type StoredSession } from "../src/storage/catalog.ts";
 function session(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
     id: "session-a",
+    displayName: null,
+    metadataRevision: 0,
     requestId: "request-a",
     payloadIdentity: "payload-a",
     directory: "/tmp/project-a",
@@ -66,6 +68,21 @@ function createV3Catalog(path: string): void {
       "INSERT INTO sessions VALUES ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 'payload-v3', '/tmp/project-v3', 'test-provider', 'test-model', '33333333-3333-4333-8333-333333333333', '/tmp/pi-session-v3.jsonl', 1, 'ready', 1000, 1100, NULL);" +
       `INSERT INTO turns VALUES ('44444444-4444-4444-8444-444444444444', '11111111-1111-4111-8111-111111111111', '55555555-5555-4555-8555-555555555555', '${"a".repeat(64)}', 'completed', 0, 1000, 1100, NULL, NULL, '["entry-user","entry-assistant"]');` +
       "PRAGMA user_version = 3;",
+  );
+  database.close();
+}
+
+function createV5Catalog(path: string): void {
+  const database = new DatabaseSync(path, { enableForeignKeyConstraints: false });
+  database.exec(
+    "CREATE TABLE runtime_configuration (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), executable TEXT NOT NULL CHECK (length(executable) > 0), entry_point TEXT CHECK (entry_point IS NULL OR length(entry_point) > 0)) STRICT;" +
+      "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, thinking_level TEXT CHECK (thinking_level IS NULL OR thinking_level IN ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')), history_check_state TEXT CHECK (history_check_state IS NULL OR history_check_state IN ('not-created', 'readable', 'missing', 'invalid')), history_checked_at INTEGER, CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT;" +
+      "CREATE TABLE turns (run_id TEXT NOT NULL PRIMARY KEY CHECK (length(run_id) > 0), session_id TEXT NOT NULL REFERENCES sessions(id), request_id TEXT NOT NULL CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) = 64), status TEXT NOT NULL CHECK (status IN ('accepted', 'dispatching', 'running', 'completed', 'failed', 'aborted', 'interrupted')), cancellation_requested INTEGER NOT NULL CHECK (cancellation_requested IN (0, 1)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error_code TEXT, error_message TEXT, entry_ids TEXT NOT NULL CHECK (json_valid(entry_ids)), UNIQUE (session_id, request_id), CHECK ((error_code IS NULL AND error_message IS NULL) OR (length(error_code) > 0 AND length(error_message) > 0))) STRICT;" +
+      "CREATE UNIQUE INDEX one_active_turn_per_session ON turns(session_id) WHERE status IN ('accepted', 'dispatching', 'running');" +
+      "INSERT INTO runtime_configuration VALUES (1, '/opt/pi/bin/pi', NULL);" +
+      "INSERT INTO sessions VALUES ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 'payload-v5', '/tmp/project-v5', 'test-provider', 'test-model', '33333333-3333-4333-8333-333333333333', '/tmp/pi-session-v5.jsonl', 1, 'ready', 1000, 1100, NULL, 'high', 'readable', 1050);" +
+      `INSERT INTO turns VALUES ('44444444-4444-4444-8444-444444444444', '11111111-1111-4111-8111-111111111111', '55555555-5555-4555-8555-555555555555', '${"a".repeat(64)}', 'completed', 0, 1000, 1100, NULL, NULL, '["entry-user","entry-assistant"]');` +
+      "PRAGMA user_version = 5;",
   );
   database.close();
 }
@@ -128,6 +145,8 @@ test("version-one catalogs migrate transactionally while preserving sessions and
   assert.deepEqual(catalog.list(), [
     {
       id: "11111111-1111-4111-8111-111111111111",
+      displayName: null,
+      metadataRevision: 0,
       requestId: "22222222-2222-4222-8222-222222222222",
       payloadIdentity: "payload-v1",
       directory: "/tmp/project-v1",
@@ -147,7 +166,7 @@ test("version-one catalogs migrate transactionally while preserving sessions and
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 5n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 6n);
   assert.equal(
     migrated.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'turns'").get()
       ?.count,
@@ -170,6 +189,8 @@ test("version-two migration preserves sessions, turns, indexes, and foreign keys
   assert.equal(catalog.configuration()?.executable, "/opt/pi/bin/pi");
   assert.deepEqual(catalog.get("11111111-1111-4111-8111-111111111111"), {
     id: "11111111-1111-4111-8111-111111111111",
+    displayName: null,
+    metadataRevision: 0,
     requestId: "22222222-2222-4222-8222-222222222222",
     payloadIdentity: "payload-v2",
     directory: "/tmp/project-v2",
@@ -211,7 +232,7 @@ test("version-two migration preserves sessions, turns, indexes, and foreign keys
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 5n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 6n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   const index = migrated
     .prepare("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = ?")
@@ -233,6 +254,8 @@ test("version-three migration preserves sessions and turns while adding thinking
   t.after(() => catalog.close());
   assert.deepEqual(catalog.get("11111111-1111-4111-8111-111111111111"), {
     id: "11111111-1111-4111-8111-111111111111",
+    displayName: null,
+    metadataRevision: 0,
     requestId: "22222222-2222-4222-8222-222222222222",
     payloadIdentity: "payload-v3",
     directory: "/tmp/project-v3",
@@ -265,13 +288,64 @@ test("version-three migration preserves sessions and turns while adding thinking
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 5n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 6n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   assert.ok(
     migrated
       .prepare("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = ?")
       .get("one_active_turn_per_session"),
   );
+  migrated.close();
+});
+
+test("version-five migration adds shared names without changing sessions or turns", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "dwell-catalog-v5-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const dataDir = join(root, "data");
+  await mkdir(dataDir, { mode: 0o700 });
+  const path = join(dataDir, "catalog.sqlite");
+  createV5Catalog(path);
+  await chmod(path, 0o600);
+
+  const catalog = await SessionCatalog.open(dataDir);
+  t.after(() => catalog.close());
+  const session = catalog.get("11111111-1111-4111-8111-111111111111");
+  assert.ok(session);
+  assert.equal(Reflect.get(session, "displayName"), null);
+  assert.equal(Reflect.get(session, "metadataRevision"), 0);
+  assert.equal(session.historyCheck?.state, "readable");
+  assert.equal(session.historyCheck?.checkedAt, 1050);
+  assert.equal(catalog.listTurns()[0]?.runId, "44444444-4444-4444-8444-444444444444");
+  assert.deepEqual(catalog.configuration(), { executable: "/opt/pi/bin/pi" });
+
+  assert.throws(() => catalog.rename(session.id, "Embedded\0null", 0, 1200), /session name/i);
+  const staleObservation = catalog.get(session.id);
+  assert.ok(staleObservation);
+  assert.equal(catalog.rename(session.id, "Shared name", 0, 1200)?.metadataRevision, 1);
+  catalog.update({
+    ...staleObservation,
+    historyCheck: { state: "readable", checkedAt: 1250 },
+  });
+  assert.equal(catalog.get(session.id)?.displayName, "Shared name");
+  assert.equal(catalog.get(session.id)?.metadataRevision, 1);
+
+  const exhausted = {
+    ...staleObservation,
+    id: "66666666-6666-4666-8666-666666666666",
+    requestId: "77777777-7777-4777-8777-777777777777",
+    displayName: "At limit",
+    metadataRevision: Number.MAX_SAFE_INTEGER,
+  };
+  catalog.insert(exhausted);
+  assert.throws(
+    () => catalog.rename(exhausted.id, "Beyond limit", Number.MAX_SAFE_INTEGER, 1300),
+    RangeError,
+  );
+  assert.equal(catalog.get(exhausted.id)?.metadataRevision, Number.MAX_SAFE_INTEGER);
+  catalog.close();
+
+  const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 6n);
   migrated.close();
 });
 

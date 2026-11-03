@@ -43,7 +43,7 @@ flowchart TD
 
 [`SessionCatalog`](../../../../src/storage/catalog.ts) 负责 Dwell 的 SQLite 文件，并验证其 schema 和每条解码后的 record。当前 schema 版本为 5。所有 statements 都使用 Node 的同步 `DatabaseSync`；写入数据时，SQL values 使用 parameterization。
 
-Schema v5 新增 nullable `history_check_state` 与 `history_checked_at`；旧 session 的 observation 初始为空，由下一次文件读取更新。详见 [catalog migration](implementation/catalog.md#catalog-schema-and-migrations)。
+Schema v6 增加 shared display name 与 metadata revision；[name updates](implementation/catalog.md#catalog-session-names) 会原子地比较 revision。Schema v5 新增 nullable `history_check_state` 与 `history_checked_at`；旧 session 的 observation 初始为空，由下一次文件读取更新。详见 [catalog migration](implementation/catalog.md#catalog-schema-and-migrations)。
 
 <a id="tables-and-invariants"></a>
 
@@ -52,7 +52,7 @@ Schema v5 新增 nullable `history_check_state` 与 `history_checked_at`；旧 s
 | Table | 存储值与约束 |
 | --- | --- |
 | `runtime_configuration` | 一个可选的单行记录（`singleton = 1`），存储规范化的 Pi executable 和可选 entry point。 |
-| `sessions` | Dwell ID、唯一的创建 request ID、request payload identity、规范化的 project directory、可为 null 的 provider/model pair、可选 thinking level、Pi session ID 与 file、`history_expected`、持久 status、timestamps 和可选 error。`ready` row 必须有 provider 和 model。 |
+| `sessions` | Shared display name、metadata revision、Dwell ID、唯一的创建 request ID、request payload identity、规范化的 project directory、可为 null 的 provider/model pair、可选 thinking level、Pi session ID 与 file、`history_expected`、持久 status、timestamps 和可选 error。`ready` row 必须有 provider 和 model。 |
 | `turns` | Run、session、request IDs；SHA-256 payload identity；status；cancellation flag；timestamps；成对出现的可选 error code/message；以及 native entry IDs 的 JSON array。`(session_id, request_id)` 唯一；partial unique index 确保每个 session 最多有一个处于 `accepted`、`dispatching` 或 `running` 的 turn。`session_id` references `sessions(id)`。 |
 
 TypeScript validators 要求已存 sessions 和 turns 的 object keys 完全匹配。Database decoding 会拒绝错误的 SQLite types、不安全 integers、无效 enum values、malformed entry-ID JSON、非 SHA-256 的 turn payload identities、不完整的 error pairs、UUID 格式不正确的 `TurnInfo`，以及未知 session/turn states。Validation 失败时不会把数据强转为看似合理的 record。
@@ -91,7 +91,7 @@ Terminal turns 不可再次 transition。`updateTurn()` 会检查 request ID、p
 
 `SessionCatalog.open(dataDir)` 首先调用 `prepareDataDirectory()`，然后在 `catalog.sqlite` 不存在时以 owner-only 权限创建。SQLite 打开前，Dwell 会使用 no-follow/nonblocking open flags 检查数据库是否为当前 user 所有、regular、只有一个 hard link 且 mode 为 `0600`。SQLite 打开时会启用 foreign keys 和 big integer reads，并禁用 extensions。初始化使用 `DELETE` journal mode 和 `synchronous = FULL`。
 
-Schema 初始化使用一个 transaction。只有不存在 user schema 时才接受 version 0，并直接创建当前 version。Versions 1、2、3 和 4 必须先与各自准确的预期 schema SQL 匹配，再以 transaction 迁移到 version 5。Version 1 先添加 turn table 和 active-turn index，再应用后续迁移。Version 2 先变为 version 3，再升级至 version 4。Version 3 会给 session 增加 nullable 的 `thinking_level` field。迁移会验证最终 schema，并在 commit 前运行 `PRAGMA foreign_key_check`。不支持的 version、不匹配的 schema、违反 turn/session foreign key 的保留 rows，或迁移检查失败都会 rollback 并报告 invalid/unsupported catalog；startup 不会重置文件。
+Schema 初始化使用一个 transaction。只有不存在 user schema 时才接受 version 0，并直接创建当前 version。Versions 1、2、3、4 和 5 必须先与各自准确的预期 schema SQL 匹配，再以 transaction 迁移到 version 6。Version 1 先添加 turn table 和 active-turn index，再应用后续迁移。Version 2 先变为 version 3，再升级至 version 4。Version 3 会给 session 增加 nullable 的 `thinking_level` field。迁移会验证最终 schema，并在 commit 前运行 `PRAGMA foreign_key_check`。不支持的 version、不匹配的 schema、违反 turn/session foreign key 的保留 rows，或迁移检查失败都会 rollback 并报告 invalid/unsupported catalog；startup 不会重置文件。
 
 `prepareDataDirectory()` 要求 directory 为 owner-only `0700`。Pi native session JSONL 可以保留 Pi 常见的 0644 mode，因为其所在的 Dwell session directory 是 private 的。Catalog 的 SQLite durability 和 Pi 的 JSONL durability 相互独立：一个 transaction 无法原子地 commit 这两个文件。
 

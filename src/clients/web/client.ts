@@ -7,7 +7,12 @@ import {
 } from "../../shared/discovery.ts";
 import { type ContextSource, type HistoryEntry, isHistoryPage } from "../../shared/history.ts";
 import { isHostStatus } from "../../shared/protocol.ts";
-import { isSessionInfo, type SessionInfo } from "../../shared/sessions.ts";
+import {
+  isSessionInfo,
+  isSessionNameRequest,
+  mergeSessionMetadata,
+  type SessionInfo,
+} from "../../shared/sessions.ts";
 import { isTurnInfo, type TurnInfo } from "../../shared/turns.ts";
 import {
   visibleLiveContent,
@@ -75,6 +80,13 @@ const closeCopy = el("close-session-copy", HTMLElement);
 const closeError = el("close-session-error", HTMLElement);
 const cancelClose = el("cancel-session-close", HTMLButtonElement);
 const confirmClose = el("confirm-session-close", HTMLButtonElement);
+const sessionNameDialog = el("session-name-dialog", HTMLDialogElement);
+const sessionNameInput = el("session-name-input", HTMLInputElement);
+const sessionNameError = el("session-name-error", HTMLElement);
+const editSessionName = el("edit-session-name", HTMLButtonElement);
+const saveSessionName = el("save-session-name", HTMLButtonElement);
+const resetSessionName = el("reset-session-name", HTMLButtonElement);
+const importLocalName = el("import-local-name", HTMLButtonElement);
 const modelDialog = el("model-dialog", HTMLDialogElement);
 const modelSearch = el("model-search", HTMLInputElement);
 const chooseModel = el("choose-model", HTMLButtonElement);
@@ -118,8 +130,7 @@ for (const id of [
   el(id, HTMLButtonElement).replaceChildren(actionIcon("close"));
 el("new-mobile", HTMLButtonElement).replaceChildren(actionIcon("plus"));
 
-const names = new Map<string, string>(),
-  drafts = new Map<string, string>();
+const drafts = new Map<string, string>();
 const turns = new Map<string, TurnInfo>();
 let sessions: SessionInfo[] = [],
   selected: string | null = null;
@@ -318,14 +329,92 @@ try {
 } catch {
   /* pairing separately explains unavailable storage */
 }
-for (const [id, name] of Object.entries(localPreferences))
-  if (id !== "selected") names.set(id, name);
 function savePreference(key: string, value: string): void {
   localPreferences[key] = value;
   try {
     localStorage.setItem("dwell.web.preferences.v1", JSON.stringify(localPreferences));
   } catch {
     /* names and selection can remain in memory */
+  }
+}
+let editingSessionId: string | null = null;
+let editingSessionRevision = 0;
+let sessionNameEditorGeneration = 0;
+function invalidateSessionNameEditor(): void {
+  sessionNameEditorGeneration++;
+  editingSessionId = null;
+}
+function closeSessionNameEditor(): void {
+  invalidateSessionNameEditor();
+  if (sessionNameDialog.open) sessionNameDialog.close();
+}
+function openSessionNameEditor(): void {
+  const session = activeSession();
+  if (!session || !authenticated) return;
+  sessionNameEditorGeneration++;
+  editingSessionId = session.id;
+  editingSessionRevision = session.metadataRevision;
+  sessionNameInput.value = session.displayName ?? "";
+  sessionNameError.textContent = "";
+  sessionNameError.hidden = true;
+  saveSessionName.disabled = false;
+  resetSessionName.disabled = false;
+  importLocalName.disabled = false;
+  const localName = localPreferences[session.id];
+  importLocalName.hidden = typeof localName !== "string" || localName.trim().length === 0;
+  sessionNameDialog.showModal();
+  sessionNameInput.focus();
+}
+async function saveSessionNameValue(displayName: string | null): Promise<void> {
+  const id = editingSessionId;
+  if (id === null) return;
+  const generation = sessionNameEditorGeneration;
+  const currentEditor = () =>
+    generation === sessionNameEditorGeneration && editingSessionId === id && sessionNameDialog.open;
+  const normalized = displayName === null ? null : displayName.trim();
+  const request = { displayName: normalized, expectedRevision: editingSessionRevision };
+  if (!isSessionNameRequest(request)) {
+    sessionNameError.textContent = "Enter a name up to 80 characters, or reset the name.";
+    sessionNameError.hidden = false;
+    return;
+  }
+  saveSessionName.disabled = true;
+  resetSessionName.disabled = true;
+  importLocalName.disabled = true;
+  try {
+    const value = await api(`/api/v1/sessions/${id}/name`, request);
+    if (!currentEditor()) return;
+    if (!isSessionInfo(value) || value.id !== id) throw new Error("Invalid session name response.");
+    updatedSession(value);
+    navigation();
+    closeSessionNameEditor();
+  } catch (error) {
+    if (!currentEditor()) return;
+    if (error instanceof ApiError && error.code === "metadata_conflict") {
+      try {
+        const latest = await api(`/api/v1/sessions/${id}`);
+        if (!currentEditor()) return;
+        if (!isSessionInfo(latest) || latest.id !== id)
+          throw new Error("Invalid session response after a name conflict.");
+        updatedSession(latest);
+        navigation();
+        closeSessionNameEditor();
+        notice.textContent = "Another browser changed this name. The latest shared name is loaded.";
+        notice.hidden = false;
+      } catch (refreshError) {
+        if (currentEditor()) showError(refreshError);
+      }
+    } else {
+      sessionNameError.textContent = message(error);
+      sessionNameError.hidden = false;
+      if (error instanceof ApiError && error.status === 401) showError(error);
+    }
+  } finally {
+    if (currentEditor()) {
+      saveSessionName.disabled = false;
+      resetSessionName.disabled = false;
+      importLocalName.disabled = false;
+    }
   }
 }
 function activeSession(): SessionInfo | undefined {
@@ -409,9 +498,8 @@ function probeCurrentModel(sessionId: string | null = selected): void {
   });
 }
 function label(s: SessionInfo): string {
-  const directory =
-    names.get(s.id) || s.directory.split(/[\\/]/).filter(Boolean).pop() || s.directory;
-  return [directory, s.model, s.thinkingLevel ? levelNames[s.thinkingLevel] : null]
+  const directory = s.directory.split(/[\\/]/).filter(Boolean).pop() || s.directory;
+  return [s.displayName ?? directory, s.model, s.thinkingLevel ? levelNames[s.thinkingLevel] : null]
     .filter(Boolean)
     .join(" · ");
 }
@@ -633,6 +721,8 @@ function navigation(): void {
   reconcileChildren(tabs, tabNodes);
   el("session-count", HTMLElement).textContent = String(sessions.length).padStart(2, "0");
   const s = activeSession();
+  editSessionName.disabled = !s || !authenticated;
+  editSessionName.title = s ? `Rename ${label(s)}` : "Select a conversation to rename";
   el("composer-footer", HTMLElement).hidden = !s;
   el("composer-context", HTMLElement).hidden = !s;
   const contextDirectory = el("composer-directory", HTMLElement);
@@ -731,9 +821,11 @@ function navigation(): void {
 }
 function updatedSession(session: SessionInfo): string[] {
   const previousTabs = openTabIds();
-  const existing = sessions.some((value) => value.id === session.id);
+  const existing = sessions.find((value) => value.id === session.id);
   sessions = existing
-    ? sessions.map((value) => (value.id === session.id ? session : value))
+    ? sessions.map((value) =>
+        value.id === session.id ? mergeSessionMetadata(value, session) : value,
+      )
     : [...sessions, session];
   sessionStateGeneration++;
   synchronizeTabSlots();
@@ -1470,10 +1562,7 @@ async function stream(id: string, epoch: number): Promise<void> {
             const previousKey = previous
               ? modelCapabilityKey(previous.provider, previous.model)
               : null;
-            const previousTabs = openTabIds();
-            sessions = sessions.map((s) => (s.id === id && state.session ? state.session : s));
-            sessionStateGeneration++;
-            synchronizeTabSlots();
+            const previousTabs = updatedSession(state.session);
             if (!runtimeOpen(state.session)) reconcileClosedRuntime(id, previousTabs);
             const current = activeSession();
             if (
@@ -1583,7 +1672,11 @@ async function refresh(): Promise<void> {
     stateGeneration !== sessionStateGeneration
   )
     return;
-  sessions = result;
+  const currentSessions = new Map(sessions.map((session) => [session.id, session]));
+  sessions = result.map((session) => {
+    const current = currentSessions.get(session.id);
+    return current ? mergeSessionMetadata(current, session) : session;
+  });
   sessionStateGeneration++;
   synchronizeTabSlots();
   if (selected && !sessions.some((session) => session.id === selected && runtimeOpen(session))) {
@@ -1661,6 +1754,7 @@ function disconnect(reason: string): void {
   authAttempt++;
   generation++;
   dialog.close();
+  closeSessionNameEditor();
   modelDialog.close();
   closeDialog.close();
   closeArmedSession = null;
@@ -2031,7 +2125,7 @@ async function changeModel(choice: PiModelOption, thinkingLevel: ThinkingLevel):
     if (!isSessionInfo(result) || result.id !== session.id)
       throw new Error("Invalid model response. Reopen the picker to check the current model.");
     if (authentication !== authAttempt) return;
-    sessions = sessions.map((s) => (s.id === session.id ? result : s));
+    updatedSession(result);
     if (selected === session.id) modelDialog.close();
     await refresh();
   } catch (error) {
@@ -2119,6 +2213,30 @@ el("new-session", HTMLButtonElement).onclick = () => {
   void newSession();
 };
 el("close-new", HTMLButtonElement).onclick = () => dialog.close();
+editSessionName.onclick = openSessionNameEditor;
+el("close-session-name", HTMLButtonElement).onclick = closeSessionNameEditor;
+el("session-name-form", HTMLFormElement).onsubmit = (event) => {
+  event.preventDefault();
+  void saveSessionNameValue(sessionNameInput.value);
+};
+resetSessionName.onclick = () => {
+  void saveSessionNameValue(null);
+};
+importLocalName.onclick = () => {
+  const saved = editingSessionId === null ? undefined : localPreferences[editingSessionId];
+  if (saved === undefined) return;
+  sessionNameInput.value = saved;
+  const request = { displayName: saved.trim(), expectedRevision: editingSessionRevision };
+  const valid = isSessionNameRequest(request);
+  sessionNameError.textContent = valid
+    ? "Saved browser name copied. Save it to share it with other browsers."
+    : "This saved browser name is blank or longer than 80 characters. Edit it before saving.";
+  sessionNameError.hidden = false;
+};
+sessionNameDialog.addEventListener("cancel", invalidateSessionNameEditor);
+sessionNameDialog.addEventListener("close", () => {
+  if (!sessionNameDialog.open) invalidateSessionNameEditor();
+});
 cancelClose.onclick = dismissCloseDialog;
 confirmClose.onclick = () => {
   void confirmSessionClose();

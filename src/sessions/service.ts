@@ -28,6 +28,7 @@ import type { HistoryPage } from "../shared/history.ts";
 import type { ImageContent } from "../shared/images.ts";
 import {
   isSessionModelRequest,
+  isSessionNameRequest,
   type NativeExecutionInfo,
   type RuntimeConfiguration,
   SESSION_ID,
@@ -302,6 +303,47 @@ export class SessionService {
     return this.#view(this.#stored(id));
   }
 
+  renameSession(
+    id: string,
+    displayName: string | null,
+    expectedRevision: number,
+  ): Promise<SessionInfo> {
+    return this.#mutate(async () => {
+      this.#stored(id);
+      if (!isSessionNameRequest({ displayName, expectedRevision }))
+        throw new SessionError(
+          400,
+          "invalid_input",
+          "Provide a name of at most 80 characters or null.",
+        );
+      let saved: StoredSession | null;
+      try {
+        saved = this.#catalog.rename(
+          id,
+          displayName === null ? null : displayName.trim(),
+          expectedRevision,
+          this.#now(),
+        );
+      } catch (error) {
+        if (error instanceof RangeError)
+          throw new SessionError(
+            503,
+            "storage_unavailable",
+            "The session name revision could not be advanced safely.",
+          );
+        throw error;
+      }
+      if (!saved)
+        throw new SessionError(
+          409,
+          "metadata_conflict",
+          "This session name changed in another browser. Reload it before saving.",
+        );
+      if (saved.metadataRevision !== expectedRevision) this.#publishState(id);
+      return this.#view(saved);
+    });
+  }
+
   listDirectories(path?: string): Promise<HostDirectoryListing> {
     try {
       this.#admit();
@@ -565,6 +607,8 @@ export class SessionService {
       const now = this.#now();
       const stored: StoredSession = {
         id: randomUUID(),
+        displayName: null,
+        metadataRevision: 0,
         requestId: request.requestId,
         payloadIdentity: identity,
         directory,
@@ -1550,6 +1594,8 @@ export class SessionService {
     const state = this.#runtimes.get(stored.id)?.state;
     return {
       id: stored.id,
+      displayName: stored.displayName,
+      metadataRevision: stored.metadataRevision,
       directory: stored.directory,
       provider: stored.provider,
       model: stored.model,

@@ -531,6 +531,40 @@ test("SSE snapshots and events are ordered for two clients; disconnect detaches 
   await second.waitForClose();
 });
 
+test("paired browsers receive host-owned session name updates over SSE", async (t) => {
+  const { host, token, createSession } = await setup(t, { withPi: true });
+  const session = await createSession();
+  const firstBrowser = await pairBrowser(host.url, token);
+  const secondBrowser = await pairBrowser(host.url, token);
+  const url = `${host.url}/api/v1/sessions/${session.id}/events`;
+  const first = await openEvents(url, firstBrowser.headers);
+  const second = await openEvents(url, secondBrowser.headers);
+  await Promise.all([
+    first.waitFor((frame) => frame.event === "snapshot"),
+    second.waitFor((frame) => frame.event === "snapshot"),
+  ]);
+
+  const rename = await fetch(`${host.url}/api/v1/sessions/${session.id}/name`, {
+    method: "POST",
+    headers: { ...firstBrowser.mutationHeaders, "Content-Type": "application/json" },
+    body: JSON.stringify({ displayName: "Shared over SSE", expectedRevision: 0 }),
+  });
+  assert.equal(rename.status, 200);
+  await Promise.all(
+    [first, second].map((reader) =>
+      reader.waitFor((frame) => {
+        if (frame.event !== "session.updated") return false;
+        const payload = framePayload(frame);
+        return payload.displayName === "Shared over SSE" && payload.metadataRevision === 1;
+      }),
+    ),
+  );
+
+  first.disconnect();
+  second.disconnect();
+  await Promise.all([first.waitForClose(), second.waitForClose()]);
+});
+
 test("browser SSE streams close on revoke, logout, expiry, and auth storage failure", async (t) => {
   let clock = Date.now();
   const { host, token, request, createSession, dataDir } = await setup(t, {

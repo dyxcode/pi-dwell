@@ -129,6 +129,7 @@ Pi RPC 又有所不同。相关联的 Pi response 若包含 `success: false`，�
 | `runtime_busy` | 409 | session 处于 open 状态时不能修改 Pi runtime 配置。 |
 | `runtime_mismatch` | 503 | Pi 未恢复或保留预期的 session/model state。 |
 | `runtime_unavailable` | 503 | Pi 未配置、无法启动，或当前操作无法使用 Pi。 |
+| `metadata_conflict` | 409 | Name 的 expected revision 已过期；重新读取共享 name 后再编辑。 |
 | `session_busy` | 409 | 存在 active turn/native execution，或 runtime 未处于此操作所需的 idle 状态。 |
 | `session_changed` | 409 | 读取 model data 期间 runtime/session 发生变化。 |
 | `session_interrupted` | 409 | Session creation 被中断；响应包含其 Dwell session ID。 |

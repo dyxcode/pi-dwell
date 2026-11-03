@@ -377,3 +377,7 @@ command input, so it is not a general Pi terminal or command surface.
 | Native extension execution separate from Dwell turns; passive observer and interactive dialog boundary | [native-executions.test.ts](../../tests/native-executions.test.ts), [runtime.test.ts](../../tests/runtime.test.ts) |
 | Pi transcript reopen, session close/reopen, and missing-history safety | [runtime.test.ts](../../tests/runtime.test.ts), [sessions.test.ts](../../tests/sessions.test.ts) |
 | Desktop/mobile browser acceptance using a synthetic Pi environment and Chrome CDP | [check-web.ts](../../scripts/check-web.ts) |
+
+## Shared session names
+
+Use the selected session’s name action to rename it across browsers. Reset restores its directory label. If this browser contains an older local name, the editor offers an explicit import action. A concurrent edit loads the latest shared name for review. See the [editor workflow](implementation/browser-controller.md#browser-shared-session-names).

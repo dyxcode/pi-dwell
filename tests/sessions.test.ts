@@ -6,12 +6,16 @@ import { DatabaseSync } from "node:sqlite";
 import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { PiProcess } from "../src/runtime/pi-process.ts";
-import { SessionService } from "../src/sessions/service.ts";
+import { SessionService, type SessionServiceOptions } from "../src/sessions/service.ts";
 import { SessionCatalog } from "../src/storage/catalog.ts";
 import type { StreamFrame } from "../src/shared/events.ts";
 import { createPiEnvironment } from "./fixtures/pi-environment.ts";
 
 const entryPoint = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent/rpc-entry"));
+
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+}
 
 async function until<T>(read: () => T, matches: (value: T) => boolean): Promise<T> {
   const deadline = Date.now() + 8000;
@@ -24,7 +28,11 @@ async function until<T>(read: () => T, matches: (value: T) => boolean): Promise<
   }
 }
 
-async function setup(t: TestContext, captureSystemPrompt = false) {
+async function setup(
+  t: TestContext,
+  captureSystemPrompt = false,
+  historyCheckCheckpoint?: SessionServiceOptions["historyCheckCheckpoint"],
+) {
   const environment = await createPiEnvironment();
   const dataDir = join(environment.root, "dwell");
   const options = {
@@ -37,6 +45,7 @@ async function setup(t: TestContext, captureSystemPrompt = false) {
         : {}),
     },
     extensions: [environment.extensionPath],
+    ...(historyCheckCheckpoint ? { historyCheckCheckpoint } : {}),
   };
   const service = await SessionService.create(options);
   t.after(async () => {
@@ -72,6 +81,112 @@ test("sessions start without Pi configuration and create/reopen empty identities
   assert.deepEqual(await restored.getContext(first.id), { messages: [] });
   await restored.closeSession(first.id);
   await restored.shutdown();
+});
+
+test("session names are host-owned, revisioned and separate from Pi history", async (t) => {
+  const { service, configure, request, options } = await setup(t);
+  await configure();
+  const session = await service.createSession(request);
+  const firstTurn = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await until(
+    () => service.getTurn(session.id, firstTurn.turn.runId),
+    (value) => value.status === "completed",
+  );
+
+  const catalog = await SessionCatalog.open(options.dataDir);
+  const piSessionFile = catalog.get(session.id)?.piSessionFile;
+  catalog.close();
+  assert.ok(piSessionFile);
+  const historyBeforeRename = await readFile(piSessionFile);
+
+  const rename = Reflect.get(service, "renameSession");
+  if (typeof rename !== "function")
+    throw new Error("SessionService must own the rename operation.");
+  const invokeRename = (displayName: string | null, expectedRevision: number): Promise<unknown> =>
+    Reflect.apply(rename, service, [session.id, displayName, expectedRevision]);
+  const renamed = await invokeRename("  Research notes  ", 0);
+  assert.equal(field(renamed, "displayName"), "Research notes");
+  assert.equal(field(renamed, "metadataRevision"), 1);
+  assert.deepEqual(await readFile(piSessionFile), historyBeforeRename);
+
+  await assert.rejects(invokeRename("Stale change", 0), (error: unknown) => {
+    assert.equal(field(error, "code"), "metadata_conflict");
+    return true;
+  });
+
+  await service.getHistory(session.id);
+  const secondTurn = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "hello",
+  });
+  await until(
+    () => service.getTurn(session.id, secondTurn.turn.runId),
+    (value) => value.status === "completed",
+  );
+  assert.equal(field(service.getSession(session.id), "displayName"), "Research notes");
+  assert.equal(field(service.getSession(session.id), "metadataRevision"), 1);
+
+  const reset = await invokeRename(null, 1);
+  assert.equal(field(reset, "displayName"), null);
+  assert.equal(field(reset, "metadataRevision"), 2);
+  const unchangedReset = await invokeRename(null, 2);
+  assert.equal(field(unchangedReset, "metadataRevision"), 2);
+  await service.closeSession(session.id);
+
+  const restored = await SessionService.create(options);
+  t.after(() => restored.shutdown());
+  const persisted = restored.getSession(session.id);
+  assert.equal(field(persisted, "displayName"), null);
+  assert.equal(field(persisted, "metadataRevision"), 2);
+});
+
+test("a concurrent history observation preserves a rename and its revision", async (t) => {
+  let pauseNextReadable = false;
+  let checkpointReached = () => {};
+  const enteredCheckpoint = new Promise<void>((resolve) => {
+    checkpointReached = resolve;
+  });
+  let continueHistory = () => {};
+  const holdHistory = new Promise<void>((resolve) => {
+    continueHistory = resolve;
+  });
+  const checkpoint: NonNullable<SessionServiceOptions["historyCheckCheckpoint"]> = async (
+    state,
+  ) => {
+    if (pauseNextReadable && state === "readable") {
+      pauseNextReadable = false;
+      checkpointReached();
+      await holdHistory;
+    }
+  };
+  const { service, configure, request } = await setup(t, false, checkpoint);
+  await configure();
+  const session = await service.createSession(request);
+  const submitted = await service.submitTurn(session.id, {
+    requestId: randomUUID(),
+    message: "save history",
+  });
+  await until(
+    () => service.getTurn(session.id, submitted.turn.runId),
+    (value) => value.status === "completed",
+  );
+  await service.renameSession(session.id, "Before observation", 0);
+
+  pauseNextReadable = true;
+  const historyRead = service.getHistory(session.id);
+  await enteredCheckpoint;
+  try {
+    await service.renameSession(session.id, "During observation", 1);
+  } finally {
+    continueHistory();
+  }
+  await historyRead;
+
+  assert.equal(service.getSession(session.id).displayName, "During observation");
+  assert.equal(service.getSession(session.id).metadataRevision, 2);
 });
 
 test("hosted Pi preserves the configured environment instead of forcing offline mode", async (t) => {

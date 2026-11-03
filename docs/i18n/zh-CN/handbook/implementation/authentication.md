@@ -31,13 +31,13 @@ Dwell 有两条 credential lane：用于本地管理的长期 CLI bearer credent
 <a id="http-authentication-integration"></a>
 ## HTTP admission 与 stream revalidation
 
-HTTP [handle](../../../../../src/server/http.ts#L167) 先检查重复的 security-sensitive header，再委托 requestAccess 选择 Host。Request 若带 Origin，必须与所选 authority 完全一致。HTTPS lane 会完全拒绝 Authorization，让 CLI bearer credential 只能留在 loopback address。受保护的 session/status route 接受有效 CLI token，或 browser cookie 加匹配的 browser-binding key。Browser POST 还必须带匹配的 Origin 和 Dwell request marker；Pi executable configuration 只允许 CLI 操作。
+HTTP [handle](../../../../../src/server/http.ts#L171) 先检查重复的 security-sensitive header，再委托 requestAccess 选择 Host。Request 若带 Origin，必须与所选 authority 完全一致。HTTPS lane 会完全拒绝 Authorization，让 CLI bearer credential 只能留在 loopback address。受保护的 session/status route 接受有效 CLI token，或 browser cookie 加匹配的 browser-binding key。Browser POST 还必须带匹配的 Origin 和 Dwell request marker；Pi executable configuration 只允许 CLI 操作。
 
 Pairing creation 和 browser revocation 要求 CLI credential。Pair redemption 对所选 browser origin 开放，但会先校验精确 code 和 browser-key shape，再调用 LocalAuth.redeem。只有 session durable save 成功后，handler 才会发送 Set-Cookie。Logout 会校验 cookie/browser binding 仍然匹配，移除该 browser、过期其 cookie，并重新验证 event stream。Revoke 会原子清空全部 persisted session 和 pending code，然后关闭所有 browser authorization 已失效的 stream。
 
 例如，CLI 先创建短时 pairing code；浏览器再携带 browser key、匹配的 Origin 和 Dwell request marker redeem code。Response 会设置 HttpOnly cookie。后续 GET 携带该 cookie 与 browser key；browser POST 还会带 Origin 和 request marker。只有 cookie、没有匹配 browser key 时会被拒绝。
 
-[openEventStream](../../../../../src/server/http.ts#L134) 捕获 request headers，并在 write 和 heartbeat 前重新检查相同 credential。[revalidateEventStreams](../../../../../src/server/http.ts#L130) 会在 logout 或 revoke 后立即关闭受影响的 stream，即使没有 event 或 heartbeat 到达。Stream writer 的 queue、expiry check 和 response cleanup 见 [HTTP 与 SSE](http.md#sse-lifecycle-and-overflow)。
+[openEventStream](../../../../../src/server/http.ts#L138) 捕获 request headers，并在 write 和 heartbeat 前重新检查相同 credential。[revalidateEventStreams](../../../../../src/server/http.ts#L134) 会在 logout 或 revoke 后立即关闭受影响的 stream，即使没有 event 或 heartbeat 到达。Stream writer 的 queue、expiry check 和 response cleanup 见 [HTTP 与 SSE](http.md#sse-lifecycle-and-overflow)。
 
 <a id="authentication-test-evidence"></a>
 ## Test evidence

@@ -12,7 +12,7 @@
 
 SSE writer 将 JSON 包成带 event IDs 的 frames，发送 heartbeat comments、遵守 output backpressure，并关闭 slow/revoked connections。Browser reducer 跟踪 session、epoch、sequence；过期或重复 frames 不能重复应用 visible changes。属于不同 active run 的 frame 可以推进 cursor，同时丢弃其 live payload，保持 stream position 而不改变 visible projection。Selection generation 防止旧 asynchronous connection 写入新的 selection。
 
-Source / verification：[`SessionService.subscribeEvents`](../../../../../src/sessions/service.ts#L455) · [src/server/sse.ts](../../../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
+Source / verification：[`SessionService.subscribeEvents`](../../../../../src/sessions/service.ts#L497) · [src/server/sse.ts](../../../../../src/server/sse.ts) · [src/clients/web/events.ts](../../../../../src/clients/web/events.ts) · [tests/events-http.test.ts](../../../../../tests/events-http.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
 
 <a id="projection"></a>
 
@@ -44,7 +44,7 @@ Settlement 后，client 可能仍需读取 history。它保留 uncovered live wo
 
 History 删除或无法确认 result 时，展示 unavailable/partial evidence，并保留已记录的 durable outcome。
 
-Source / verification：[`renderConversation`](../../../../../src/clients/web/client.ts#L1073) · [`loadHistory`](../../../../../src/clients/web/client.ts#L1299) · [`SessionService.getHistory`](../../../../../src/sessions/service.ts#L760) · [tests/session-events.test.ts](../../../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
+Source / verification：[`renderConversation`](../../../../../src/clients/web/client.ts#L1165) · [`loadHistory`](../../../../../src/clients/web/client.ts#L1391) · [`SessionService.getHistory`](../../../../../src/sessions/service.ts#L804) · [tests/session-events.test.ts](../../../../../tests/session-events.test.ts) · [tests/history-service.test.ts](../../../../../tests/history-service.test.ts)
 
 <a id="reconnect"></a>
 
@@ -54,4 +54,4 @@ Server 支持 reconnect 时携带最后已知 event cursor。Caller 提供 curso
 
 Page wake-up 与 refresh 恢复 connectivity 和 selected-session views，不重放 prompt。Authentication failure 返回 pairing；network outage 保留可恢复本地 state 并 retry observation。迟到 response 按 selection/generation 检查，防止切换 session 后显示旧 session history。Retry observation 与 submit new work 的区别，是 refresh、reconnect、host restart 共同需要保持的 invariant。
 
-Source / verification：[`stream`](../../../../../src/clients/web/client.ts#L1412) · [`resume`](../../../../../src/clients/web/client.ts#L2286) · [src/sessions/events.ts](../../../../../src/sessions/events.ts) · [tests/events.test.ts](../../../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)
+Source / verification：[`stream`](../../../../../src/clients/web/client.ts#L1504) · [`resume`](../../../../../src/clients/web/client.ts#L2404) · [src/sessions/events.ts](../../../../../src/sessions/events.ts) · [tests/events.test.ts](../../../../../tests/events.test.ts) · [tests/web-events.test.ts](../../../../../tests/web-events.test.ts)

@@ -6,7 +6,11 @@ import { prepareDataDirectory } from "../local/files.ts";
 import { dataDirectory, type HostMode } from "../local/paths.ts";
 import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
 import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
-import { isRuntimeConfiguration, isSessionModelRequest } from "../shared/sessions.ts";
+import {
+  isRuntimeConfiguration,
+  isSessionModelRequest,
+  isSessionNameRequest,
+} from "../shared/sessions.ts";
 import { isModelCapabilitiesRequest } from "../shared/thinking.ts";
 import { isTurnCreateRequest } from "../shared/turns.ts";
 import { browserCookie, readBrowserOrigin, requestAccess } from "./access.ts";
@@ -229,6 +233,7 @@ export async function startHost({
       const sessionMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)(?:\/(open|close|context))?$/.exec(
         path,
       );
+      const sessionNameMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/name$/.exec(path);
       const modelMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/model$/.exec(path);
       const sessionModelsMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)\/models$/.exec(path);
       const sessionCapabilitiesMatch =
@@ -251,6 +256,7 @@ export async function startHost({
         sessionModelsMatch !== null ||
         sessionCapabilitiesMatch !== null ||
         sessionMatch !== null ||
+        sessionNameMatch !== null ||
         historyMatch !== null ||
         eventMatch !== null ||
         nativeExecutionMatch !== null ||
@@ -262,6 +268,7 @@ export async function startHost({
           path === "/api/v1/model-capabilities" ||
           modelMatch !== null ||
           sessionCapabilitiesMatch !== null ||
+          sessionNameMatch !== null ||
           nativeExecutionMatch !== null ||
           sessionMatch?.[2] === "open" ||
           sessionMatch?.[2] === "close"
@@ -396,6 +403,16 @@ export async function startHost({
           if (!isModelCapabilitiesRequest(body))
             fail(400, "invalid_input", "Provide provider and model.");
           send(response, 200, await sessions.getSessionModelCapabilities(id, body));
+        } else if (sessionNameMatch) {
+          const id = sessionNameMatch[1];
+          if (!id) fail(400, "invalid_input", "Invalid session ID.");
+          if (!isSessionNameRequest(body))
+            fail(400, "invalid_input", "Provide displayName and the current metadata revision.");
+          send(
+            response,
+            200,
+            await sessions.renameSession(id, body.displayName, body.expectedRevision),
+          );
         } else if (modelMatch) {
           const id = modelMatch[1];
           if (!id) fail(400, "invalid_input", "Invalid session ID.");

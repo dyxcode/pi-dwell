@@ -69,6 +69,7 @@ export const HOST_PAGE = `<!doctype html>
 <div id="composer-context" class="composer-context" hidden>
 <span id="composer-directory" aria-label="Current directory"></span>
 <button id="choose-model" type="button" aria-label="Choose model" aria-haspopup="dialog" disabled><span id="model-label"></span><span id="thinking-label"></span><svg class="model-chevron" aria-hidden="true" viewBox="0 0 12 12" fill="none"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+<button id="edit-session-name" class="icon" type="button" aria-label="Rename conversation" aria-haspopup="dialog" disabled>✎</button>
 </div>
 <form id="composer">
 <label for="message" class="sr-only">Message Pi</label>
@@ -87,6 +88,26 @@ export const HOST_PAGE = `<!doctype html>
 <p id="close-session-copy" hidden></p>
 <p id="close-session-error" class="feedback" role="status" hidden></p>
 <div class="close-actions"><button id="cancel-session-close" type="button">Keep open</button><button id="confirm-session-close" type="button">Close</button></div>
+</dialog>
+<dialog id="session-name-dialog" aria-labelledby="session-name-title">
+<div class="handle"></div>
+<div class="panel-heading">
+<h2 id="session-name-title">Conversation name</h2>
+<button id="close-session-name" class="icon" type="button" aria-label="Close name editor">×</button>
+</div>
+<p class="panel-copy">Names are shared by every browser connected to this host.</p>
+<form id="session-name-form">
+<label for="session-name-input">Name</label>
+<input id="session-name-input" autocomplete="off">
+<p id="session-name-error" class="feedback" role="status" hidden></p>
+<div class="session-name-actions">
+<button id="import-local-name" class="text-button" type="button" hidden>Import this browser's saved name</button>
+<div class="close-actions">
+<button id="reset-session-name" type="button">Reset name</button>
+<button id="save-session-name" class="action" type="submit">Save</button>
+</div>
+</div>
+</form>
 </dialog>
 <dialog id="new-dialog" aria-labelledby="new-title">
 <div class="handle">
@@ -856,4 +877,21 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 .history-retry{min-height:28px;padding:0 4px;font:inherit;color:var(--dark)}
 .history-entry-anchor{display:block;height:0}
 .markdown>.history-entry-anchor:first-child+*{margin-top:0}
+#edit-session-name{display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:16px var(--mono)}
+#edit-session-name:disabled{opacity:.45}
+@media(max-width:760px){#edit-session-name{flex-basis:26px;width:26px;height:26px;min-height:26px;font-size:14px}}
+#session-name-dialog{position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 32px));max-width:none;height:fit-content;max-height:calc(100dvh - 32px);padding:20px;border:1px solid var(--line);border-radius:0;background:var(--surface);box-shadow:4px 4px var(--lilac);color:var(--ink)}
+#session-name-dialog .panel-heading{margin-bottom:10px;gap:12px}
+#session-name-dialog h2{font:600 18px/1.4 var(--sans);letter-spacing:0;margin:0}
+#session-name-dialog #close-session-name{width:32px;height:32px;margin:0}
+#session-name-dialog .panel-copy{font-size:12px;margin:0 0 12px}
+#session-name-dialog label{display:block;margin:8px 0 6px;font:11px/1.5 var(--mono);color:var(--muted)}
+#session-name-dialog #session-name-input{width:100%;height:40px;padding:8px;border:1px solid var(--line);border-radius:0;background:var(--paper);font:13px var(--sans)}
+#session-name-error{margin:8px 0 0}
+.session-name-actions{display:grid;gap:8px;margin-top:14px}
+.session-name-actions .text-button{justify-self:start;min-height:32px;padding:0;font-size:10px}
+.session-name-actions .close-actions{margin-top:0;gap:12px}
+.session-name-actions .close-actions button{min-height:38px;padding:0 10px;font:11px var(--mono)}
+#save-session-name{border:1px solid var(--dark);background:var(--dark);color:var(--surface);box-shadow:2px 2px var(--lilac)}
+@media(max-width:760px){#session-name-dialog{inset:auto 0 0;margin:0;width:100%;max-width:none;max-height:86dvh;padding:14px 20px max(24px,env(safe-area-inset-bottom));border:0;border-top:1px solid var(--line);box-shadow:0 -3px var(--lilac)}#session-name-dialog .handle{margin-bottom:14px}}
 `;

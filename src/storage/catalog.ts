@@ -9,12 +9,15 @@ import {
   type HistoryCheck,
   type HistoryCheckState,
   type RuntimeConfiguration,
+  isSessionDisplayName,
 } from "../shared/sessions.ts";
 import { isThinkingLevel, type ThinkingLevel } from "../shared/thinking.ts";
 import { isTurnInfo, type TurnError, type TurnInfo, type TurnStatus } from "../shared/turns.ts";
 
 export interface StoredSession {
   id: string;
+  displayName: string | null;
+  metadataRevision: number;
   requestId: string;
   payloadIdentity: string;
   directory: string;
@@ -35,13 +38,19 @@ export interface StoredTurn extends TurnInfo {
   payloadIdentity: string;
 }
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 const V1_SCHEMA_VERSION = 1;
 const V2_SCHEMA_VERSION = 2;
 const V3_SCHEMA_VERSION = 3;
 const V4_SCHEMA_VERSION = 4;
+const V5_SCHEMA_VERSION = 5;
 const DATABASE_NAME = "catalog.sqlite";
 const SESSION_COLUMNS = `
+  id, request_id, payload_identity, directory, provider, model, pi_session_id,
+  pi_session_file, history_expected, status, created_at, updated_at, error,
+  thinking_level, history_check_state, history_checked_at, display_name, metadata_revision
+`;
+const V5_SESSION_COLUMNS = `
   id, request_id, payload_identity, directory, provider, model, pi_session_id,
   pi_session_file, history_expected, status, created_at, updated_at, error,
   thinking_level, history_check_state, history_checked_at
@@ -64,8 +73,10 @@ const V3_SESSIONS_SCHEMA =
   "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT";
 const V4_SESSIONS_SCHEMA =
   "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, thinking_level TEXT CHECK (thinking_level IS NULL OR thinking_level IN ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')), CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT";
-const SESSIONS_SCHEMA =
+const V5_SESSIONS_SCHEMA =
   "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, thinking_level TEXT CHECK (thinking_level IS NULL OR thinking_level IN ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')), history_check_state TEXT CHECK (history_check_state IS NULL OR history_check_state IN ('not-created', 'readable', 'missing', 'invalid')), history_checked_at INTEGER, CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT";
+const SESSIONS_SCHEMA =
+  "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, thinking_level TEXT CHECK (thinking_level IS NULL OR thinking_level IN ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')), history_check_state TEXT CHECK (history_check_state IS NULL OR history_check_state IN ('not-created', 'readable', 'missing', 'invalid')), history_checked_at INTEGER, display_name TEXT CHECK (display_name IS NULL OR (length(display_name) BETWEEN 1 AND 80 AND instr(display_name, char(0)) = 0)), metadata_revision INTEGER NOT NULL DEFAULT 0 CHECK (metadata_revision >= 0), CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT";
 const TURNS_SCHEMA =
   "CREATE TABLE turns (run_id TEXT NOT NULL PRIMARY KEY CHECK (length(run_id) > 0), session_id TEXT NOT NULL REFERENCES sessions(id), request_id TEXT NOT NULL CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) = 64), status TEXT NOT NULL CHECK (status IN ('accepted', 'dispatching', 'running', 'completed', 'failed', 'aborted', 'interrupted')), cancellation_requested INTEGER NOT NULL CHECK (cancellation_requested IN (0, 1)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error_code TEXT, error_message TEXT, entry_ids TEXT NOT NULL CHECK (json_valid(entry_ids)), UNIQUE (session_id, request_id), CHECK ((error_code IS NULL AND error_message IS NULL) OR (length(error_code) > 0 AND length(error_message) > 0))) STRICT";
 const ACTIVE_TURN_INDEX =
@@ -137,6 +148,10 @@ function isStoredSession(value: unknown): value is StoredSession {
   if (
     !Object.hasOwn(value, "id") ||
     !("id" in value) ||
+    !Object.hasOwn(value, "displayName") ||
+    !("displayName" in value) ||
+    !Object.hasOwn(value, "metadataRevision") ||
+    !("metadataRevision" in value) ||
     !Object.hasOwn(value, "requestId") ||
     !("requestId" in value) ||
     !Object.hasOwn(value, "payloadIdentity") ||
@@ -168,11 +183,14 @@ function isStoredSession(value: unknown): value is StoredSession {
   ) {
     return false;
   }
-  if (Object.keys(value).length !== 15) {
+  if (Object.keys(value).length !== 17) {
     return false;
   }
   return (
     isNonEmptyString(value.id) &&
+    isSessionDisplayName(value.displayName) &&
+    isSafeIntegerValue(value.metadataRevision) &&
+    value.metadataRevision >= 0 &&
     isNonEmptyString(value.requestId) &&
     isNonEmptyString(value.payloadIdentity) &&
     isNonEmptyString(value.directory) &&
@@ -333,6 +351,8 @@ function sessionFromDatabase(row: Record<string, SQLOutputValue>): StoredSession
   }
   const session: StoredSession = {
     id: stringFromDatabase(row, "id"),
+    displayName: nullableStringFromDatabase(row, "display_name"),
+    metadataRevision: integerFromDatabase(row, "metadata_revision"),
     requestId: stringFromDatabase(row, "request_id"),
     payloadIdentity: stringFromDatabase(row, "payload_identity"),
     directory: stringFromDatabase(row, "directory"),
@@ -348,6 +368,8 @@ function sessionFromDatabase(row: Record<string, SQLOutputValue>): StoredSession
     updatedAt: integerFromDatabase(row, "updated_at"),
     error,
   };
+  if (!isSessionDisplayName(session.displayName) || session.metadataRevision < 0)
+    throw invalidCatalog("session name metadata is invalid");
   return session;
 }
 
@@ -423,7 +445,7 @@ function hasUserSchema(database: DatabaseSync): boolean {
   );
 }
 
-function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4 | 5): void {
+function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4 | 5 | 6): void {
   const rows = databaseRows(
     database,
     "SELECT type, name, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -447,7 +469,9 @@ function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4 | 5): void 
                   ? V3_SESSIONS_SCHEMA
                   : version === V4_SCHEMA_VERSION
                     ? V4_SESSIONS_SCHEMA
-                    : SESSIONS_SCHEMA,
+                    : version === V5_SCHEMA_VERSION
+                      ? V5_SESSIONS_SCHEMA
+                      : SESSIONS_SCHEMA,
           },
           { type: "table", name: "turns", sql: TURNS_SCHEMA },
         ];
@@ -496,9 +520,9 @@ function migrateV3ToV4(database: DatabaseSync): void {
 
 function migrateV4ToV5(database: DatabaseSync): void {
   database.exec("ALTER TABLE sessions RENAME TO sessions_v4");
-  database.exec(SESSIONS_SCHEMA);
+  database.exec(V5_SESSIONS_SCHEMA);
   database.exec(
-    `INSERT INTO sessions (${SESSION_COLUMNS}) SELECT ${V4_SESSION_COLUMNS}, NULL, NULL FROM sessions_v4`,
+    `INSERT INTO sessions (${V5_SESSION_COLUMNS}) SELECT ${V4_SESSION_COLUMNS}, NULL, NULL FROM sessions_v4`,
   );
   database.exec("ALTER TABLE turns RENAME TO turns_v4");
   database.exec(TURNS_SCHEMA);
@@ -506,6 +530,17 @@ function migrateV4ToV5(database: DatabaseSync): void {
   database.exec("DROP TABLE turns_v4");
   database.exec(ACTIVE_TURN_INDEX);
   database.exec("DROP TABLE sessions_v4");
+  database.exec(`PRAGMA user_version = ${V5_SCHEMA_VERSION}`);
+  verifySchema(database, V5_SCHEMA_VERSION);
+}
+
+function migrateV5ToV6(database: DatabaseSync): void {
+  database.exec(
+    "ALTER TABLE sessions ADD COLUMN display_name TEXT CHECK (display_name IS NULL OR (length(display_name) BETWEEN 1 AND 80 AND instr(display_name, char(0)) = 0))",
+  );
+  database.exec(
+    "ALTER TABLE sessions ADD COLUMN metadata_revision INTEGER NOT NULL DEFAULT 0 CHECK (metadata_revision >= 0)",
+  );
   database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   verifySchema(database, SCHEMA_VERSION);
 }
@@ -536,18 +571,25 @@ function initializeSchema(database: DatabaseSync): void {
         migrateV2ToV3(database);
         migrateV3ToV4(database);
         migrateV4ToV5(database);
+        migrateV5ToV6(database);
       } else if (version === V2_SCHEMA_VERSION) {
         verifySchema(database, V2_SCHEMA_VERSION);
         migrateV2ToV3(database);
         migrateV3ToV4(database);
         migrateV4ToV5(database);
+        migrateV5ToV6(database);
       } else if (version === V3_SCHEMA_VERSION) {
         verifySchema(database, V3_SCHEMA_VERSION);
         migrateV3ToV4(database);
         migrateV4ToV5(database);
+        migrateV5ToV6(database);
       } else if (version === V4_SCHEMA_VERSION) {
         verifySchema(database, V4_SCHEMA_VERSION);
         migrateV4ToV5(database);
+        migrateV5ToV6(database);
+      } else if (version === V5_SCHEMA_VERSION) {
+        verifySchema(database, V5_SCHEMA_VERSION);
+        migrateV5ToV6(database);
       } else if (version === SCHEMA_VERSION) {
         verifySchema(database, SCHEMA_VERSION);
       } else {
@@ -687,7 +729,7 @@ export class SessionCatalog {
     validateRecord(record);
     this.database
       .prepare(
-        `INSERT INTO sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         record.id,
@@ -706,7 +748,57 @@ export class SessionCatalog {
         record.thinkingLevel,
         record.historyCheck?.state ?? null,
         record.historyCheck?.checkedAt ?? null,
+        record.displayName,
+        record.metadataRevision,
       );
+  }
+
+  rename(
+    id: string,
+    displayName: string | null,
+    expectedRevision: number,
+    updatedAt: number,
+  ): StoredSession | null {
+    if (
+      !isSessionDisplayName(displayName) ||
+      !Number.isSafeInteger(expectedRevision) ||
+      expectedRevision < 0 ||
+      !Number.isSafeInteger(updatedAt)
+    )
+      throw new TypeError("Invalid session name update.");
+
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const current = this.get(id);
+      if (!current) throw new Error(`Cannot rename missing session: ${id}.`);
+      if (current.metadataRevision !== expectedRevision) {
+        this.database.exec("COMMIT");
+        return null;
+      }
+      if (current.displayName === displayName) {
+        this.database.exec("COMMIT");
+        return current;
+      }
+      if (current.metadataRevision === Number.MAX_SAFE_INTEGER)
+        throw new RangeError("Session metadata revision cannot be advanced safely.");
+
+      const result = this.database
+        .prepare(
+          "UPDATE sessions SET display_name = ?, metadata_revision = metadata_revision + 1, updated_at = ? WHERE id = ? AND metadata_revision = ?",
+        )
+        .run(displayName, updatedAt, id, expectedRevision);
+      if (result.changes !== 1 && result.changes !== 1n) {
+        this.database.exec("COMMIT");
+        return null;
+      }
+      const updated = this.get(id);
+      if (!updated) throw new Error(`Cannot read renamed session: ${id}.`);
+      this.database.exec("COMMIT");
+      return updated;
+    } catch (error) {
+      if (this.database.isTransaction) this.database.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   update(record: StoredSession): void {

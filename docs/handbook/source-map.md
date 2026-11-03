@@ -122,14 +122,14 @@ Local dependencies: [clients/web/icons.ts](../../src/clients/web/icons.ts), [sha
 
 Prose explanation: [browser-controller](implementation/browser-controller.md)
 
-[Open source](../../src/clients/web/client.ts) · 2316 lines
+[Open source](../../src/clients/web/client.ts) · 2434 lines
 
 Local dependencies: [shared/discovery.ts](../../src/shared/discovery.ts), [shared/history.ts](../../src/shared/history.ts), [shared/protocol.ts](../../src/shared/protocol.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/turns.ts](../../src/shared/turns.ts), [clients/web/events.ts](../../src/clients/web/events.ts), [clients/web/tool-command.ts](../../src/clients/web/tool-command.ts), [clients/web/icons.ts](../../src/clients/web/icons.ts), [clients/web/attachments.ts](../../src/clients/web/attachments.ts), [clients/web/markdown.ts](../../src/clients/web/markdown.ts), [clients/web/conversation.ts](../../src/clients/web/conversation.ts), [clients/web/dom.ts](../../src/clients/web/dom.ts), [shared/images.ts](../../src/shared/images.ts), [shared/events.ts](../../src/shared/events.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [clients/web/input.ts](../../src/clients/web/input.ts), [clients/web/transport.ts](../../src/clients/web/transport.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`el`](../../src/clients/web/client.ts#L40) | Function | id, type | [Read explanation](implementation/browser-controller.md#dom-contract-coordinator-state) |
-| [`node`](../../src/clients/web/client.ts#L45) | Function | tag, text, className | [Read explanation](implementation/browser-controller.md#dom-contract-coordinator-state) |
+| [`el`](../../src/clients/web/client.ts#L45) | Function | id, type | [Read explanation](implementation/browser-controller.md#dom-contract-coordinator-state) |
+| [`node`](../../src/clients/web/client.ts#L50) | Function | tag, text, className | [Read explanation](implementation/browser-controller.md#dom-contract-coordinator-state) |
 | [`input`](../../src/clients/web/client.ts#L55) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
 | [`form`](../../src/clients/web/client.ts#L56) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
 | [`rail`](../../src/clients/web/client.ts#L57) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
@@ -153,144 +153,146 @@ Local dependencies: [shared/discovery.ts](../../src/shared/discovery.ts), [share
 | [`closeError`](../../src/clients/web/client.ts#L75) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
 | [`cancelClose`](../../src/clients/web/client.ts#L76) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
 | [`confirmClose`](../../src/clients/web/client.ts#L77) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`modelDialog`](../../src/clients/web/client.ts#L78) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`modelSearch`](../../src/clients/web/client.ts#L79) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`chooseModel`](../../src/clients/web/client.ts#L80) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`availableModels`](../../src/clients/web/client.ts#L81) | Module value | `PiModelOption[]` | [Read explanation](implementation/browser-controller.md) |
-| [`capabilities`](../../src/clients/web/client.ts#L82) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`capabilityRequests`](../../src/clients/web/client.ts#L83) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`capabilityErrors`](../../src/clients/web/client.ts#L84) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`capabilityGeneration`](../../src/clients/web/client.ts#L85) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`resetCapabilities`](../../src/clients/web/client.ts#L86) | Function |  | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`thinkingChoice`](../../src/clients/web/client.ts#L92) | Module value | `PiModelOption \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`levelNames`](../../src/clients/web/client.ts#L93) | Module value | `Record<ThinkingLevel, string>` | [Read explanation](implementation/browser-controller.md) |
-| [`modelSession`](../../src/clients/web/client.ts#L102) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`changingModel`](../../src/clients/web/client.ts#L103) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`older`](../../src/clients/web/client.ts#L104) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`names`](../../src/clients/web/client.ts#L121) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`drafts`](../../src/clients/web/client.ts#L122) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`turns`](../../src/clients/web/client.ts#L123) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`sessions`](../../src/clients/web/client.ts#L124) | Module value | `SessionInfo[]` | [Read explanation](implementation/browser-controller.md) |
-| [`selected`](../../src/clients/web/client.ts#L125) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`state`](../../src/clients/web/client.ts#L126) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`contextSources`](../../src/clients/web/client.ts#L127) | Module value | `ContextSource[]` | [Read explanation](implementation/browser-controller.md) |
-| [`contextSourcesTruncated`](../../src/clients/web/client.ts#L128) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`entries`](../../src/clients/web/client.ts#L129) | Module value | `HistoryEntry[]` | [Read explanation](implementation/browser-controller.md) |
-| [`nextCursor`](../../src/clients/web/client.ts#L130) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`controller`](../../src/clients/web/client.ts#L131) | Module value | `AbortController \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`generation`](../../src/clients/web/client.ts#L132) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`authenticated`](../../src/clients/web/client.ts#L133) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`reconnectTimer`](../../src/clients/web/client.ts#L134) | Module value | `number \| undefined` | [Read explanation](implementation/browser-controller.md) |
-| [`pollTimer`](../../src/clients/web/client.ts#L134) | Module value | `number \| undefined` | [Read explanation](implementation/browser-controller.md) |
-| [`polling`](../../src/clients/web/client.ts#L135) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`suspended`](../../src/clients/web/client.ts#L136) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`HistoryReadRecovery`](../../src/clients/web/client.ts#L137) | Interface |  | [Read explanation](implementation/browser-controller.md) |
-| [`historyRecovery`](../../src/clients/web/client.ts#L142) | Module value | `Record<"latest" \| "older", HistoryReadRecovery>` | [Read explanation](implementation/browser-controller.md) |
-| [`historyContentFailed`](../../src/clients/web/client.ts#L146) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`historyCoverageReads`](../../src/clients/web/client.ts#L147) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`historyCoverageRun`](../../src/clients/web/client.ts#L148) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`resetHistoryPagination`](../../src/clients/web/client.ts#L149) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`historyPending`](../../src/clients/web/client.ts#L150) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`sending`](../../src/clients/web/client.ts#L151) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`pendingSend`](../../src/clients/web/client.ts#L152) | Module value | `{   session: string;   requestId: string;   message: string;   images: ImageContent[]; } \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`pendingCreate`](../../src/clients/web/client.ts#L158) | Module value | `{   requestId: string;   directory: string; } \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`tabSlots`](../../src/clients/web/client.ts#L162) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`openingSessions`](../../src/clients/web/client.ts#L163) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`closeArmedSession`](../../src/clients/web/client.ts#L164) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`preparingCloseSession`](../../src/clients/web/client.ts#L165) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`closeTarget`](../../src/clients/web/client.ts#L166) | Module value | `{   id: string;   activeRunId: string \| null;   nativeExecutionId: string \| null;   attempted: boolean; } \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`closingSession`](../../src/clients/web/client.ts#L172) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
-| [`closePreparationGeneration`](../../src/clients/web/client.ts#L173) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`closeAttemptGeneration`](../../src/clients/web/client.ts#L174) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`sessionRefreshGeneration`](../../src/clients/web/client.ts#L175) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`sessionStateGeneration`](../../src/clients/web/client.ts#L176) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`selectionGeneration`](../../src/clients/web/client.ts#L177) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`openIntentGeneration`](../../src/clients/web/client.ts#L178) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`authAttempt`](../../src/clients/web/client.ts#L179) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`browseAttempt`](../../src/clients/web/client.ts#L180) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`modelAttempt`](../../src/clients/web/client.ts#L181) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`hostMode`](../../src/clients/web/client.ts#L182) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`streamConnected`](../../src/clients/web/client.ts#L183) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`imageDialog`](../../src/clients/web/client.ts#L184) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`showImage`](../../src/clients/web/client.ts#L185) | Function | url, name | [Read explanation](implementation/browser-controller.md#dom-contract-coordinator-state) |
-| [`attachments`](../../src/clients/web/client.ts#L191) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`attachButton`](../../src/clients/web/client.ts#L199) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`imageFiles`](../../src/clients/web/client.ts#L200) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`imageCache`](../../src/clients/web/client.ts#L238) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`imageQueue`](../../src/clients/web/client.ts#L239) | Module value | `Promise<unknown>` | [Read explanation](implementation/browser-controller.md) |
-| [`liveOrder`](../../src/clients/web/client.ts#L240) | Module value | `{ kind: "message" \| "tool"; id: string }[]` | [Read explanation](implementation/browser-controller.md) |
-| [`releaseImages`](../../src/clients/web/client.ts#L241) | Function |  | [Read explanation](implementation/browser-controller.md#dom-contract-coordinator-state) |
-| [`historyImage`](../../src/clients/web/client.ts#L251) | Function | entryId, index, mimeType | [Read explanation](implementation/browser-controller.md#conversation-rendering-saved-images) |
-| [`localPreferences`](../../src/clients/web/client.ts#L312) | Module value | `Record<string, string>` | [Read explanation](implementation/browser-controller.md) |
-| [`savePreference`](../../src/clients/web/client.ts#L323) | Function | key, value | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`activeSession`](../../src/clients/web/client.ts#L331) | Function |  | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`modelCapabilityKey`](../../src/clients/web/client.ts#L334) | Function | provider, model, sessionId | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`requestModelCapabilities`](../../src/clients/web/client.ts#L343) | Function | choice, sessionId | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`probeCurrentModel`](../../src/clients/web/client.ts#L383) | Function | sessionId | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
-| [`label`](../../src/clients/web/client.ts#L411) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`runtimeOpen`](../../src/clients/web/client.ts#L428) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`nativeRunning`](../../src/clients/web/client.ts#L431) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`sessionBusy`](../../src/clients/web/client.ts#L434) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`status`](../../src/clients/web/client.ts#L437) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`TabStatus`](../../src/clients/web/client.ts#L459) | TypeAlias |  | [Read explanation](implementation/browser-controller.md) |
-| [`tabStatus`](../../src/clients/web/client.ts#L460) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`tabStatusLabel`](../../src/clients/web/client.ts#L469) | Function | value | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`SVG_NS`](../../src/clients/web/client.ts#L480) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`statusPaths`](../../src/clients/web/client.ts#L481) | Module value | `Record<   "ready" \| "working" \| "attention" \| "stopped" \| "opening" \| "close",   string >` | [Read explanation](implementation/browser-controller.md) |
-| [`tabSymbol`](../../src/clients/web/client.ts#L492) | Function | value | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`synchronizeTabSlots`](../../src/clients/web/client.ts#L508) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`openTabIds`](../../src/clients/web/client.ts#L520) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`closeBlockedReason`](../../src/clients/web/client.ts#L523) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`showError`](../../src/clients/web/client.ts#L533) | Function | error | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`clearNotice`](../../src/clients/web/client.ts#L541) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`nav`](../../src/clients/web/client.ts#L545) | Function | open | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`navigation`](../../src/clients/web/client.ts#L554) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-| [`updatedSession`](../../src/clients/web/client.ts#L732) | Function | session | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`neighborAfterClose`](../../src/clients/web/client.ts#L742) | Function | id, previousTabs | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`reconcileClosedRuntime`](../../src/clients/web/client.ts#L757) | Function | id, previousTabs | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`userMessageSnippet`](../../src/clients/web/client.ts#L766) | Function | values | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`showCloseError`](../../src/clients/web/client.ts#L779) | Function | error | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`prepareClose`](../../src/clients/web/client.ts#L783) | Function | id | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`sessionSnapshot`](../../src/clients/web/client.ts#L867) | Function | id | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`turnSnapshot`](../../src/clients/web/client.ts#L873) | Function | id, runId | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`turnIsActive`](../../src/clients/web/client.ts#L879) | Function | turn | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`waitForTurnAndRuntime`](../../src/clients/web/client.ts#L882) | Function | id, runId, authentication | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`finishClose`](../../src/clients/web/client.ts#L907) | Function | id, previousTabs | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`confirmSessionClose`](../../src/clients/web/client.ts#L913) | Function |  | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`openFromSidebar`](../../src/clients/web/client.ts#L1025) | Function | id | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`identifyLiveThinking`](../../src/clients/web/client.ts#L1061) | Function | message | [Read explanation](implementation/browser-controller.md#conversation-rendering-saved-images) |
-| [`renderConversation`](../../src/clients/web/client.ts#L1073) | Function |  | [Read explanation](implementation/browser-controller.md#conversation-rendering-saved-images) |
-| [`historyProblem`](../../src/clients/web/client.ts#L1259) | Function |  | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
-| [`resetHistoryRecovery`](../../src/clients/web/client.ts#L1263) | Function | more | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
-| [`uncoveredHistoryRun`](../../src/clients/web/client.ts#L1279) | Function |  | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
-| [`scheduleHistoryRecovery`](../../src/clients/web/client.ts#L1290) | Function | more | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
-| [`loadHistory`](../../src/clients/web/client.ts#L1299) | Function | more | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
-| [`stopStream`](../../src/clients/web/client.ts#L1398) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`renderFrame`](../../src/clients/web/client.ts#L1403) | Module value | `number \| undefined` | [Read explanation](implementation/browser-controller.md) |
-| [`scheduleStreamRender`](../../src/clients/web/client.ts#L1404) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`stream`](../../src/clients/web/client.ts#L1412) | Function | id, epoch | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`select`](../../src/clients/web/client.ts#L1532) | Function | id | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`connection`](../../src/clients/web/client.ts#L1566) | Function | text | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`refresh`](../../src/clients/web/client.ts#L1569) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`poll`](../../src/clients/web/client.ts#L1633) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`disconnect`](../../src/clients/web/client.ts#L1655) | Function | reason | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`connect`](../../src/clients/web/client.ts#L1679) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
-| [`submit`](../../src/clients/web/client.ts#L1718) | Function |  | [Read explanation](implementation/browser-controller.md#sending-stopping-safe-retry) |
-| [`browse`](../../src/clients/web/client.ts#L1821) | Function | path | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`renderModels`](../../src/clients/web/client.ts#L1870) | Function |  | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`showModels`](../../src/clients/web/client.ts#L1898) | Function |  | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`showThinking`](../../src/clients/web/client.ts#L1949) | Function | choice | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`changeModel`](../../src/clients/web/client.ts#L2010) | Function | choice, thinkingLevel | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`newSession`](../../src/clients/web/client.ts#L2055) | Function |  | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`createSession`](../../src/clients/web/client.ts#L2063) | Function |  | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
-| [`resetCloseDialog`](../../src/clients/web/client.ts#L2130) | Function |  | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`dismissCloseDialog`](../../src/clients/web/client.ts#L2143) | Function |  | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
-| [`pairingCode`](../../src/clients/web/client.ts#L2170) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`viewport`](../../src/clients/web/client.ts#L2263) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
-| [`responsive`](../../src/clients/web/client.ts#L2264) | Function |  | [Read explanation](implementation/browser-controller.md#event-bindings-page-lifecycle) |
-| [`resume`](../../src/clients/web/client.ts#L2286) | Function |  | [Read explanation](implementation/browser-controller.md#event-bindings-page-lifecycle) |
-| [`savedHistoryWarning`](../../src/clients/web/client.ts#L418) | Function | | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
-
+| [`modelDialog`](../../src/clients/web/client.ts#L85) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`modelSearch`](../../src/clients/web/client.ts#L86) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`chooseModel`](../../src/clients/web/client.ts#L87) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`availableModels`](../../src/clients/web/client.ts#L88) | Module value | `PiModelOption[]` | [Read explanation](implementation/browser-controller.md) |
+| [`capabilities`](../../src/clients/web/client.ts#L89) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`capabilityRequests`](../../src/clients/web/client.ts#L90) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`capabilityErrors`](../../src/clients/web/client.ts#L91) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`capabilityGeneration`](../../src/clients/web/client.ts#L92) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`resetCapabilities`](../../src/clients/web/client.ts#L98) | Function |  | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`thinkingChoice`](../../src/clients/web/client.ts#L99) | Module value | `PiModelOption \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`levelNames`](../../src/clients/web/client.ts#L100) | Module value | `Record<ThinkingLevel, string>` | [Read explanation](implementation/browser-controller.md) |
+| [`modelSession`](../../src/clients/web/client.ts#L109) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`changingModel`](../../src/clients/web/client.ts#L110) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`older`](../../src/clients/web/client.ts#L111) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`drafts`](../../src/clients/web/client.ts#L128) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`turns`](../../src/clients/web/client.ts#L129) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`sessions`](../../src/clients/web/client.ts#L130) | Module value | `SessionInfo[]` | [Read explanation](implementation/browser-controller.md) |
+| [`selected`](../../src/clients/web/client.ts#L131) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`state`](../../src/clients/web/client.ts#L132) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`contextSources`](../../src/clients/web/client.ts#L133) | Module value | `ContextSource[]` | [Read explanation](implementation/browser-controller.md) |
+| [`contextSourcesTruncated`](../../src/clients/web/client.ts#L134) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`entries`](../../src/clients/web/client.ts#L135) | Module value | `HistoryEntry[]` | [Read explanation](implementation/browser-controller.md) |
+| [`nextCursor`](../../src/clients/web/client.ts#L136) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`controller`](../../src/clients/web/client.ts#L137) | Module value | `AbortController \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`generation`](../../src/clients/web/client.ts#L138) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`authenticated`](../../src/clients/web/client.ts#L139) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`reconnectTimer`](../../src/clients/web/client.ts#L140) | Module value | `number \| undefined` | [Read explanation](implementation/browser-controller.md) |
+| [`pollTimer`](../../src/clients/web/client.ts#L140) | Module value | `number \| undefined` | [Read explanation](implementation/browser-controller.md) |
+| [`polling`](../../src/clients/web/client.ts#L141) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`suspended`](../../src/clients/web/client.ts#L142) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`HistoryReadRecovery`](../../src/clients/web/client.ts#L143) | Interface |  | [Read explanation](implementation/browser-controller.md) |
+| [`historyRecovery`](../../src/clients/web/client.ts#L148) | Module value | `Record<"latest" \| "older", HistoryReadRecovery>` | [Read explanation](implementation/browser-controller.md) |
+| [`historyContentFailed`](../../src/clients/web/client.ts#L152) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`historyCoverageReads`](../../src/clients/web/client.ts#L153) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`historyCoverageRun`](../../src/clients/web/client.ts#L154) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`resetHistoryPagination`](../../src/clients/web/client.ts#L155) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`historyPending`](../../src/clients/web/client.ts#L156) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`sending`](../../src/clients/web/client.ts#L157) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`pendingSend`](../../src/clients/web/client.ts#L158) | Module value | `{   session: string;   requestId: string;   message: string;   images: ImageContent[]; } \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`pendingCreate`](../../src/clients/web/client.ts#L164) | Module value | `{   requestId: string;   directory: string; } \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`tabSlots`](../../src/clients/web/client.ts#L168) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`openingSessions`](../../src/clients/web/client.ts#L169) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`closeArmedSession`](../../src/clients/web/client.ts#L170) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`preparingCloseSession`](../../src/clients/web/client.ts#L171) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`closeTarget`](../../src/clients/web/client.ts#L172) | Module value | `{   id: string;   activeRunId: string \| null;   nativeExecutionId: string \| null;   attempted: boolean; } \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`closingSession`](../../src/clients/web/client.ts#L178) | Module value | `string \| null` | [Read explanation](implementation/browser-controller.md) |
+| [`closePreparationGeneration`](../../src/clients/web/client.ts#L179) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`closeAttemptGeneration`](../../src/clients/web/client.ts#L180) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`sessionRefreshGeneration`](../../src/clients/web/client.ts#L181) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`sessionStateGeneration`](../../src/clients/web/client.ts#L182) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`selectionGeneration`](../../src/clients/web/client.ts#L183) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`openIntentGeneration`](../../src/clients/web/client.ts#L184) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`authAttempt`](../../src/clients/web/client.ts#L185) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`browseAttempt`](../../src/clients/web/client.ts#L186) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`modelAttempt`](../../src/clients/web/client.ts#L187) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`hostMode`](../../src/clients/web/client.ts#L188) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`streamConnected`](../../src/clients/web/client.ts#L189) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`imageDialog`](../../src/clients/web/client.ts#L190) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`showImage`](../../src/clients/web/client.ts#L196) | Function | url, name | [Read explanation](implementation/browser-controller.md#dom-contract-coordinator-state) |
+| [`attachments`](../../src/clients/web/client.ts#L197) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`attachButton`](../../src/clients/web/client.ts#L205) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`imageFiles`](../../src/clients/web/client.ts#L206) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`imageCache`](../../src/clients/web/client.ts#L244) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`imageQueue`](../../src/clients/web/client.ts#L245) | Module value | `Promise<unknown>` | [Read explanation](implementation/browser-controller.md) |
+| [`liveOrder`](../../src/clients/web/client.ts#L246) | Module value | `{ kind: "message" \| "tool"; id: string }[]` | [Read explanation](implementation/browser-controller.md) |
+| [`releaseImages`](../../src/clients/web/client.ts#L252) | Function |  | [Read explanation](implementation/browser-controller.md#dom-contract-coordinator-state) |
+| [`historyImage`](../../src/clients/web/client.ts#L262) | Function | entryId, index, mimeType | [Read explanation](implementation/browser-controller.md#conversation-rendering-saved-images) |
+| [`localPreferences`](../../src/clients/web/client.ts#L318) | Module value | `Record<string, string>` | [Read explanation](implementation/browser-controller.md) |
+| [`savePreference`](../../src/clients/web/client.ts#L332) | Function | key, value | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`activeSession`](../../src/clients/web/client.ts#L420) | Function |  | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`modelCapabilityKey`](../../src/clients/web/client.ts#L423) | Function | provider, model, sessionId | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`requestModelCapabilities`](../../src/clients/web/client.ts#L432) | Function | choice, sessionId | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`probeCurrentModel`](../../src/clients/web/client.ts#L472) | Function | sessionId | [Read explanation](implementation/browser-controller.md#model-capability-state-image-gate) |
+| [`label`](../../src/clients/web/client.ts#L500) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`runtimeOpen`](../../src/clients/web/client.ts#L516) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`nativeRunning`](../../src/clients/web/client.ts#L519) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`sessionBusy`](../../src/clients/web/client.ts#L522) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`status`](../../src/clients/web/client.ts#L525) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`TabStatus`](../../src/clients/web/client.ts#L542) | TypeAlias |  | [Read explanation](implementation/browser-controller.md) |
+| [`tabStatus`](../../src/clients/web/client.ts#L548) | Function | s | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`tabStatusLabel`](../../src/clients/web/client.ts#L557) | Function | value | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`SVG_NS`](../../src/clients/web/client.ts#L563) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`statusPaths`](../../src/clients/web/client.ts#L564) | Module value | `Record<   "ready" \| "working" \| "attention" \| "stopped" \| "opening" \| "close",   string >` | [Read explanation](implementation/browser-controller.md) |
+| [`tabSymbol`](../../src/clients/web/client.ts#L580) | Function | value | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`synchronizeTabSlots`](../../src/clients/web/client.ts#L596) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`openTabIds`](../../src/clients/web/client.ts#L608) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`closeBlockedReason`](../../src/clients/web/client.ts#L611) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`showError`](../../src/clients/web/client.ts#L621) | Function | error | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`clearNotice`](../../src/clients/web/client.ts#L629) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`nav`](../../src/clients/web/client.ts#L633) | Function | open | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`navigation`](../../src/clients/web/client.ts#L642) | Function |  | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`updatedSession`](../../src/clients/web/client.ts#L822) | Function | session | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`neighborAfterClose`](../../src/clients/web/client.ts#L834) | Function | id, previousTabs | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`reconcileClosedRuntime`](../../src/clients/web/client.ts#L849) | Function | id, previousTabs | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`userMessageSnippet`](../../src/clients/web/client.ts#L858) | Function | values | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`showCloseError`](../../src/clients/web/client.ts#L871) | Function | error | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`prepareClose`](../../src/clients/web/client.ts#L875) | Function | id | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`sessionSnapshot`](../../src/clients/web/client.ts#L959) | Function | id | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`turnSnapshot`](../../src/clients/web/client.ts#L965) | Function | id, runId | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`turnIsActive`](../../src/clients/web/client.ts#L971) | Function | turn | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`waitForTurnAndRuntime`](../../src/clients/web/client.ts#L974) | Function | id, runId, authentication | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`finishClose`](../../src/clients/web/client.ts#L999) | Function | id, previousTabs | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`confirmSessionClose`](../../src/clients/web/client.ts#L1005) | Function |  | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`openFromSidebar`](../../src/clients/web/client.ts#L1117) | Function | id | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`identifyLiveThinking`](../../src/clients/web/client.ts#L1153) | Function | message | [Read explanation](implementation/browser-controller.md#conversation-rendering-saved-images) |
+| [`renderConversation`](../../src/clients/web/client.ts#L1165) | Function |  | [Read explanation](implementation/browser-controller.md#conversation-rendering-saved-images) |
+| [`historyProblem`](../../src/clients/web/client.ts#L1351) | Function |  | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
+| [`resetHistoryRecovery`](../../src/clients/web/client.ts#L1355) | Function | more | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
+| [`uncoveredHistoryRun`](../../src/clients/web/client.ts#L1371) | Function |  | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
+| [`scheduleHistoryRecovery`](../../src/clients/web/client.ts#L1382) | Function | more | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
+| [`loadHistory`](../../src/clients/web/client.ts#L1391) | Function | more | [Read explanation](implementation/browser-controller.md#saved-history-recovery) |
+| [`stopStream`](../../src/clients/web/client.ts#L1490) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`renderFrame`](../../src/clients/web/client.ts#L1488) | Module value | `number \| undefined` | [Read explanation](implementation/browser-controller.md) |
+| [`scheduleStreamRender`](../../src/clients/web/client.ts#L1496) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`stream`](../../src/clients/web/client.ts#L1504) | Function | id, epoch | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`select`](../../src/clients/web/client.ts#L1621) | Function | id | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`connection`](../../src/clients/web/client.ts#L1655) | Function | text | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`refresh`](../../src/clients/web/client.ts#L1658) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`poll`](../../src/clients/web/client.ts#L1726) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`disconnect`](../../src/clients/web/client.ts#L1748) | Function | reason | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`connect`](../../src/clients/web/client.ts#L1773) | Function |  | [Read explanation](implementation/browser-controller.md#sse-connection-selection-lifecycle) |
+| [`submit`](../../src/clients/web/client.ts#L1812) | Function |  | [Read explanation](implementation/browser-controller.md#sending-stopping-safe-retry) |
+| [`browse`](../../src/clients/web/client.ts#L1915) | Function | path | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`renderModels`](../../src/clients/web/client.ts#L1964) | Function |  | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`showModels`](../../src/clients/web/client.ts#L1992) | Function |  | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`showThinking`](../../src/clients/web/client.ts#L2043) | Function | choice | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`changeModel`](../../src/clients/web/client.ts#L2104) | Function | choice, thinkingLevel | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`newSession`](../../src/clients/web/client.ts#L2149) | Function |  | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`createSession`](../../src/clients/web/client.ts#L2157) | Function |  | [Read explanation](implementation/browser-controller.md#directory-selection-session-creation-model-picker) |
+| [`resetCloseDialog`](../../src/clients/web/client.ts#L2248) | Function |  | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`dismissCloseDialog`](../../src/clients/web/client.ts#L2261) | Function |  | [Read explanation](implementation/browser-controller.md#opening-closing-concurrency-checks) |
+| [`pairingCode`](../../src/clients/web/client.ts#L2280) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`viewport`](../../src/clients/web/client.ts#L2373) | Module value | Inferred from initializer | [Read explanation](implementation/browser-controller.md) |
+| [`responsive`](../../src/clients/web/client.ts#L2382) | Function |  | [Read explanation](implementation/browser-controller.md#event-bindings-page-lifecycle) |
+| [`resume`](../../src/clients/web/client.ts#L2404) | Function |  | [Read explanation](implementation/browser-controller.md#event-bindings-page-lifecycle) |
+| [`savedHistoryWarning`](../../src/clients/web/client.ts#L506) | Function | | [Read explanation](implementation/browser-controller.md#session-labels-status-navigation) |
+| [`invalidateSessionNameEditor`](../../src/clients/web/client.ts#L343) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
+| [`closeSessionNameEditor`](../../src/clients/web/client.ts#L347) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
+| [`openSessionNameEditor`](../../src/clients/web/client.ts#L351) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
+| [`saveSessionNameValue`](../../src/clients/web/client.ts#L368) | Function |  | [Read explanation](implementation/browser-controller.md#browser-shared-session-names) |
 
 ## src/clients/web/conversation.ts
 
@@ -358,7 +360,7 @@ Prose explanation: [browser-rendering](implementation/browser-rendering.md)
 
 Prose explanation: [browser-events](implementation/browser-events.md)
 
-[Open source](../../src/clients/web/events.ts) · 847 lines
+[Open source](../../src/clients/web/events.ts) · 851 lines
 
 Local dependencies: [shared/events.ts](../../src/shared/events.ts), [shared/history.ts](../../src/shared/history.ts), [shared/sessions.ts](../../src/shared/sessions.ts).
 
@@ -408,13 +410,13 @@ Local dependencies: [shared/events.ts](../../src/shared/events.ts), [shared/hist
 | [`upsertSnapshotMessage`](../../src/clients/web/events.ts#L396) | Function | messages, value | [Read explanation](implementation/browser-events.md#saved-history-coverage-snapshot-merging) |
 | [`upsertSnapshotTool`](../../src/clients/web/events.ts#L412) | Function | tools, value | [Read explanation](implementation/browser-events.md#saved-history-coverage-snapshot-merging) |
 | [`snapshotState`](../../src/clients/web/events.ts#L425) | Function | state, frame | [Read explanation](implementation/browser-events.md#saved-history-coverage-snapshot-merging) |
-| [`upsertMessage`](../../src/clients/web/events.ts#L522) | Function | messages, value | [Read explanation](implementation/browser-events.md#live-delta-accumulation) |
-| [`appendDelta`](../../src/clients/web/events.ts#L542) | Function | messages, messageId, delta, truncated, blockDelta | [Read explanation](implementation/browser-events.md#live-delta-accumulation) |
-| [`messageThinkingBytes`](../../src/clients/web/events.ts#L637) | Function | message | [Read explanation](implementation/browser-events.md#live-delta-accumulation) |
-| [`upsertTool`](../../src/clients/web/events.ts#L645) | Function | tools, value | [Read explanation](implementation/browser-events.md#live-delta-accumulation) |
-| [`reduceFrame`](../../src/clients/web/events.ts#L664) | Function | state, frame | [Read explanation](implementation/browser-events.md#event-reducer-branches-cursor-rules) |
-| [`reconcileHistory`](../../src/clients/web/events.ts#L814) | Function | state, page | [Read explanation](implementation/browser-events.md#event-reducer-branches-cursor-rules) |
-| [`visibleLiveContent`](../../src/clients/web/events.ts#L822) | Function | state, entries | [Read explanation](implementation/browser-events.md#event-reducer-branches-cursor-rules) |
+| [`upsertMessage`](../../src/clients/web/events.ts#L524) | Function | messages, value | [Read explanation](implementation/browser-events.md#live-delta-accumulation) |
+| [`appendDelta`](../../src/clients/web/events.ts#L544) | Function | messages, messageId, delta, truncated, blockDelta | [Read explanation](implementation/browser-events.md#live-delta-accumulation) |
+| [`messageThinkingBytes`](../../src/clients/web/events.ts#L639) | Function | message | [Read explanation](implementation/browser-events.md#live-delta-accumulation) |
+| [`upsertTool`](../../src/clients/web/events.ts#L647) | Function | tools, value | [Read explanation](implementation/browser-events.md#live-delta-accumulation) |
+| [`reduceFrame`](../../src/clients/web/events.ts#L666) | Function | state, frame | [Read explanation](implementation/browser-events.md#event-reducer-branches-cursor-rules) |
+| [`reconcileHistory`](../../src/clients/web/events.ts#L818) | Function | state, page | [Read explanation](implementation/browser-events.md#event-reducer-branches-cursor-rules) |
+| [`visibleLiveContent`](../../src/clients/web/events.ts#L826) | Function | state, entries | [Read explanation](implementation/browser-events.md#event-reducer-branches-cursor-rules) |
 
 
 ## src/clients/web/icons.ts
@@ -465,12 +467,12 @@ Prose explanation: [browser-rendering](implementation/browser-rendering.md)
 
 Prose explanation: [browser-rendering](implementation/browser-rendering.md)
 
-[Open source](../../src/clients/web/page.ts) · 859 lines
+[Open source](../../src/clients/web/page.ts) · 897 lines
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
 | [`HOST_PAGE`](../../src/clients/web/page.ts#L1) | Module value | Inferred from initializer | [Read explanation](implementation/browser-rendering.md) |
-| [`STYLE`](../../src/clients/web/page.ts#L138) | Module value | Inferred from initializer | [Read explanation](implementation/browser-rendering.md) |
+| [`STYLE`](../../src/clients/web/page.ts#L159) | Module value | Inferred from initializer | [Read explanation](implementation/browser-rendering.md) |
 
 
 ## src/clients/web/script.ts
@@ -839,24 +841,24 @@ Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts]
 
 Prose explanation: [http](implementation/http.md)
 
-[Open source](../../src/server/http.ts) · 619 lines
+[Open source](../../src/server/http.ts) · 636 lines
 
 Local dependencies: [clients/web/page.ts](../../src/clients/web/page.ts), [clients/web/script.ts](../../src/clients/web/script.ts), [local/files.ts](../../src/local/files.ts), [local/paths.ts](../../src/local/paths.ts), [sessions/service.ts](../../src/sessions/service.ts), [shared/protocol.ts](../../src/shared/protocol.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/turns.ts](../../src/shared/turns.ts), [server/access.ts](../../src/server/access.ts), [server/auth.ts](../../src/server/auth.ts), [server/sse.ts](../../src/server/sse.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`HostOptions`](../../src/server/http.ts#L16) | Interface |  | [Read explanation](implementation/http.md) |
-| [`RunningHost`](../../src/server/http.ts#L26) | Interface |  | [Read explanation](implementation/http.md) |
-| [`fail`](../../src/server/http.ts#L31) | Function | status, code, message | [Read explanation](implementation/http.md#request-validation) |
-| [`cookieToken`](../../src/server/http.ts#L34) | Function | request, name | [Read explanation](implementation/http.md#request-validation) |
-| [`browserRequest`](../../src/server/http.ts#L42) | Function | request, origin | [Read explanation](implementation/http.md#request-validation) |
-| [`readJson`](../../src/server/http.ts#L47) | Function | request, limit | [Read explanation](implementation/http.md#request-validation) |
-| [`send`](../../src/server/http.ts#L84) | Function | response, status, body | [Read explanation](implementation/http.md#request-validation) |
-| [`parseHistoryCursor`](../../src/server/http.ts#L88) | Function | query | [Read explanation](implementation/http.md#request-validation) |
-| [`startHost`](../../src/server/http.ts#L102) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [Read explanation](implementation/http.md#host-lifecycle) |
-| [`startHost.revalidateEventStreams`](../../src/server/http.ts#L130) | Nested function |  | [Read explanation](implementation/http.md#host-lifecycle) |
-| [`startHost.openEventStream`](../../src/server/http.ts#L134) | Nested function | request, response, sessionId, cursor, cookieName | [Read explanation](implementation/http.md#host-lifecycle) |
-| [`startHost.handle`](../../src/server/http.ts#L167) | Nested function | request, response | [Read explanation](implementation/http.md#route-dispatch) |
+| [`HostOptions`](../../src/server/http.ts#L20) | Interface |  | [Read explanation](implementation/http.md) |
+| [`RunningHost`](../../src/server/http.ts#L30) | Interface |  | [Read explanation](implementation/http.md) |
+| [`fail`](../../src/server/http.ts#L35) | Function | status, code, message | [Read explanation](implementation/http.md#request-validation) |
+| [`cookieToken`](../../src/server/http.ts#L38) | Function | request, name | [Read explanation](implementation/http.md#request-validation) |
+| [`browserRequest`](../../src/server/http.ts#L46) | Function | request, origin | [Read explanation](implementation/http.md#request-validation) |
+| [`readJson`](../../src/server/http.ts#L51) | Function | request, limit | [Read explanation](implementation/http.md#request-validation) |
+| [`send`](../../src/server/http.ts#L88) | Function | response, status, body | [Read explanation](implementation/http.md#request-validation) |
+| [`parseHistoryCursor`](../../src/server/http.ts#L92) | Function | query | [Read explanation](implementation/http.md#request-validation) |
+| [`startHost`](../../src/server/http.ts#L106) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [Read explanation](implementation/http.md#host-lifecycle) |
+| [`startHost.revalidateEventStreams`](../../src/server/http.ts#L134) | Nested function |  | [Read explanation](implementation/http.md#host-lifecycle) |
+| [`startHost.openEventStream`](../../src/server/http.ts#L138) | Nested function | request, response, sessionId, cursor, cookieName | [Read explanation](implementation/http.md#host-lifecycle) |
+| [`startHost.handle`](../../src/server/http.ts#L171) | Nested function | request, response | [Read explanation](implementation/http.md#route-dispatch) |
 
 
 ## src/server/session-discovery.ts
@@ -1007,7 +1009,7 @@ Local dependencies: [local/paths.ts](../../src/local/paths.ts), [shared/protocol
 
 Prose explanation: [events](implementation/events.md)
 
-[Open source](../../src/sessions/events.ts) · 1379 lines
+[Open source](../../src/sessions/events.ts) · 1381 lines
 
 Local dependencies: [runtime/message-identity.ts](../../src/runtime/message-identity.ts), [runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts), [shared/events.ts](../../src/shared/events.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/turns.ts](../../src/shared/turns.ts).
 
@@ -1063,63 +1065,63 @@ Local dependencies: [runtime/message-identity.ts](../../src/runtime/message-iden
 | [`emptyLiveState`](../../src/sessions/events.ts#L229) | Function |  | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
 | [`parseCursor`](../../src/sessions/events.ts#L246) | Function | cursor, sessionId | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
 | [`projectSession`](../../src/sessions/events.ts#L260) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
-| [`projectTurn`](../../src/sessions/events.ts#L313) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
-| [`extractText`](../../src/sessions/events.ts#L339) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
-| [`clippedToolInput`](../../src/sessions/events.ts#L350) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
-| [`clippedToolText`](../../src/sessions/events.ts#L354) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
-| [`eventSize`](../../src/sessions/events.ts#L358) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
-| [`asReplayable`](../../src/sessions/events.ts#L362) | Function | frame | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
-| [`copyFrame`](../../src/sessions/events.ts#L366) | Function | frame | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
-| [`SessionEvents`](../../src/sessions/events.ts#L371) | Class |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.#maxSessions`](../../src/sessions/events.ts#L372) | Property |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.#maxReplayEvents`](../../src/sessions/events.ts#L373) | Property |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.#maxReplayBytes`](../../src/sessions/events.ts#L374) | Property |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.#maxSubscribersPerSession`](../../src/sessions/events.ts#L375) | Property |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.#maxSubscribers`](../../src/sessions/events.ts#L376) | Property |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.#streams`](../../src/sessions/events.ts#L377) | Property |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.#subscriberCount`](../../src/sessions/events.ts#L378) | Property |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.#tick`](../../src/sessions/events.ts#L379) | Property |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.#closed`](../../src/sessions/events.ts#L380) | Property |  | [Read explanation](implementation/events.md) |
-| [`SessionEvents.constructor`](../../src/sessions/events.ts#L382) | Constructor | options | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.ensure`](../../src/sessions/events.ts#L397) | Method | sessionId | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.publishSession`](../../src/sessions/events.ts#L402) | Method | session | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.publishTurn`](../../src/sessions/events.ts#L430) | Method | session, activeTurn, latestTurn | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.beginTurn`](../../src/sessions/events.ts#L494) | Method | sessionId, runId, messageCounts, messageIdentityKnown | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
-| [`SessionEvents.beginNativeExecution`](../../src/sessions/events.ts#L519) | Method | sessionId, executionId, messageCounts | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
-| [`SessionEvents.observe`](../../src/sessions/events.ts#L562) | Method | sessionId, runId, event | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
-| [`SessionEvents.endTurn`](../../src/sessions/events.ts#L594) | Method | sessionId, runId | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
-| [`SessionEvents.endNativeExecution`](../../src/sessions/events.ts#L603) | Method | sessionId, executionId | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
-| [`SessionEvents.fail`](../../src/sessions/events.ts#L627) | Method | sessionId, code, message | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.connect`](../../src/sessions/events.ts#L643) | Method | session, activeTurn, latestTurn, cursor, listener | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.close`](../../src/sessions/events.ts#L673) | Method |  | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.#validView`](../../src/sessions/events.ts#L684) | Method | session, activeTurn, latestTurn | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.#getOrCreate`](../../src/sessions/events.ts#L704) | Method | sessionId | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.#touch`](../../src/sessions/events.ts#L736) | Method | stream | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.#removeSubscriber`](../../src/sessions/events.ts#L740) | Method | stream, subscriber | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.#reconcileView`](../../src/sessions/events.ts#L747) | Method | stream, session, activeTurn, latestTurn | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.#publishViewLimits`](../../src/sessions/events.ts#L803) | Method | stream, _session, activeTurn, latestTurn, sessionLimited | [Read explanation](implementation/events.md#event-hub-lifecycle) |
-| [`SessionEvents.#initialFrames`](../../src/sessions/events.ts#L817) | Method | stream, cursor | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.#snapshotFrame`](../../src/sessions/events.ts#L841) | Method | stream | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.#resyncFrame`](../../src/sessions/events.ts#L872) | Method | stream, reason | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.#cursor`](../../src/sessions/events.ts#L886) | Method | stream | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.#emit`](../../src/sessions/events.ts#L890) | Method | stream, runId, type, payload | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.#limited`](../../src/sessions/events.ts#L935) | Method | stream, scope, limit | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.#projectionError`](../../src/sessions/events.ts#L942) | Method | stream | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
-| [`SessionEvents.#messageStart`](../../src/sessions/events.ts#L951) | Method | stream, event | [Read explanation](implementation/events.md#live-message-projection) |
-| [`SessionEvents.#messageUpdate`](../../src/sessions/events.ts#L964) | Method | stream, event | [Read explanation](implementation/events.md#live-message-projection) |
-| [`SessionEvents.#messageEnd`](../../src/sessions/events.ts#L1095) | Method | stream, event | [Read explanation](implementation/events.md#live-message-projection) |
-| [`SessionEvents.#parseContent`](../../src/sessions/events.ts#L1119) | Method | content, finished | [Read explanation](implementation/events.md#live-message-projection) |
-| [`SessionEvents.#contentBlock`](../../src/sessions/events.ts#L1153) | Method | stream, contentIndex, type | [Read explanation](implementation/events.md#live-message-projection) |
-| [`SessionEvents.#partialContent`](../../src/sessions/events.ts#L1175) | Method | partial, contentIndex, type | [Read explanation](implementation/events.md#live-message-projection) |
-| [`SessionEvents.#appendContent`](../../src/sessions/events.ts#L1187) | Method | content, block, text | [Read explanation](implementation/events.md#live-message-projection) |
-| [`SessionEvents.#publishMessage`](../../src/sessions/events.ts#L1204) | Method | stream, type, nativeKey, messageId | [Read explanation](implementation/events.md#live-message-projection) |
-| [`SessionEvents.#toolStart`](../../src/sessions/events.ts#L1257) | Method | stream, event | [Read explanation](implementation/events.md#live-tool-projection) |
-| [`SessionEvents.#toolUpdate`](../../src/sessions/events.ts#L1277) | Method | stream, event | [Read explanation](implementation/events.md#live-tool-projection) |
-| [`SessionEvents.#toolEnd`](../../src/sessions/events.ts#L1301) | Method | stream, event | [Read explanation](implementation/events.md#live-tool-projection) |
-| [`SessionEvents.#getTool`](../../src/sessions/events.ts#L1325) | Method | stream, rawId, name, input | [Read explanation](implementation/events.md#live-tool-projection) |
-| [`SessionEvents.#toolEventId`](../../src/sessions/events.ts#L1361) | Method | event | [Read explanation](implementation/events.md#live-tool-projection) |
-| [`SessionEvents.#toolEventName`](../../src/sessions/events.ts#L1369) | Method | event | [Read explanation](implementation/events.md#live-tool-projection) |
-| [`boundedLimit`](../../src/sessions/events.ts#L1374) | Function | value, maximum, minimum | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
+| [`projectTurn`](../../src/sessions/events.ts#L315) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
+| [`extractText`](../../src/sessions/events.ts#L341) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
+| [`clippedToolInput`](../../src/sessions/events.ts#L352) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
+| [`clippedToolText`](../../src/sessions/events.ts#L356) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
+| [`eventSize`](../../src/sessions/events.ts#L360) | Function | value | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
+| [`asReplayable`](../../src/sessions/events.ts#L364) | Function | frame | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
+| [`copyFrame`](../../src/sessions/events.ts#L368) | Function | frame | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
+| [`SessionEvents`](../../src/sessions/events.ts#L373) | Class |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.#maxSessions`](../../src/sessions/events.ts#L374) | Property |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.#maxReplayEvents`](../../src/sessions/events.ts#L375) | Property |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.#maxReplayBytes`](../../src/sessions/events.ts#L376) | Property |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.#maxSubscribersPerSession`](../../src/sessions/events.ts#L377) | Property |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.#maxSubscribers`](../../src/sessions/events.ts#L378) | Property |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.#streams`](../../src/sessions/events.ts#L379) | Property |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.#subscriberCount`](../../src/sessions/events.ts#L380) | Property |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.#tick`](../../src/sessions/events.ts#L381) | Property |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.#closed`](../../src/sessions/events.ts#L382) | Property |  | [Read explanation](implementation/events.md) |
+| [`SessionEvents.constructor`](../../src/sessions/events.ts#L384) | Constructor | options | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.ensure`](../../src/sessions/events.ts#L399) | Method | sessionId | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.publishSession`](../../src/sessions/events.ts#L404) | Method | session | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.publishTurn`](../../src/sessions/events.ts#L432) | Method | session, activeTurn, latestTurn | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.beginTurn`](../../src/sessions/events.ts#L496) | Method | sessionId, runId, messageCounts, messageIdentityKnown | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
+| [`SessionEvents.beginNativeExecution`](../../src/sessions/events.ts#L521) | Method | sessionId, executionId, messageCounts | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
+| [`SessionEvents.observe`](../../src/sessions/events.ts#L564) | Method | sessionId, runId, event | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
+| [`SessionEvents.endTurn`](../../src/sessions/events.ts#L596) | Method | sessionId, runId | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
+| [`SessionEvents.endNativeExecution`](../../src/sessions/events.ts#L605) | Method | sessionId, executionId | [Read explanation](implementation/events.md#live-turn-and-native-execution) |
+| [`SessionEvents.fail`](../../src/sessions/events.ts#L629) | Method | sessionId, code, message | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.connect`](../../src/sessions/events.ts#L645) | Method | session, activeTurn, latestTurn, cursor, listener | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.close`](../../src/sessions/events.ts#L675) | Method |  | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.#validView`](../../src/sessions/events.ts#L686) | Method | session, activeTurn, latestTurn | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.#getOrCreate`](../../src/sessions/events.ts#L706) | Method | sessionId | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.#touch`](../../src/sessions/events.ts#L738) | Method | stream | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.#removeSubscriber`](../../src/sessions/events.ts#L742) | Method | stream, subscriber | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.#reconcileView`](../../src/sessions/events.ts#L749) | Method | stream, session, activeTurn, latestTurn | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.#publishViewLimits`](../../src/sessions/events.ts#L805) | Method | stream, _session, activeTurn, latestTurn, sessionLimited | [Read explanation](implementation/events.md#event-hub-lifecycle) |
+| [`SessionEvents.#initialFrames`](../../src/sessions/events.ts#L819) | Method | stream, cursor | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.#snapshotFrame`](../../src/sessions/events.ts#L843) | Method | stream | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.#resyncFrame`](../../src/sessions/events.ts#L874) | Method | stream, reason | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.#cursor`](../../src/sessions/events.ts#L888) | Method | stream | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.#emit`](../../src/sessions/events.ts#L892) | Method | stream, runId, type, payload | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.#limited`](../../src/sessions/events.ts#L937) | Method | stream, scope, limit | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.#projectionError`](../../src/sessions/events.ts#L944) | Method | stream | [Read explanation](implementation/events.md#connection-snapshots-and-replay) |
+| [`SessionEvents.#messageStart`](../../src/sessions/events.ts#L953) | Method | stream, event | [Read explanation](implementation/events.md#live-message-projection) |
+| [`SessionEvents.#messageUpdate`](../../src/sessions/events.ts#L966) | Method | stream, event | [Read explanation](implementation/events.md#live-message-projection) |
+| [`SessionEvents.#messageEnd`](../../src/sessions/events.ts#L1097) | Method | stream, event | [Read explanation](implementation/events.md#live-message-projection) |
+| [`SessionEvents.#parseContent`](../../src/sessions/events.ts#L1121) | Method | content, finished | [Read explanation](implementation/events.md#live-message-projection) |
+| [`SessionEvents.#contentBlock`](../../src/sessions/events.ts#L1155) | Method | stream, contentIndex, type | [Read explanation](implementation/events.md#live-message-projection) |
+| [`SessionEvents.#partialContent`](../../src/sessions/events.ts#L1177) | Method | partial, contentIndex, type | [Read explanation](implementation/events.md#live-message-projection) |
+| [`SessionEvents.#appendContent`](../../src/sessions/events.ts#L1189) | Method | content, block, text | [Read explanation](implementation/events.md#live-message-projection) |
+| [`SessionEvents.#publishMessage`](../../src/sessions/events.ts#L1206) | Method | stream, type, nativeKey, messageId | [Read explanation](implementation/events.md#live-message-projection) |
+| [`SessionEvents.#toolStart`](../../src/sessions/events.ts#L1259) | Method | stream, event | [Read explanation](implementation/events.md#live-tool-projection) |
+| [`SessionEvents.#toolUpdate`](../../src/sessions/events.ts#L1279) | Method | stream, event | [Read explanation](implementation/events.md#live-tool-projection) |
+| [`SessionEvents.#toolEnd`](../../src/sessions/events.ts#L1303) | Method | stream, event | [Read explanation](implementation/events.md#live-tool-projection) |
+| [`SessionEvents.#getTool`](../../src/sessions/events.ts#L1327) | Method | stream, rawId, name, input | [Read explanation](implementation/events.md#live-tool-projection) |
+| [`SessionEvents.#toolEventId`](../../src/sessions/events.ts#L1363) | Method | event | [Read explanation](implementation/events.md#live-tool-projection) |
+| [`SessionEvents.#toolEventName`](../../src/sessions/events.ts#L1371) | Method | event | [Read explanation](implementation/events.md#live-tool-projection) |
+| [`boundedLimit`](../../src/sessions/events.ts#L1376) | Function | value, maximum, minimum | [Read explanation](implementation/events.md#event-shapes-and-helper-functions) |
 
 
 ## src/sessions/files.ts
@@ -1178,112 +1180,112 @@ Local dependencies: [runtime/message-identity.ts](../../src/runtime/message-iden
 
 Prose explanation: [sessions](implementation/sessions.md)
 
-[Open source](../../src/sessions/service.ts) · 2148 lines
+[Open source](../../src/sessions/service.ts) · 2194 lines
 
 Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts](../../src/local/paths.ts), [runtime/message-identity.ts](../../src/runtime/message-identity.ts), [runtime/pi-history.ts](../../src/runtime/pi-history.ts), [runtime/pi-process.ts](../../src/runtime/pi-process.ts), [runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts), [server/session-discovery.ts](../../src/server/session-discovery.ts), [shared/discovery.ts](../../src/shared/discovery.ts), [shared/events.ts](../../src/shared/events.ts), [shared/history.ts](../../src/shared/history.ts), [shared/images.ts](../../src/shared/images.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/turns.ts](../../src/shared/turns.ts), [storage/catalog.ts](../../src/storage/catalog.ts), [sessions/events.ts](../../src/sessions/events.ts), [sessions/history.ts](../../src/sessions/history.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`SessionError`](../../src/sessions/service.ts#L57) | Class |  | [Read explanation](implementation/sessions.md) |
-| [`SessionError.status`](../../src/sessions/service.ts#L58) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionError.code`](../../src/sessions/service.ts#L59) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionError.constructor`](../../src/sessions/service.ts#L60) | Constructor | status, code, message | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionServiceOptions`](../../src/sessions/service.ts#L67) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`HISTORY_UNAVAILABLE`](../../src/sessions/service.ts#L82) | Module value | Inferred from initializer | [Read explanation](implementation/sessions.md) |
-| [`MAX_OPEN_SESSIONS`](../../src/sessions/service.ts#L83) | Module value | Inferred from initializer | [Read explanation](implementation/sessions.md) |
-| [`turnPayloadIdentity`](../../src/sessions/service.ts#L85) | Function | message, images | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`validateStored`](../../src/sessions/service.ts#L97) | Function | stored | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`ActiveTurn`](../../src/sessions/service.ts#L113) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`HistoryIdentity`](../../src/sessions/service.ts#L129) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`NativeExecutionRecord`](../../src/sessions/service.ts#L134) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`NativeStateRefreshRequest`](../../src/sessions/service.ts#L145) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`NativeStateRefresh`](../../src/sessions/service.ts#L150) | Interface |  | [Read explanation](implementation/sessions.md) |
-| [`isMessageAfterBaseline`](../../src/sessions/service.ts#L155) | Function | key, baseline | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`messageKeysAfterBaseline`](../../src/sessions/service.ts#L167) | Function | entries, baseline | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`messageKeyDelta`](../../src/sessions/service.ts#L177) | Function | baseline, finalCounts | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`turnView`](../../src/sessions/service.ts#L191) | Function | turn | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`active`](../../src/sessions/service.ts#L196) | Function | turn | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`truncateUtf8`](../../src/sessions/service.ts#L200) | Function | value, maxBytes | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService`](../../src/sessions/service.ts#L213) | Class |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#catalog`](../../src/sessions/service.ts#L214) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#dataDir`](../../src/sessions/service.ts#L215) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#env`](../../src/sessions/service.ts#L216) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#extensions`](../../src/sessions/service.ts#L217) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#now`](../../src/sessions/service.ts#L218) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#runtimes`](../../src/sessions/service.ts#L219) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#runtimeObservers`](../../src/sessions/service.ts#L220) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#historyIdentity`](../../src/sessions/service.ts#L221) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#nativeExecutions`](../../src/sessions/service.ts#L222) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#nativeStateRefreshes`](../../src/sessions/service.ts#L223) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#turns`](../../src/sessions/service.ts#L224) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#storageFaults`](../../src/sessions/service.ts#L225) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#events`](../../src/sessions/service.ts#L226) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#historyPages`](../../src/sessions/service.ts#L227) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#reads`](../../src/sessions/service.ts#L230) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#nativeRefreshes`](../../src/sessions/service.ts#L231) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#shutdownController`](../../src/sessions/service.ts#L232) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#modelDiscovery`](../../src/sessions/service.ts#L233) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#modelCapabilityDiscoveries`](../../src/sessions/service.ts#L234) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#sessionModelReads`](../../src/sessions/service.ts#L235) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#checkpoint`](../../src/sessions/service.ts#L236) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#queue`](../../src/sessions/service.ts#L238) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#stopping`](../../src/sessions/service.ts#L239) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.#shutdown`](../../src/sessions/service.ts#L240) | Property |  | [Read explanation](implementation/sessions.md) |
-| [`SessionService.constructor`](../../src/sessions/service.ts#L242) | Constructor | catalog, dataDir, options | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.create`](../../src/sessions/service.ts#L253) | Method | options | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.runtimeCount`](../../src/sessions/service.ts#L268) | GetAccessor |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.configure`](../../src/sessions/service.ts#L272) | Method | configuration | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.listSessions`](../../src/sessions/service.ts#L295) | Method |  | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.getSession`](../../src/sessions/service.ts#L300) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.listDirectories`](../../src/sessions/service.ts#L305) | Method | path | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.listAvailableModels`](../../src/sessions/service.ts#L328) | Method |  | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.listSessionModels`](../../src/sessions/service.ts#L353) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.getSessionModelCapabilities`](../../src/sessions/service.ts#L396) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.getModelCapabilities`](../../src/sessions/service.ts#L416) | Method | request | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.subscribeEvents`](../../src/sessions/service.ts#L455) | Method | id, cursor, listener | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.#publishState`](../../src/sessions/service.ts#L486) | Method | id, withTurn | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.#storageFault`](../../src/sessions/service.ts#L509) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
-| [`SessionService.createSession`](../../src/sessions/service.ts#L519) | Method | request | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.setSessionModel`](../../src/sessions/service.ts#L601) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.openSession`](../../src/sessions/service.ts#L708) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.closeSession`](../../src/sessions/service.ts#L712) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.getContext`](../../src/sessions/service.ts#L748) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.getHistory`](../../src/sessions/service.ts#L760) | Method | id, cursor | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.getHistoryImage`](../../src/sessions/service.ts#L878) | Method | id, entryId, imageIndex | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.submitTurn`](../../src/sessions/service.ts#L906) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.getTurn`](../../src/sessions/service.ts#L982) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.getTurnResult`](../../src/sessions/service.ts#L988) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.abortTurn`](../../src/sessions/service.ts#L1040) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.abortNativeExecution`](../../src/sessions/service.ts#L1075) | Method | id, executionId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#storedTurn`](../../src/sessions/service.ts#L1119) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#checkStorage`](../../src/sessions/service.ts#L1127) | Method | id | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#writeTurn`](../../src/sessions/service.ts#L1136) | Method | turn | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#abortRuntime`](../../src/sessions/service.ts#L1150) | Method | slot | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#executeTurn`](../../src/sessions/service.ts#L1165) | Method | slot, message, images | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.#completeHandledTurn`](../../src/sessions/service.ts#L1348) | Method | sessionId, runId, runtime, before, historyWasExpected | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
-| [`SessionService.shutdown`](../../src/sessions/service.ts#L1411) | Method |  | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
-| [`SessionService.#configuration`](../../src/sessions/service.ts#L1480) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#admit`](../../src/sessions/service.ts#L1491) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#mutate`](../../src/sessions/service.ts#L1496) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#read`](../../src/sessions/service.ts#L1510) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
-| [`SessionService.#stored`](../../src/sessions/service.ts#L1540) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#view`](../../src/sessions/service.ts#L1548) | Method | stored | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#directory`](../../src/sessions/service.ts#L1594) | Method | path | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#prune`](../../src/sessions/service.ts#L1610) | Method |  | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#checkHistory`](../../src/sessions/service.ts#L1621) | Method | stored | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#savedHistory`](../../src/sessions/service.ts#L1724) | Method | stored, options | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#identityForEntries`](../../src/sessions/service.ts#L1742) | Method | entries | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#identityForHistory`](../../src/sessions/service.ts#L1747) | Method | history | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#observeRuntime`](../../src/sessions/service.ts#L1753) | Method | sessionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#nativeExecutionEvent`](../../src/sessions/service.ts#L1787) | Method | sessionId, event, startedLate | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#refreshNativeHistory`](../../src/sessions/service.ts#L1873) | Method | sessionId, executionId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#scheduleNativeStateRefresh`](../../src/sessions/service.ts#L1904) | Method | sessionId, executionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#refreshNativeSessionState`](../../src/sessions/service.ts#L1934) | Method | sessionId, executionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
-| [`SessionService.#open`](../../src/sessions/service.ts#L1985) | Method | stored, options | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#rememberHistory`](../../src/sessions/service.ts#L2123) | Method | stored, runtime | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
-| [`SessionService.#recordHistoryCheck`](../../src/sessions/service.ts#L1682) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
-| [`SessionService.#historyCheckState`](../../src/sessions/service.ts#L1713) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
-
+| [`SessionError`](../../src/sessions/service.ts#L58) | Class |  | [Read explanation](implementation/sessions.md) |
+| [`SessionError.status`](../../src/sessions/service.ts#L59) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionError.code`](../../src/sessions/service.ts#L60) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionError.constructor`](../../src/sessions/service.ts#L61) | Constructor | status, code, message | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionServiceOptions`](../../src/sessions/service.ts#L68) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`HISTORY_UNAVAILABLE`](../../src/sessions/service.ts#L83) | Module value | Inferred from initializer | [Read explanation](implementation/sessions.md) |
+| [`MAX_OPEN_SESSIONS`](../../src/sessions/service.ts#L84) | Module value | Inferred from initializer | [Read explanation](implementation/sessions.md) |
+| [`turnPayloadIdentity`](../../src/sessions/service.ts#L86) | Function | message, images | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`validateStored`](../../src/sessions/service.ts#L98) | Function | stored | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`ActiveTurn`](../../src/sessions/service.ts#L114) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`HistoryIdentity`](../../src/sessions/service.ts#L130) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`NativeExecutionRecord`](../../src/sessions/service.ts#L135) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`NativeStateRefreshRequest`](../../src/sessions/service.ts#L146) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`NativeStateRefresh`](../../src/sessions/service.ts#L151) | Interface |  | [Read explanation](implementation/sessions.md) |
+| [`isMessageAfterBaseline`](../../src/sessions/service.ts#L156) | Function | key, baseline | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`messageKeysAfterBaseline`](../../src/sessions/service.ts#L168) | Function | entries, baseline | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`messageKeyDelta`](../../src/sessions/service.ts#L178) | Function | baseline, finalCounts | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`turnView`](../../src/sessions/service.ts#L192) | Function | turn | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`active`](../../src/sessions/service.ts#L197) | Function | turn | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`truncateUtf8`](../../src/sessions/service.ts#L201) | Function | value, maxBytes | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService`](../../src/sessions/service.ts#L214) | Class |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#catalog`](../../src/sessions/service.ts#L215) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#dataDir`](../../src/sessions/service.ts#L216) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#env`](../../src/sessions/service.ts#L217) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#extensions`](../../src/sessions/service.ts#L218) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#now`](../../src/sessions/service.ts#L219) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#runtimes`](../../src/sessions/service.ts#L220) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#runtimeObservers`](../../src/sessions/service.ts#L221) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#historyIdentity`](../../src/sessions/service.ts#L222) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#nativeExecutions`](../../src/sessions/service.ts#L223) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#nativeStateRefreshes`](../../src/sessions/service.ts#L224) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#turns`](../../src/sessions/service.ts#L225) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#storageFaults`](../../src/sessions/service.ts#L226) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#events`](../../src/sessions/service.ts#L227) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#historyPages`](../../src/sessions/service.ts#L228) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#reads`](../../src/sessions/service.ts#L231) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#nativeRefreshes`](../../src/sessions/service.ts#L232) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#shutdownController`](../../src/sessions/service.ts#L233) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#modelDiscovery`](../../src/sessions/service.ts#L234) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#modelCapabilityDiscoveries`](../../src/sessions/service.ts#L235) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#sessionModelReads`](../../src/sessions/service.ts#L236) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#checkpoint`](../../src/sessions/service.ts#L237) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#queue`](../../src/sessions/service.ts#L239) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#stopping`](../../src/sessions/service.ts#L240) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.#shutdown`](../../src/sessions/service.ts#L241) | Property |  | [Read explanation](implementation/sessions.md) |
+| [`SessionService.constructor`](../../src/sessions/service.ts#L243) | Constructor | catalog, dataDir, options | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.create`](../../src/sessions/service.ts#L254) | Method | options | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.runtimeCount`](../../src/sessions/service.ts#L269) | GetAccessor |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.configure`](../../src/sessions/service.ts#L273) | Method | configuration | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.listSessions`](../../src/sessions/service.ts#L296) | Method |  | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.getSession`](../../src/sessions/service.ts#L301) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.listDirectories`](../../src/sessions/service.ts#L347) | Method | path | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.listAvailableModels`](../../src/sessions/service.ts#L370) | Method |  | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.listSessionModels`](../../src/sessions/service.ts#L395) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.getSessionModelCapabilities`](../../src/sessions/service.ts#L438) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.getModelCapabilities`](../../src/sessions/service.ts#L458) | Method | request | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.subscribeEvents`](../../src/sessions/service.ts#L497) | Method | id, cursor, listener | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.#publishState`](../../src/sessions/service.ts#L528) | Method | id, withTurn | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.#storageFault`](../../src/sessions/service.ts#L551) | Method | id | [Read explanation](implementation/sessions.md#sessions-discovery-and-observation) |
+| [`SessionService.createSession`](../../src/sessions/service.ts#L561) | Method | request | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.setSessionModel`](../../src/sessions/service.ts#L645) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.openSession`](../../src/sessions/service.ts#L752) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.closeSession`](../../src/sessions/service.ts#L756) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.getContext`](../../src/sessions/service.ts#L792) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.getHistory`](../../src/sessions/service.ts#L804) | Method | id, cursor | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.getHistoryImage`](../../src/sessions/service.ts#L922) | Method | id, entryId, imageIndex | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.submitTurn`](../../src/sessions/service.ts#L950) | Method | id, request | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.getTurn`](../../src/sessions/service.ts#L1026) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.getTurnResult`](../../src/sessions/service.ts#L1032) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.abortTurn`](../../src/sessions/service.ts#L1084) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.abortNativeExecution`](../../src/sessions/service.ts#L1119) | Method | id, executionId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#storedTurn`](../../src/sessions/service.ts#L1163) | Method | id, runId | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#checkStorage`](../../src/sessions/service.ts#L1171) | Method | id | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#writeTurn`](../../src/sessions/service.ts#L1180) | Method | turn | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#abortRuntime`](../../src/sessions/service.ts#L1194) | Method | slot | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#executeTurn`](../../src/sessions/service.ts#L1209) | Method | slot, message, images | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.#completeHandledTurn`](../../src/sessions/service.ts#L1392) | Method | sessionId, runId, runtime, before, historyWasExpected | [Read explanation](implementation/sessions.md#sessions-turn-state-machine) |
+| [`SessionService.shutdown`](../../src/sessions/service.ts#L1455) | Method |  | [Read explanation](implementation/sessions.md#sessions-shutdown-and-private-helpers) |
+| [`SessionService.#configuration`](../../src/sessions/service.ts#L1524) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#admit`](../../src/sessions/service.ts#L1535) | Method |  | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#mutate`](../../src/sessions/service.ts#L1540) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#read`](../../src/sessions/service.ts#L1554) | Method | operation | [Read explanation](implementation/sessions.md#session-identity-and-recovery) |
+| [`SessionService.#stored`](../../src/sessions/service.ts#L1584) | Method | id | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#view`](../../src/sessions/service.ts#L1592) | Method | stored | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#directory`](../../src/sessions/service.ts#L1640) | Method | path | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#prune`](../../src/sessions/service.ts#L1656) | Method |  | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#checkHistory`](../../src/sessions/service.ts#L1667) | Method | stored | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#savedHistory`](../../src/sessions/service.ts#L1770) | Method | stored, options | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#identityForEntries`](../../src/sessions/service.ts#L1788) | Method | entries | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#identityForHistory`](../../src/sessions/service.ts#L1793) | Method | history | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#observeRuntime`](../../src/sessions/service.ts#L1799) | Method | sessionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#nativeExecutionEvent`](../../src/sessions/service.ts#L1833) | Method | sessionId, event, startedLate | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#refreshNativeHistory`](../../src/sessions/service.ts#L1919) | Method | sessionId, executionId | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#scheduleNativeStateRefresh`](../../src/sessions/service.ts#L1950) | Method | sessionId, executionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#refreshNativeSessionState`](../../src/sessions/service.ts#L1980) | Method | sessionId, executionId, runtime | [Read explanation](implementation/sessions.md#sessions-cancellation-and-native-execution) |
+| [`SessionService.#open`](../../src/sessions/service.ts#L2031) | Method | stored, options | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#rememberHistory`](../../src/sessions/service.ts#L2169) | Method | stored, runtime | [Read explanation](implementation/sessions.md#sessions-create-open-close) |
+| [`SessionService.#recordHistoryCheck`](../../src/sessions/service.ts#L1728) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.#historyCheckState`](../../src/sessions/service.ts#L1759) | Method | | [Read explanation](implementation/sessions.md#sessions-history-results) |
+| [`SessionService.renameSession`](../../src/sessions/service.ts#L306) | Method |  | [Read explanation](implementation/sessions.md#sessions-shared-names) |
 
 ## src/shared/discovery.ts
 
@@ -1313,7 +1315,7 @@ Local dependencies: [shared/sessions.ts](../../src/shared/sessions.ts), [shared/
 
 Prose explanation: [validators](implementation/validators.md)
 
-[Open source](../../src/shared/events.ts) · 525 lines
+[Open source](../../src/shared/events.ts) · 527 lines
 
 Local dependencies: [shared/sessions.ts](../../src/shared/sessions.ts), [shared/turns.ts](../../src/shared/turns.ts).
 
@@ -1336,27 +1338,27 @@ Local dependencies: [shared/sessions.ts](../../src/shared/sessions.ts), [shared/
 | [`UUID`](../../src/shared/events.ts#L137) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
 | [`CURSOR`](../../src/shared/events.ts#L138) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
 | [`SESSION_KEYS`](../../src/shared/events.ts#L139) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
-| [`TURN_PROJECTION_KEYS`](../../src/shared/events.ts#L155) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
-| [`SNAPSHOT_KEYS`](../../src/shared/events.ts#L167) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
-| [`LIVE_KEYS`](../../src/shared/events.ts#L168) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
-| [`MESSAGE_KEYS`](../../src/shared/events.ts#L169) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
-| [`MESSAGE_DELTA_KEYS`](../../src/shared/events.ts#L170) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
-| [`TOOL_KEYS`](../../src/shared/events.ts#L171) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
-| [`MAX_LIVE_MESSAGE_BLOCKS`](../../src/shared/events.ts#L172) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
-| [`MAX_LIVE_TEXT_RANGES`](../../src/shared/events.ts#L173) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
-| [`isRecord`](../../src/shared/events.ts#L175) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`hasExactKeys`](../../src/shared/events.ts#L179) | Function | value, expected | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`isBoundedString`](../../src/shared/events.ts#L184) | Function | value, maxBytes | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`isCursorFor`](../../src/shared/events.ts#L188) | Function | value, sessionId | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`isSession`](../../src/shared/events.ts#L199) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`isTurnProjection`](../../src/shared/events.ts#L211) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`isLiveMessage`](../../src/shared/events.ts#L252) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`isLiveMessageDelta`](../../src/shared/events.ts#L332) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`isLiveTool`](../../src/shared/events.ts#L364) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`isLiveProjection`](../../src/shared/events.ts#L390) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
-| [`hasBoundedJsonSize`](../../src/shared/events.ts#L404) | Function | value, maxBytes | [Read explanation](implementation/validators.md#stream-frame) |
-| [`isCommonEvent`](../../src/shared/events.ts#L412) | Function | value | [Read explanation](implementation/validators.md#stream-frame) |
-| [`isStreamFrame`](../../src/shared/events.ts#L422) | Function | value | [Read explanation](implementation/validators.md#stream-frame) |
+| [`TURN_PROJECTION_KEYS`](../../src/shared/events.ts#L157) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
+| [`SNAPSHOT_KEYS`](../../src/shared/events.ts#L169) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
+| [`LIVE_KEYS`](../../src/shared/events.ts#L170) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
+| [`MESSAGE_KEYS`](../../src/shared/events.ts#L171) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
+| [`MESSAGE_DELTA_KEYS`](../../src/shared/events.ts#L172) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
+| [`TOOL_KEYS`](../../src/shared/events.ts#L173) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
+| [`MAX_LIVE_MESSAGE_BLOCKS`](../../src/shared/events.ts#L174) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
+| [`MAX_LIVE_TEXT_RANGES`](../../src/shared/events.ts#L175) | Module value | Inferred from initializer | [Read explanation](implementation/validators.md) |
+| [`isRecord`](../../src/shared/events.ts#L177) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`hasExactKeys`](../../src/shared/events.ts#L181) | Function | value, expected | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`isBoundedString`](../../src/shared/events.ts#L186) | Function | value, maxBytes | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`isCursorFor`](../../src/shared/events.ts#L190) | Function | value, sessionId | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`isSession`](../../src/shared/events.ts#L201) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`isTurnProjection`](../../src/shared/events.ts#L213) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`isLiveMessage`](../../src/shared/events.ts#L254) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`isLiveMessageDelta`](../../src/shared/events.ts#L334) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`isLiveTool`](../../src/shared/events.ts#L366) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`isLiveProjection`](../../src/shared/events.ts#L392) | Function | value | [Read explanation](implementation/validators.md#stream-primitives) |
+| [`hasBoundedJsonSize`](../../src/shared/events.ts#L406) | Function | value, maxBytes | [Read explanation](implementation/validators.md#stream-frame) |
+| [`isCommonEvent`](../../src/shared/events.ts#L414) | Function | value | [Read explanation](implementation/validators.md#stream-frame) |
+| [`isStreamFrame`](../../src/shared/events.ts#L424) | Function | value | [Read explanation](implementation/validators.md#stream-frame) |
 
 
 ## src/shared/history.ts
@@ -1425,7 +1427,7 @@ Prose explanation: [validators](implementation/validators.md)
 
 Prose explanation: [validators](implementation/validators.md)
 
-[Open source](../../src/shared/sessions.ts) · 177 lines
+[Open source](../../src/shared/sessions.ts) · 234 lines
 
 Local dependencies: [shared/thinking.ts](../../src/shared/thinking.ts).
 
@@ -1435,14 +1437,16 @@ Local dependencies: [shared/thinking.ts](../../src/shared/thinking.ts).
 | [`RuntimeConfiguration`](../../src/shared/sessions.ts#L5) | Interface |  | [Read explanation](implementation/validators.md) |
 | [`SessionCreateRequest`](../../src/shared/sessions.ts#L10) | Interface |  | [Read explanation](implementation/validators.md) |
 | [`SessionModelRequest`](../../src/shared/sessions.ts#L17) | Interface |  | [Read explanation](implementation/validators.md) |
-| [`NativeExecutionInfo`](../../src/shared/sessions.ts#L23) | Interface |  | [Read explanation](implementation/validators.md) |
-| [`SessionInfo`](../../src/shared/sessions.ts#L37) | Interface |  | [Read explanation](implementation/validators.md) |
-| [`isRuntimeConfiguration`](../../src/shared/sessions.ts#L58) | Function | value | [Read explanation](implementation/validators.md#sessions) |
-| [`isSessionInfo`](../../src/shared/sessions.ts#L70) | Function | value | [Read explanation](implementation/validators.md#sessions) |
-| [`isNativeExecutionInfo`](../../src/shared/sessions.ts#L139) | Function | value | [Read explanation](implementation/validators.md#sessions) |
-| [`isSessionModelRequest`](../../src/shared/sessions.ts#L157) | Function | value | [Read explanation](implementation/validators.md#sessions) |
-| [`isHistoryCheck`](../../src/shared/sessions.ts#L124) | Function | | [Read explanation](implementation/validators.md#sessions) |
-
+| [`NativeExecutionInfo`](../../src/shared/sessions.ts#L30) | Interface |  | [Read explanation](implementation/validators.md) |
+| [`SessionInfo`](../../src/shared/sessions.ts#L44) | Interface |  | [Read explanation](implementation/validators.md) |
+| [`isRuntimeConfiguration`](../../src/shared/sessions.ts#L77) | Function | value | [Read explanation](implementation/validators.md#sessions) |
+| [`isSessionInfo`](../../src/shared/sessions.ts#L89) | Function | value | [Read explanation](implementation/validators.md#sessions) |
+| [`isNativeExecutionInfo`](../../src/shared/sessions.ts#L196) | Function | value | [Read explanation](implementation/validators.md#sessions) |
+| [`isSessionModelRequest`](../../src/shared/sessions.ts#L214) | Function | value | [Read explanation](implementation/validators.md#sessions) |
+| [`isHistoryCheck`](../../src/shared/sessions.ts#L181) | Function | | [Read explanation](implementation/validators.md#sessions) |
+| [`isSessionDisplayName`](../../src/shared/sessions.ts#L149) | Function |  | [Read explanation](implementation/validators.md#sessions) |
+| [`isSessionNameRequest`](../../src/shared/sessions.ts#L160) | Function |  | [Read explanation](implementation/validators.md#sessions) |
+| [`mergeSessionMetadata`](../../src/shared/sessions.ts#L67) | Function |  | [Read explanation](implementation/validators.md#sessions) |
 
 ## src/shared/thinking.ts
 
@@ -1491,84 +1495,86 @@ Local dependencies: [shared/images.ts](../../src/shared/images.ts).
 
 Prose explanation: [catalog](implementation/catalog.md)
 
-[Open source](../../src/storage/catalog.ts) · 881 lines
+[Open source](../../src/storage/catalog.ts) · 973 lines
 
 Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts](../../src/local/paths.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/turns.ts](../../src/shared/turns.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`StoredSession`](../../src/storage/catalog.ts#L16) | Interface |  | [Read explanation](implementation/catalog.md) |
-| [`StoredTurn`](../../src/storage/catalog.ts#L34) | Interface |  | [Read explanation](implementation/catalog.md) |
-| [`SCHEMA_VERSION`](../../src/storage/catalog.ts#L38) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`V1_SCHEMA_VERSION`](../../src/storage/catalog.ts#L39) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`V2_SCHEMA_VERSION`](../../src/storage/catalog.ts#L40) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`V3_SCHEMA_VERSION`](../../src/storage/catalog.ts#L41) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`DATABASE_NAME`](../../src/storage/catalog.ts#L43) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`SESSION_COLUMNS`](../../src/storage/catalog.ts#L44) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`V3_SESSION_COLUMNS`](../../src/storage/catalog.ts#L54) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`CONFIGURATION_SCHEMA`](../../src/storage/catalog.ts#L59) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`V2_SESSIONS_SCHEMA`](../../src/storage/catalog.ts#L61) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`V3_SESSIONS_SCHEMA`](../../src/storage/catalog.ts#L63) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`SESSIONS_SCHEMA`](../../src/storage/catalog.ts#L67) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`TURNS_SCHEMA`](../../src/storage/catalog.ts#L69) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`ACTIVE_TURN_INDEX`](../../src/storage/catalog.ts#L71) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`TURN_COLUMNS`](../../src/storage/catalog.ts#L73) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`SESSION_STATUSES`](../../src/storage/catalog.ts#L76) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`TURN_STATUSES`](../../src/storage/catalog.ts#L77) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`TERMINAL_TURN_STATUSES`](../../src/storage/catalog.ts#L86) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`ALLOWED_TURN_TRANSITIONS`](../../src/storage/catalog.ts#L92) | Module value | `Readonly<Record<TurnStatus, ReadonlySet<TurnStatus>>>` | [Read explanation](implementation/catalog.md) |
-| [`PAYLOAD_IDENTITY`](../../src/storage/catalog.ts#L101) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
-| [`isSessionStatus`](../../src/storage/catalog.ts#L103) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`isTurnStatus`](../../src/storage/catalog.ts#L107) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`invalidCatalog`](../../src/storage/catalog.ts#L111) | Function | reason | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`isNonEmptyString`](../../src/storage/catalog.ts#L117) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`isNullableNonEmptyString`](../../src/storage/catalog.ts#L121) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`isSafeIntegerValue`](../../src/storage/catalog.ts#L125) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`isStoredSession`](../../src/storage/catalog.ts#L135) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`hasExactKeys`](../../src/storage/catalog.ts#L195) | Function | value, expected | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`isStoredTurn`](../../src/storage/catalog.ts#L200) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`assertRuntimeConfiguration`](../../src/storage/catalog.ts#L248) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`integerFromDatabase`](../../src/storage/catalog.ts#L272) | Function | row, column | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`stringFromDatabase`](../../src/storage/catalog.ts#L286) | Function | row, column | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`nullableStringFromDatabase`](../../src/storage/catalog.ts#L294) | Function | row, column | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`nullableThinkingLevelFromDatabase`](../../src/storage/catalog.ts#L306) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`sessionFromDatabase`](../../src/storage/catalog.ts#L327) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`entryIdsFromDatabase`](../../src/storage/catalog.ts#L354) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`nullableErrorFromDatabase`](../../src/storage/catalog.ts#L374) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`turnFromDatabase`](../../src/storage/catalog.ts#L389) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`databaseRows`](../../src/storage/catalog.ts#L413) | Function | database, sql | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`hasUserSchema`](../../src/storage/catalog.ts#L417) | Function | database | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`verifySchema`](../../src/storage/catalog.ts#L426) | Function | database, version | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`migrateV2ToV3`](../../src/storage/catalog.ts#L465) | Function | database | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`migrateV3ToV4`](../../src/storage/catalog.ts#L481) | Function | database | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`initializeSchema`](../../src/storage/catalog.ts#L513) | Function | database | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
-| [`validateDatabaseFile`](../../src/storage/catalog.ts#L569) | Function | path | [Read explanation](implementation/catalog.md#catalog-file-safety-and-open) |
-| [`validateRecord`](../../src/storage/catalog.ts#L593) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`validateTurnRecord`](../../src/storage/catalog.ts#L597) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`SessionCatalog`](../../src/storage/catalog.ts#L601) | Class |  | [Read explanation](implementation/catalog.md) |
-| [`SessionCatalog.database`](../../src/storage/catalog.ts#L602) | Property |  | [Read explanation](implementation/catalog.md) |
-| [`SessionCatalog.constructor`](../../src/storage/catalog.ts#L604) | Constructor | database | [Read explanation](implementation/catalog.md#catalog-file-safety-and-open) |
-| [`SessionCatalog.open`](../../src/storage/catalog.ts#L608) | Method | dataDir | [Read explanation](implementation/catalog.md#catalog-file-safety-and-open) |
-| [`SessionCatalog.configuration`](../../src/storage/catalog.ts#L646) | Method |  | [Read explanation](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.configure`](../../src/storage/catalog.ts#L656) | Method | config | [Read explanation](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.list`](../../src/storage/catalog.ts#L665) | Method |  | [Read explanation](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.get`](../../src/storage/catalog.ts#L672) | Method | id | [Read explanation](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.findRequest`](../../src/storage/catalog.ts#L679) | Method | requestId | [Read explanation](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.insert`](../../src/storage/catalog.ts#L686) | Method | record | [Read explanation](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.update`](../../src/storage/catalog.ts#L712) | Method | record | [Read explanation](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.interruptCreating`](../../src/storage/catalog.ts#L741) | Method | now | [Read explanation](implementation/catalog.md#catalog-session-operations) |
-| [`SessionCatalog.insertTurn`](../../src/storage/catalog.ts#L751) | Method | record | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.updateTurn`](../../src/storage/catalog.ts#L770) | Method | record | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.getTurn`](../../src/storage/catalog.ts#L808) | Method | sessionId, runId | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.findTurnRequest`](../../src/storage/catalog.ts#L815) | Method | sessionId, requestId | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.latestTurn`](../../src/storage/catalog.ts#L822) | Method | sessionId | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.activeTurn`](../../src/storage/catalog.ts#L829) | Method | sessionId | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.listTurns`](../../src/storage/catalog.ts#L838) | Method |  | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.markTurnDispatching`](../../src/storage/catalog.ts#L845) | Method | record, session | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.interruptTurns`](../../src/storage/catalog.ts#L868) | Method | now | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
-| [`SessionCatalog.close`](../../src/storage/catalog.ts#L878) | Method |  | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`StoredSession`](../../src/storage/catalog.ts#L17) | Interface |  | [Read explanation](implementation/catalog.md) |
+| [`StoredTurn`](../../src/storage/catalog.ts#L37) | Interface |  | [Read explanation](implementation/catalog.md) |
+| [`SCHEMA_VERSION`](../../src/storage/catalog.ts#L41) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`V1_SCHEMA_VERSION`](../../src/storage/catalog.ts#L42) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`V2_SCHEMA_VERSION`](../../src/storage/catalog.ts#L43) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`V3_SCHEMA_VERSION`](../../src/storage/catalog.ts#L44) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`DATABASE_NAME`](../../src/storage/catalog.ts#L47) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`SESSION_COLUMNS`](../../src/storage/catalog.ts#L48) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`V3_SESSION_COLUMNS`](../../src/storage/catalog.ts#L63) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`CONFIGURATION_SCHEMA`](../../src/storage/catalog.ts#L68) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`V2_SESSIONS_SCHEMA`](../../src/storage/catalog.ts#L70) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`V3_SESSIONS_SCHEMA`](../../src/storage/catalog.ts#L72) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`SESSIONS_SCHEMA`](../../src/storage/catalog.ts#L78) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`TURNS_SCHEMA`](../../src/storage/catalog.ts#L80) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`ACTIVE_TURN_INDEX`](../../src/storage/catalog.ts#L82) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`TURN_COLUMNS`](../../src/storage/catalog.ts#L84) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`SESSION_STATUSES`](../../src/storage/catalog.ts#L87) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`TURN_STATUSES`](../../src/storage/catalog.ts#L88) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`TERMINAL_TURN_STATUSES`](../../src/storage/catalog.ts#L97) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`ALLOWED_TURN_TRANSITIONS`](../../src/storage/catalog.ts#L103) | Module value | `Readonly<Record<TurnStatus, ReadonlySet<TurnStatus>>>` | [Read explanation](implementation/catalog.md) |
+| [`PAYLOAD_IDENTITY`](../../src/storage/catalog.ts#L112) | Module value | Inferred from initializer | [Read explanation](implementation/catalog.md) |
+| [`isSessionStatus`](../../src/storage/catalog.ts#L114) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`isTurnStatus`](../../src/storage/catalog.ts#L118) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`invalidCatalog`](../../src/storage/catalog.ts#L122) | Function | reason | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`isNonEmptyString`](../../src/storage/catalog.ts#L128) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`isNullableNonEmptyString`](../../src/storage/catalog.ts#L132) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`isSafeIntegerValue`](../../src/storage/catalog.ts#L136) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`isStoredSession`](../../src/storage/catalog.ts#L146) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`hasExactKeys`](../../src/storage/catalog.ts#L213) | Function | value, expected | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`isStoredTurn`](../../src/storage/catalog.ts#L218) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`assertRuntimeConfiguration`](../../src/storage/catalog.ts#L266) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`integerFromDatabase`](../../src/storage/catalog.ts#L290) | Function | row, column | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`stringFromDatabase`](../../src/storage/catalog.ts#L304) | Function | row, column | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`nullableStringFromDatabase`](../../src/storage/catalog.ts#L312) | Function | row, column | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`nullableThinkingLevelFromDatabase`](../../src/storage/catalog.ts#L324) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`sessionFromDatabase`](../../src/storage/catalog.ts#L345) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`entryIdsFromDatabase`](../../src/storage/catalog.ts#L376) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`nullableErrorFromDatabase`](../../src/storage/catalog.ts#L396) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`turnFromDatabase`](../../src/storage/catalog.ts#L411) | Function | row | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`databaseRows`](../../src/storage/catalog.ts#L435) | Function | database, sql | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`hasUserSchema`](../../src/storage/catalog.ts#L439) | Function | database | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`verifySchema`](../../src/storage/catalog.ts#L448) | Function | database, version | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`migrateV2ToV3`](../../src/storage/catalog.ts#L489) | Function | database | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`migrateV3ToV4`](../../src/storage/catalog.ts#L505) | Function | database | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`initializeSchema`](../../src/storage/catalog.ts#L548) | Function | database | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`validateDatabaseFile`](../../src/storage/catalog.ts#L611) | Function | path | [Read explanation](implementation/catalog.md#catalog-file-safety-and-open) |
+| [`validateRecord`](../../src/storage/catalog.ts#L635) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`validateTurnRecord`](../../src/storage/catalog.ts#L639) | Function | value | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`SessionCatalog`](../../src/storage/catalog.ts#L643) | Class |  | [Read explanation](implementation/catalog.md) |
+| [`SessionCatalog.database`](../../src/storage/catalog.ts#L644) | Property |  | [Read explanation](implementation/catalog.md) |
+| [`SessionCatalog.constructor`](../../src/storage/catalog.ts#L646) | Constructor | database | [Read explanation](implementation/catalog.md#catalog-file-safety-and-open) |
+| [`SessionCatalog.open`](../../src/storage/catalog.ts#L650) | Method | dataDir | [Read explanation](implementation/catalog.md#catalog-file-safety-and-open) |
+| [`SessionCatalog.configuration`](../../src/storage/catalog.ts#L688) | Method |  | [Read explanation](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.configure`](../../src/storage/catalog.ts#L698) | Method | config | [Read explanation](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.list`](../../src/storage/catalog.ts#L707) | Method |  | [Read explanation](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.get`](../../src/storage/catalog.ts#L714) | Method | id | [Read explanation](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.findRequest`](../../src/storage/catalog.ts#L721) | Method | requestId | [Read explanation](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.insert`](../../src/storage/catalog.ts#L728) | Method | record | [Read explanation](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.update`](../../src/storage/catalog.ts#L804) | Method | record | [Read explanation](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.interruptCreating`](../../src/storage/catalog.ts#L833) | Method | now | [Read explanation](implementation/catalog.md#catalog-session-operations) |
+| [`SessionCatalog.insertTurn`](../../src/storage/catalog.ts#L843) | Method | record | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.updateTurn`](../../src/storage/catalog.ts#L862) | Method | record | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.getTurn`](../../src/storage/catalog.ts#L900) | Method | sessionId, runId | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.findTurnRequest`](../../src/storage/catalog.ts#L907) | Method | sessionId, requestId | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.latestTurn`](../../src/storage/catalog.ts#L914) | Method | sessionId | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.activeTurn`](../../src/storage/catalog.ts#L921) | Method | sessionId | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.listTurns`](../../src/storage/catalog.ts#L930) | Method |  | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.markTurnDispatching`](../../src/storage/catalog.ts#L937) | Method | record, session | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.interruptTurns`](../../src/storage/catalog.ts#L960) | Method | now | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`SessionCatalog.close`](../../src/storage/catalog.ts#L970) | Method |  | [Read explanation](implementation/catalog.md#catalog-turn-operations) |
+| [`isHistoryCheckState`](../../src/storage/catalog.ts#L140) | Function | | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`nullableHistoryCheckFromDatabase`](../../src/storage/catalog.ts#L333) | Function | | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
+| [`migrateV4ToV5`](../../src/storage/catalog.ts#L521) | Function | | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
+| [`migrateV5ToV6`](../../src/storage/catalog.ts#L537) | Function |  | [Read explanation](implementation/catalog.md#catalog-session-names) |
+| [`SessionCatalog.rename`](../../src/storage/catalog.ts#L756) | Method |  | [Read explanation](implementation/catalog.md#catalog-session-names) |
 
-Indexed **43 source files** and **1056 declarations/members**.
-| [`isHistoryCheckState`](../../src/storage/catalog.ts#L129) | Function | | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`nullableHistoryCheckFromDatabase`](../../src/storage/catalog.ts#L315) | Function | | [Read explanation](implementation/catalog.md#catalog-records-and-validation) |
-| [`migrateV4ToV5`](../../src/storage/catalog.ts#L497) | Function | | [Read explanation](implementation/catalog.md#catalog-schema-and-migrations) |
+Indexed **44 source files** and **612 callable explanations**.

@@ -275,6 +275,8 @@ function projectSession(value: SessionInfo): { value: SessionInfo; limited: bool
   return {
     value: {
       id: value.id,
+      displayName: value.displayName,
+      metadataRevision: value.metadataRevision,
       directory: directory.value,
       provider: provider?.value ?? null,
       model: model?.value ?? null,

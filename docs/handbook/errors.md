@@ -115,6 +115,7 @@ These errors are raised by `SessionService` or by its delegated history/discover
 | `runtime_busy` | 409 | Pi runtime configuration cannot change while sessions are open. |
 | `runtime_mismatch` | 503 | Pi did not restore or retain the expected session/model state. |
 | `runtime_unavailable` | 503 | Pi is unconfigured, could not start, or is not available to the operation. |
+| `metadata_conflict` | 409 | The expected name revision is stale. Reload the shared name before editing again. |
 | `session_busy` | 409 | A turn/native execution is active, or the runtime is not idle for this operation. |
 | `session_changed` | 409 | The runtime/session changed while model data was being read. |
 | `session_interrupted` | 409 | Session creation was interrupted; the response includes its Dwell session ID. |

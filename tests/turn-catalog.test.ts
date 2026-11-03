@@ -36,6 +36,8 @@ function turn(overrides: Partial<StoredTurn> = {}): StoredTurn {
 function session(id: string, updatedAt = 1000): StoredSession {
   return {
     id,
+    displayName: null,
+    metadataRevision: 0,
     requestId: id === SESSION_A ? REQUEST_A : REQUEST_B,
     payloadIdentity: HASH_A,
     directory: "/tmp/project",

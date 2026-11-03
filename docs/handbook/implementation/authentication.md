@@ -31,13 +31,13 @@ All durable mutations pass through [LocalAuth.serialize](../../../src/server/aut
 <a id="http-authentication-integration"></a>
 ## HTTP admission and stream revalidation
 
-The HTTP [handle](../../../src/server/http.ts#L167) checks duplicate security-sensitive headers, then delegates Host selection to requestAccess. A request carrying Origin must match the selected authority. The HTTPS lane rejects Authorization entirely so CLI bearer credentials stay on the loopback address. Protected session and status routes accept either a valid CLI token or a browser cookie plus matching browser-binding key. Browser POSTs also need the matching Origin and Dwell request marker; Pi executable configuration remains CLI-only.
+The HTTP [handle](../../../src/server/http.ts#L171) checks duplicate security-sensitive headers, then delegates Host selection to requestAccess. A request carrying Origin must match the selected authority. The HTTPS lane rejects Authorization entirely so CLI bearer credentials stay on the loopback address. Protected session and status routes accept either a valid CLI token or a browser cookie plus matching browser-binding key. Browser POSTs also need the matching Origin and Dwell request marker; Pi executable configuration remains CLI-only.
 
 Pairing creation and browser revocation require the CLI credential. Pair redemption is public to the selected browser origin but validates the exact code and browser-key shape before calling LocalAuth.redeem. The handler sends Set-Cookie only after redemption has durably saved the session. Logout validates that the presented cookie and browser binding still match, removes that one browser, expires its cookie, and revalidates event streams. Revoke atomically clears all persisted sessions and pending codes, then closes every stream whose browser authorization no longer holds.
 
 For example, the CLI creates a short pairing code; the browser redeems it with its browser key, matching Origin, and Dwell request marker. The response sets an HttpOnly cookie. Later GETs send that cookie with the browser key; browser POSTs also send the Origin and request marker. A copied cookie without its matching browser key is rejected.
 
-[openEventStream](../../../src/server/http.ts#L134) closes over the request headers and rechecks the same credentials before writes and heartbeats. [revalidateEventStreams](../../../src/server/http.ts#L130) closes affected streams immediately after logout or revoke, including when no event or heartbeat arrives. The stream writer's queue, expiry checks, and response cleanup are documented in [HTTP and SSE](http.md#sse-lifecycle-and-overflow).
+[openEventStream](../../../src/server/http.ts#L138) closes over the request headers and rechecks the same credentials before writes and heartbeats. [revalidateEventStreams](../../../src/server/http.ts#L134) closes affected streams immediately after logout or revoke, including when no event or heartbeat arrives. The stream writer's queue, expiry checks, and response cleanup are documented in [HTTP and SSE](http.md#sse-lifecycle-and-overflow).
 
 <a id="authentication-test-evidence"></a>
 ## Test evidence

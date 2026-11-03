@@ -37,16 +37,16 @@ flowchart TD
 
 ## The durable catalog
 
-[`SessionCatalog`](../../src/storage/catalog.ts) owns Dwell's SQLite file and validates both its schema and every decoded record. The current schema is version 5. All statements use Node's synchronous `DatabaseSync`; SQL values are parameterized for data writes.
+[`SessionCatalog`](../../src/storage/catalog.ts) owns Dwell's SQLite file and validates both its schema and every decoded record. The current schema is version 6. All statements use Node's synchronous `DatabaseSync`; SQL values are parameterized for data writes.
 
-Schema v5 adds nullable `history_check_state` and `history_checked_at`; migrated sessions remain unchecked until their next read. See [catalog migration](implementation/catalog.md#catalog-schema-and-migrations).
+Schema v6 adds shared display names and metadata revisions; [name updates](implementation/catalog.md#catalog-session-names) compare revisions atomically. Schema v5 adds nullable `history_check_state` and `history_checked_at`; migrated sessions remain unchecked until their next read. See [catalog migration](implementation/catalog.md#catalog-schema-and-migrations).
 
 ### Tables and invariants
 
 | Table | Stored values and constraints |
 | --- | --- |
 | `runtime_configuration` | A single optional row (`singleton = 1`) with the canonical Pi executable and optional entry point. |
-| `sessions` | Dwell ID, unique creation request ID, request payload identity, canonical project directory, nullable provider/model pair, optional thinking level, Pi session ID and file, `history_expected`, last history check state/time, durable status, timestamps, and an optional error. A `ready` row must have provider and model. |
+| `sessions` | Shared display name, metadata revision, Dwell ID, unique creation request ID, request payload identity, canonical project directory, nullable provider/model pair, optional thinking level, Pi session ID and file, `history_expected`, last history check state/time, durable status, timestamps, and an optional error. A `ready` row must have provider and model. |
 | `turns` | Run, session, and request IDs; SHA-256 payload identity; status; cancellation flag; timestamps; optional paired error code/message; and a JSON array of native entry IDs. `(session_id, request_id)` is unique, and a partial unique index permits at most one `accepted`, `dispatching`, or `running` turn for a session. `session_id` references `sessions(id)`. |
 
 The TypeScript validators require exact object keys for stored sessions and turns. Database decoding rejects wrong SQLite types, unsafe integers, invalid enum values, malformed entry ID JSON, non-SHA-256 turn payload identities, incomplete error pairs, invalid UUID-backed `TurnInfo`, and unknown session or turn states. A validation failure does not coerce data into a plausible record.
@@ -83,7 +83,7 @@ Terminal turns cannot transition again. `updateTurn()` checks that request ID, p
 
 `SessionCatalog.open(dataDir)` first uses `prepareDataDirectory()`, then creates `catalog.sqlite` as an owner-only file if absent. Before SQLite opens it, Dwell checks that the database is a regular, current-user-owned, single-link file with mode `0600`, using no-follow/nonblocking open flags. SQLite opens with foreign keys enabled, big integer reads, and extensions disabled. Initialization uses `DELETE` journal mode and `synchronous = FULL`.
 
-Schema initialization is one transaction. Version 0 is accepted only when there is no user schema, then creates the current version directly. Versions 1, 2, 3, and 4 are checked against their exact expected schema SQL before transactional migration through version 5. Version 1 first adds the turn table and active-turn index, then applies the later migrations. Version 2 becomes version 3 before version 4. Version 3 adds the nullable `thinking_level` session field. Migrations verify the resulting schema and run `PRAGMA foreign_key_check` before commit. Unsupported versions, a mismatched schema, preserved rows that violate the turn/session foreign key, or failed migration checks are rolled back and reported as an invalid/unsupported catalog; startup does not reset the file.
+Schema initialization is one transaction. Version 0 is accepted only when there is no user schema, then creates the current version directly. Versions 1, 2, 3, 4, and 5 are checked against their exact expected schema SQL before transactional migration through version 6. Version 1 first adds the turn table and active-turn index, then applies the later migrations. Version 2 becomes version 3 before version 4. Version 3 adds the nullable `thinking_level` session field. Migrations verify the resulting schema and run `PRAGMA foreign_key_check` before commit. Unsupported versions, a mismatched schema, preserved rows that violate the turn/session foreign key, or failed migration checks are rolled back and reported as an invalid/unsupported catalog; startup does not reset the file.
 
 `prepareDataDirectory()` requires an owner-only `0700` directory. The native Pi session JSONL can keep Pi's usual 0644 mode because its containing Dwell session directory is private. The catalog's SQLite durability and Pi's JSONL durability are separate: a transaction cannot atomically commit both files.
 

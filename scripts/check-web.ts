@@ -1467,6 +1467,8 @@ for (const mode of modes) {
       }),
     );
     assert.equal(typeof session.id, "string");
+    const namedSessionId = String(session.id);
+    const browserLegacyName = "Browser-only legacy name";
     const settingsPath = join(environment.agentDir, "settings.json");
     const settings = record(JSON.parse(await readFile(settingsPath, "utf8")));
     settings.defaultModel = "dwell-test-image";
@@ -1533,6 +1535,7 @@ for (const mode of modes) {
       return result;
     }
     const first = await page(`(()=>{
+      localStorage.setItem("dwell.web.preferences.v1",JSON.stringify({[${JSON.stringify(namedSessionId)}]:${JSON.stringify(browserLegacyName)}}));
       const original=window.fetch.bind(window);
       let release=()=>{};
       const gate=new Promise(resolve=>{release=resolve;});
@@ -1591,6 +1594,45 @@ for (const mode of modes) {
       false,
       "the existing default text model is reported as image-incompatible",
     );
+    const workspace = String(session.directory).split(/[\\/]/).filter(Boolean).at(-1);
+    await first.until(
+      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(workspace)}) && !row.textContent.includes(${JSON.stringify(browserLegacyName)}))`,
+    );
+    await first.click("#edit-session-name");
+    await first.until('document.querySelector("#session-name-dialog").open');
+    assert.equal(await first.evaluate('document.querySelector("#session-name-input").value'), "");
+    assert.equal(
+      await first.evaluate('!document.querySelector("#import-local-name").hidden'),
+      true,
+      "legacy browser names are offered only through an explicit import button",
+    );
+    await first.click("#import-local-name");
+    assert.equal(
+      await first.evaluate('document.querySelector("#session-name-input").value'),
+      browserLegacyName,
+    );
+    await first.click("#save-session-name");
+    await first.until(
+      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(browserLegacyName)}))`,
+    );
+    assert.equal(
+      record(await request(`/sessions/${namedSessionId}`)).displayName,
+      browserLegacyName,
+    );
+    const savedPreferences = JSON.parse(
+      String(await first.evaluate('localStorage.getItem("dwell.web.preferences.v1")')),
+    ) as Record<string, unknown>;
+    assert.equal(savedPreferences[namedSessionId], browserLegacyName);
+    await first.click("#edit-session-name");
+    await first.until('document.querySelector("#session-name-dialog").open');
+    await first.click("#reset-session-name");
+    await first.until(
+      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(workspace)}) && !row.textContent.includes(${JSON.stringify(browserLegacyName)}))`,
+    );
+    const resetName = record(await request(`/sessions/${namedSessionId}`));
+    assert.equal(resetName.displayName, null);
+    assert.equal(resetName.metadataRevision, 2);
+    console.log(`PASS ${mode} shared conversation names, explicit browser-name import, and reset`);
     console.log(`PASS ${mode} real browser pairing and session selection`);
     await assertStatusCloseGeometry(first, "desktop");
     await assertSavedRendererCacheAndImageGeneration(first);
@@ -1719,6 +1761,136 @@ for (const mode of modes) {
     await assertComposerLayout(first, "desktop");
     await assertDesktopSidebarWidth(first);
     await assertActionIconGeometry(first, "desktop");
+    const secondSessionId = String(session.id);
+    const originalDirectory = String((await request(`/sessions/${namedSessionId}`)).directory);
+    await first.evaluate(
+      `document.querySelector('#session-list .name-row[data-session-id="${namedSessionId}"]').click()`,
+    );
+    await first.until(
+      `document.querySelector('#session-list .name-row.active')?.dataset.sessionId===${JSON.stringify(namedSessionId)} && document.querySelector("#composer-directory").textContent===${JSON.stringify(originalDirectory)}`,
+    );
+    await first.click("#edit-session-name");
+    await first.until('document.querySelector("#session-name-dialog").open');
+    await first.type("#session-name-input", "Stale browser name");
+    await first.evaluate(`(()=>{
+      const original=window.fetch.bind(window);
+      let release=()=>{};
+      const gate=new Promise(resolve=>{release=resolve;});
+      window.__sessionNameRequestWaiting=false;
+      window.__releaseSessionNameRequest=()=>{window.fetch=original;release();};
+      window.fetch=async(input,init)=>{
+        const target=typeof input==="string"?input:input.url;
+        if(new URL(target,location.href).pathname.endsWith("/name")&&init?.method==="POST"){
+          window.__sessionNameRequestWaiting=true;
+          await gate;
+        }
+        return original(input,init);
+      };
+    })()`);
+    await first.click("#save-session-name");
+    await first.until("window.__sessionNameRequestWaiting");
+    const competingName = "Other browser name";
+    assert.equal(
+      record(
+        await request(`/sessions/${namedSessionId}/name`, {
+          displayName: competingName,
+          expectedRevision: 2,
+        }),
+      ).metadataRevision,
+      3,
+    );
+    await first.until(
+      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(competingName)}))`,
+    );
+    await first.click("#close-session-name");
+    await first.until('!document.querySelector("#session-name-dialog").open');
+    await first.evaluate(
+      `document.querySelector('#session-list .name-row[data-session-id="${secondSessionId}"]').click()`,
+    );
+    await first.until(
+      `document.querySelector('#session-list .name-row.active')?.dataset.sessionId===${JSON.stringify(secondSessionId)} && document.querySelector("#composer-directory").textContent===${JSON.stringify(longDirectory)}`,
+    );
+    await first.click("#edit-session-name");
+    await first.until(
+      'document.querySelector("#session-name-dialog").open && document.querySelector("#session-name-input").value===""',
+    );
+    await first.evaluate("window.__releaseSessionNameRequest()");
+    await delay(200);
+    assert.equal(await first.evaluate('document.querySelector("#session-name-dialog").open'), true);
+    assert.equal(await first.evaluate('document.querySelector("#session-name-input").value'), "");
+    assert.equal(
+      await first.evaluate('document.querySelector("#session-name-error").hidden'),
+      true,
+    );
+    await first.click("#close-session-name");
+    console.log(
+      `PASS ${mode} stale name conflicts do not affect a reopened editor for another session`,
+    );
+    const raceBase = record(await request(`/sessions/${namedSessionId}`));
+    const raceRevision = Number(raceBase.metadataRevision);
+    const delayedHttpName = "Delayed HTTP name";
+    const newerSseName = "Newer SSE name";
+    await first.evaluate(
+      `document.querySelector('#session-list .name-row[data-session-id="${namedSessionId}"]').click()`,
+    );
+    await first.until(
+      `document.querySelector('#session-list .name-row.active')?.dataset.sessionId===${JSON.stringify(namedSessionId)}`,
+    );
+    await first.click("#edit-session-name");
+    await first.until('document.querySelector("#session-name-dialog").open');
+    await first.type("#session-name-input", delayedHttpName);
+    await first.evaluate(`(()=>{
+      const original=window.fetch.bind(window);
+      let release=()=>{};
+      const gate=new Promise(resolve=>{release=resolve;});
+      window.__nameResponseWaiting=false;
+      window.__releaseNameResponse=()=>{window.fetch=original;release();};
+      window.fetch=async(input,init)=>{
+        const target=typeof input==="string"?input:input.url;
+        const response=await original(input,init);
+        if(new URL(target,location.href).pathname.endsWith("/name")&&init?.method==="POST"){
+          window.__nameResponseWaiting=true;
+          await gate;
+        }
+        return response;
+      };
+    })()`);
+    await first.click("#save-session-name");
+    await first.until("window.__nameResponseWaiting");
+    const delayedResponseSession = record(await request(`/sessions/${namedSessionId}`));
+    assert.equal(delayedResponseSession.displayName, delayedHttpName);
+    assert.equal(delayedResponseSession.metadataRevision, raceRevision + 1);
+    const newerNameSession = record(
+      await request(`/sessions/${namedSessionId}/name`, {
+        displayName: newerSseName,
+        expectedRevision: raceRevision + 1,
+      }),
+    );
+    assert.equal(newerNameSession.metadataRevision, raceRevision + 2);
+    await first.until(
+      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(newerSseName)}))`,
+    );
+    assert.equal(
+      await first.evaluate('document.querySelector("#session-name-dialog").open'),
+      true,
+      "the same editor remains open while the newer SSE update arrives",
+    );
+    await first.evaluate("window.__releaseNameResponse()");
+    await first.until('!document.querySelector("#session-name-dialog").open');
+    assert.equal(
+      await first.evaluate(
+        `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(newerSseName)}))`,
+      ),
+      true,
+      "a delayed successful HTTP response cannot replace a newer SSE name",
+    );
+    console.log(`PASS ${mode} delayed rename response preserves the newer SSE name`);
+    await first.evaluate(
+      `document.querySelector('#session-list .name-row[data-session-id="${secondSessionId}"]').click()`,
+    );
+    await first.until(
+      `document.querySelector('#session-list .name-row.active')?.dataset.sessionId===${JSON.stringify(secondSessionId)} && document.querySelector("#composer-directory").textContent===${JSON.stringify(longDirectory)}`,
+    );
     await assertInputGrows(first, "desktop");
     console.log(`PASS ${mode} directory-only browser creation uses the native Pi default model`);
     await first.type("#message", "hello");
@@ -2514,11 +2686,17 @@ for (const mode of modes) {
       "High",
     );
     assert.equal(await second.evaluate('document.querySelectorAll(".image-attachment").length'), 0);
+    const mobileComposerHeights = record(
+      await second.evaluate(`(()=>({
+        actions:document.querySelector(".composer-actions").getBoundingClientRect().height,
+        context:document.querySelector(".composer-context").getBoundingClientRect().height,
+        nameButton:document.querySelector("#edit-session-name").getBoundingClientRect().height
+      }))()`),
+    );
     assert.equal(
-      await second.evaluate(
-        'document.querySelector(".composer-actions").getBoundingClientRect().height===document.querySelector(".composer-context").getBoundingClientRect().height',
-      ),
-      true,
+      mobileComposerHeights.actions,
+      mobileComposerHeights.context,
+      `mobile composer rows align: ${JSON.stringify(mobileComposerHeights)}`,
     );
     await second.type("#message", "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight");
     assert.equal(

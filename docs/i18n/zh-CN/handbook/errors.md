@@ -202,6 +202,8 @@ Pi RPC transport errors，例如 `Pi RPC connection closed`、`Pi RPC record exc
 | SSE replay、overload 和 browser decoding | [server event HTTP](../../../../tests/events-http.test.ts)、[session events](../../../../tests/session-events.test.ts)、[event hub](../../../../tests/events.test.ts)、[browser SSE](../../../../tests/web-events.test.ts) |
 | Pi RPC 和 runtime failure | [runtime failure](../../../../tests/runtime-failure.test.ts)、[runtime](../../../../tests/runtime.test.ts) |
 | Durable turn results 和 restart recovery | [turns](../../../../tests/turns.test.ts)、[turn catalog](../../../../tests/turn-catalog.test.ts)、[turn recovery](../../../../tests/turn-recovery.test.ts) |
+| Distill Memory route validation、revision conflict 和 pagination | [Memory HTTP](../../../../tests/memory-http.test.ts) |
+| Memory search/read presentation 与恢复 | [Memory Web](../../../../tests/memory-web.test.ts) |
 | 浏览器处理 Host errors 和 retry states | [web client](../../../../tests/web-client.test.ts) |
 
 类型清单和 endpoint schema 见[共享契约](contracts.md)。详细 dispatch/recovery algorithm 见[sessions 和 storage](sessions-storage.md)；路由和 access checks 见[HTTP 和 authentication](http-auth.md)。
@@ -215,3 +217,15 @@ Pi RPC transport errors，例如 `Pi RPC connection closed`、`Pi RPC record exc
 | `library_unavailable` | 503 | Current 未配置或暂不可用。 |
 | `library_not_found` | 404 | Exact item version 不存在；已保存 reference 仍可移除。 |
 | `library_binding_mismatch` | 409 | Reference 属于另一个 library，或 binding 已关联不同 root。 |
+
+<a id="memory-errors"></a>
+
+### Distill Memory
+
+| Code | HTTP | 含义 |
+| --- | --- | --- |
+| `memory_not_found` | 404 | Distill 中没有可用的目标 record。 |
+| `memory_changed` | 409 | Record revision 与 search result 所选 revision 不同；请重新搜索再读取。 |
+| `memory_unavailable` | 503 | 配置的 Distill Memory reader 暂时无法处理请求。 |
+
+无效 Memory request shape 使用 `invalid_input`；无效 continuation cursor 使用 `invalid_cursor`。Memory reader 不可用时，Dwell Host 和 Distill source coordination 仍可正常使用。

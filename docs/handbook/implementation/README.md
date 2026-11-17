@@ -23,6 +23,7 @@ Each chapter follows a feature through user behavior, module responsibilities, d
 | [Reconnect to ongoing work](reconnect.md) | Live events, snapshots, replay and saved-state reconciliation |
 | [Read saved history and context](saved-history.md) | Pi files, branches, pagination, images and concurrent reads |
 | [Read and navigate a conversation](read-conversation.md) | Markdown, tools, thinking, navigation and stable rendering |
+| [Search and read Memory](memory.md) | Distill-owned records, bounded search, revision-aware reading and host integration |
 | [Read Library content and attach references](library.md) | Current search, exact versions, bindings and offline references |
 | [Coordinate history cleanup](history-retirement.md) | Distill leases, runtime reservations, retirement and restoration |
 

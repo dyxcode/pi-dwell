@@ -46,6 +46,8 @@ Dwell turn 或 native Pi extension execution 正在运行时，composer 操作�
 
 侧边栏列出 session identity；顶部状态标签显示 Dwell 当前认为已打开的 session，其中也包括需要处理的 session。状态包括 Ready、Working、Needs attention、Stopped 和 Opening。
 
+配置 Distill 后，侧边栏会切换为 Memory search 与阅读入口。Conversation list 会由 icon-only session controls 取代；主视图仍显示所选 conversation 和 composer，**New** 仍可用。未配置 Distill 时，侧边栏仍显示 conversation list。详见[搜索与阅读 Memory](#distill-memory)。
+
 - 选择侧边栏项目可切换到已打开的 session。
 - 选择侧边栏中的已关闭 session 可显式重新打开它。
 - 已关闭的 session 会保留其 saved history。刷新浏览器不会自动重新打开它。
@@ -69,6 +71,16 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 
 **Context** 折叠区显示 Pi 保存为 system context 的 project instruction sources 有界预览。内容可能会标明已缩短或省略。这不是发送给 model 的完整 prompt。
 
+<a id="distill-memory"></a>
+
+## 搜索与阅读 Distill Memory
+
+在 Dwell 中显式连接 Distill 后，可以使用 sidebar 的 **Memory** 搜索已保存的记录，并打开结果阅读。Search results 会提供简短 preview；选中结果后读取对应的记录 revision。Reader 暂不可用时，Memory 仍保留在 sidebar 中并提供 **Retry**。Conversation view 及其 controls 继续可用。
+
+Search 页面可能没有结果，但仍有后续内容；只要页面提供继续选项，就可以继续搜索。
+
+Memory 与 conversation 及 Current Library 相互独立。阅读记录不会将内容加入 Pi prompt 或已保存的 conversation。要浏览收集到的外部来源并附加 exact-version references，仍使用独立的 [Current Library](#current-library)。
+
 <a id="stay-connected"></a>
 
 ## 保持连接
@@ -89,7 +101,9 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 当前功能和数值限制请参阅[功能参考](reference.md)。实现行为和测试覆盖请参阅 [Web client 内部说明](web-client.md)、[共享 contracts](contracts.md)和[手册索引](README.md)。
 
 
-## Distill storage coordination
+<a id="distill-configuration"></a>
+
+## 配置 Distill Memory 与 source coordination
 
 在 Distill checkout 中运行 `npm run build:package`，构建 public Node API。然后在 Dwell data directory 创建 owner-only `0600` 的 `integrations.json`：
 
@@ -103,7 +117,9 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 }
 ```
 
-`database` 指向管理这些 Pi sessions 的 Distill store，然后 restart Dwell。Dwell 的文件读取与 hosted Pi processes 会参与该 store 的 cleanup coordination。省略 Distill entry 时不启用 source coordination；省略整个文件时采用 standalone operation。Configuration 或 module opening 失败会停止 startup。详见 [access lifecycle](implementation/history-retirement.md#behavior)。
+`database` 指向管理这些 Pi sessions 的 Distill store，然后 restart Dwell。该显式 host configuration 会启用 source coordination，以及由该 Distill module 提供的 Memory reader；仅安装或注册 Pi extension 不会为 Dwell 完成集成配置。Dwell 会让文件读取和 hosted Pi processes 参与 store 的 cleanup coordination。省略 Distill entry 时两项集成都不启用；未配置 Distill 时，现有 Conversations sidebar 保持不变。
+
+Source-access configuration 或 module opening 出错仍会导致 startup 失败。Memory reader 初始化是 optional：reader 不存在或无法打开时，Dwell 会在 source coordination 可用的情况下正常启动，并在 sidebar 显示 Memory 不可用及 **Retry**。详见 [Memory](implementation/memory.md) 和 [access lifecycle](implementation/history-retirement.md#behavior)。
 
 <a id="current-library"></a>
 
@@ -124,7 +140,7 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 
 请将两个 path 替换为本机 absolute path。同一个 canonical root 应持续使用相同 binding；Current 打开后，若该 binding 指向不同 root，Dwell 会拒绝启动。配置文件从 Dwell data directory 读取，并需满足现有 private-file permission checks。省略 `current` 时 session host 仍可用，library routes 会返回 `library_unavailable`。
 
-打开 **Library** 可查看 latest items、搜索和读取 exact version。选中 session 后，使用 **Attach to session** 保存 reference；该操作不会改变 Pi prompt。已保存的 reference 可在 Current 暂不可用时继续查看和移除。
+打开 **Library** 可查看 latest items、搜索和读取 exact version。Candidate result 会显示 **Article text has not been saved.**、发现时间和原始来源链接。已保存 item 则提供正文供阅读。选中 session 后，使用 **Attach to session** 保存 exact item/version reference，包括已确认的 candidate。该操作不会改变 Pi prompt，也不会获取 candidate text。Current 暂不可用时，已保存 reference 仍可查看和移除。
 
 `current` 和 `distill` 可放在同一个 version 1 configuration 中。详见 [Library](implementation/library.md) 与 [历史清理](implementation/history-retirement.md)。
 

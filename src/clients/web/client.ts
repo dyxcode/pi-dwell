@@ -9,6 +9,11 @@ import type { LiveMessage } from "../../shared/events.ts";
 import { type ContextSource, type HistoryEntry, isHistoryPage } from "../../shared/history.ts";
 import type { ImageContent } from "../../shared/images.ts";
 import {
+  MEMORY_QUERY_CODEPOINTS,
+  isClientCapabilities,
+  type ClientCapabilities,
+} from "../../shared/memory.ts";
+import {
   isLibraryItemsResponse,
   isLibraryItemView,
   isLibraryLatestResponse,
@@ -47,6 +52,7 @@ import {
 } from "./events.ts";
 import { actionIcon, labelWithIcon } from "./icons.ts";
 import { setupComposer } from "./input.ts";
+import { MemoryPanel, type MemoryPanelState } from "./memory.ts";
 import { renderMarkdown } from "./markdown.ts";
 import { appendToolCommand } from "./tool-command.ts";
 import { ApiError, api, binding, headers, message, responseError } from "./transport.ts";
@@ -103,12 +109,35 @@ const libraryDialog = el("library-dialog", HTMLDialogElement);
 const libraryItems = el("library-items", HTMLElement);
 const libraryReferences = el("library-references", HTMLElement);
 const libraryError = el("library-error", HTMLElement);
+const memoryView = el("memory-view", HTMLElement);
+const memoryQuery = el("memory-query", HTMLInputElement);
+const memoryResults = el("memory-results", HTMLElement);
+const memoryReader = el("memory-reader", HTMLElement);
+const memoryText = el("memory-text", HTMLPreElement);
+const memorySearchMore = el("memory-search-more", HTMLButtonElement);
+const memoryReadMore = el("memory-read-more", HTMLButtonElement);
+const memoryRetry = el("memory-retry", HTMLButtonElement);
 let libraryReadGeneration = 0;
 let libraryDialogGeneration = 0;
 let libraryReferencesGeneration = 0;
 let libraryReferenceMutationPending = false;
 let currentLibraryItem: LibraryItemView | null = null;
 let currentLibraryReferences: LibraryReference[] = [];
+let clientCapabilities: ClientCapabilities | null = null;
+let clientCapabilityGeneration = 0;
+let clientCapabilityRequestPending = false;
+let clientCapabilitiesError: string | null = null;
+let capabilityRetryPending = false;
+const CLIENT_CAPABILITY_NOTICE =
+  "Integration status could not be checked. Open navigation and select Retry integration status.";
+const memoryPanel = new MemoryPanel(async (path, body) => {
+  try {
+    return await api(path, body);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) showError(error);
+    throw error;
+  }
+}, renderMemoryPanel);
 let availableModels: PiModelOption[] = [];
 const capabilities = new Map<string, ModelCapabilitiesResponse>();
 const capabilityRequests = new Map<string, Promise<ModelCapabilitiesResponse>>();
@@ -166,6 +195,8 @@ let historyGeneration = 0,
 let reconnectTimer: number | undefined, pollTimer: number | undefined;
 let polling = false,
   suspended = false;
+let streamRecoveryPending = false,
+  pollRecoveryPending = false;
 interface HistoryReadRecovery {
   failures: number;
   timer: number | undefined;
@@ -212,6 +243,7 @@ let authAttempt = 0,
   browseAttempt = 0,
   modelAttempt = 0;
 let hostMode = "",
+  hostInstanceId: string | null = null,
   streamConnected = false;
 const imageDialog = el("image-dialog", HTMLDialogElement);
 function showImage(url: string, name: string): void {
@@ -266,10 +298,16 @@ function renderLibraryItems(items: LibraryItemView[]): void {
   for (const item of items) {
     const button = node("button", "", "library-result");
     button.type = "button";
-    const excerpt = item.summary ?? item.text.slice(0, 240);
+    const candidate = item.candidate === true;
+    const excerpt =
+      item.summary ?? (candidate ? "Article text has not been saved." : item.text.slice(0, 240));
+    const timestamp = candidate ? item.discoveredAt : item.retrievedAt;
     button.append(
       node("strong", item.title || "Untitled"),
-      node("small", `${item.sourceId} · ${new Date(item.retrievedAt).toLocaleDateString()}`),
+      node(
+        "small",
+        `${item.sourceId} · ${candidate ? "Discovered" : "Retrieved"} ${new Date(timestamp).toLocaleDateString()}`,
+      ),
       node("span", excerpt),
     );
     button.onclick = () => void readLibraryItem(item.reference);
@@ -283,27 +321,36 @@ function renderLibraryReader(): void {
     return;
   }
   const item = currentLibraryItem;
+  const candidate = item.candidate === true;
   reader.hidden = false;
   el("library-reader-title", HTMLElement).textContent = item.title || "Untitled";
   el("library-reader-meta", HTMLElement).textContent = [
     item.sourceId,
     item.author,
-    item.retrievedAt,
+    candidate
+      ? `Discovered ${new Date(item.discoveredAt).toLocaleString()}`
+      : `Retrieved ${new Date(item.retrievedAt).toLocaleString()}`,
   ]
     .filter((value): value is string => Boolean(value))
     .join(" · ");
   const link = el("library-source-link", HTMLAnchorElement);
   link.href = item.url;
   el("library-summary", HTMLElement).textContent = item.summary ?? "";
-  el("library-text", HTMLPreElement).textContent = item.text;
-  const completeness =
-    item.sourceCompleteness === "known-partial"
-      ? "Known partial source"
-      : "Source completeness unknown";
-  el("library-completeness", HTMLElement).textContent =
-    item.truncated || item.displayTruncated
-      ? `${completeness} · displayed text is shortened.`
-      : completeness;
+  el("library-text", HTMLPreElement).textContent = candidate
+    ? "Article text has not been saved."
+    : item.text;
+  const completenessNode = el("library-completeness", HTMLElement);
+  completenessNode.hidden = candidate;
+  if (!candidate) {
+    const completeness =
+      item.sourceCompleteness === "known-partial"
+        ? "Known partial source"
+        : "Source completeness unknown";
+    completenessNode.textContent =
+      item.truncated || item.displayTruncated
+        ? `${completeness} · displayed text is shortened.`
+        : completeness;
+  } else completenessNode.textContent = "";
   const action = el("library-reference-action", HTMLButtonElement);
   const attached = currentLibraryReferences.some((reference) =>
     sameLibraryReference(reference, item.reference),
@@ -479,6 +526,158 @@ function openLibrary(): void {
   renderLibraryReader();
   void loadLibraryReferences();
   void loadLatestLibraryItems();
+}
+function memoryConfigured(): boolean {
+  return clientCapabilities?.memory.configured === true;
+}
+function memoryReady(): boolean {
+  return clientCapabilities?.memory.state === "ready";
+}
+function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
+  const capability = clientCapabilities?.memory;
+  const available = capability?.state === "ready";
+  const capabilityStatus = el("memory-capability-status", HTMLElement);
+  const retryCapabilities = el("client-capabilities-retry", HTMLButtonElement);
+  const capabilityError = el("client-capabilities-error", HTMLElement);
+  const queryLength = Array.from(state.query.trim()).length;
+  const queryTooLong = queryLength > MEMORY_QUERY_CODEPOINTS;
+  const searchButton = el("memory-search", HTMLButtonElement);
+  const searchError = el("memory-search-error", HTMLElement);
+  const readError = el("memory-read-error", HTMLElement);
+  const readerTitle = el("memory-reader-title", HTMLElement);
+
+  capabilityError.hidden = clientCapabilitiesError === null;
+  capabilityError.textContent = clientCapabilitiesError ?? "";
+  retryCapabilities.hidden = capabilityError.hidden;
+  capabilityStatus.hidden = capability?.state !== "unavailable";
+  capabilityStatus.textContent =
+    capability?.state === "unavailable" ? "Memory is temporarily unavailable." : "";
+  memoryRetry.hidden =
+    !memoryConfigured() ||
+    (capability?.state !== "unavailable" &&
+      state.searchError !== "Memory is temporarily unavailable. Retry when Distill is ready." &&
+      state.readError !== "Memory is temporarily unavailable. Retry when Distill is ready.");
+  memoryRetry.disabled = capabilityRetryPending;
+  memoryQuery.disabled = !available;
+  searchButton.disabled =
+    !available || state.searchPending || state.query.trim().length === 0 || queryTooLong;
+  searchButton.textContent = state.searchPending ? "Searching…" : "Search";
+  searchError.textContent =
+    state.searchError ??
+    (queryTooLong ? `Search queries can be at most ${MEMORY_QUERY_CODEPOINTS} characters.` : "");
+  readError.textContent = state.readError ?? "";
+
+  const focusedResult =
+    document.activeElement instanceof HTMLButtonElement &&
+    document.activeElement.classList.contains("memory-result")
+      ? `${document.activeElement.dataset.memoryId ?? ""}:${document.activeElement.dataset.revision ?? ""}`
+      : null;
+  memoryResults.replaceChildren();
+  if (state.items.length === 0) {
+    const empty = state.searchPending
+      ? "Searching memory…"
+      : state.query.trim().length === 0
+        ? "Search for a memory to carry forward."
+        : state.nextCursor !== null
+          ? "No matches in this batch. Continue search to check more memories."
+          : state.searchError === null
+            ? "No matching memories."
+            : "";
+    if (empty) memoryResults.append(node("p", empty, "memory-empty"));
+  } else {
+    for (const item of state.items) {
+      const result = node("button", "", "memory-result");
+      result.type = "button";
+      result.dataset.memoryId = item.id;
+      result.dataset.revision = String(item.revision);
+      result.setAttribute("aria-current", String(state.selected?.id === item.id));
+      result.setAttribute("aria-label", `Read memory: ${item.preview}`);
+      result.title = item.preview;
+      result.disabled = !available || state.readPending;
+      const title = item.preview.replace(/\s+/g, " ").trim();
+      result.append(
+        node("strong", [...title].slice(0, 80).join("") || "Saved memory"),
+        node("span", item.preview),
+      );
+      result.onclick = () => void memoryPanel.read(item);
+      memoryResults.append(result);
+    }
+  }
+  memorySearchMore.hidden = state.nextCursor === null;
+  memorySearchMore.disabled = !available || state.searchPending;
+  memorySearchMore.textContent = state.searchPending ? "Searching…" : "Continue search";
+
+  const hasReader = state.selected !== null;
+  memoryReader.hidden = !hasReader;
+  const selectedItem =
+    state.selected === null
+      ? undefined
+      : state.items.find(
+          (item) => item.id === state.selected?.id && item.revision === state.selected?.revision,
+        );
+  const selectedTitle = selectedItem?.preview.replace(/\s+/g, " ").trim() ?? "Saved memory";
+  readerTitle.textContent = [...selectedTitle].slice(0, 80).join("");
+  readerTitle.title = selectedTitle;
+  readerTitle.setAttribute("aria-label", `Reading memory: ${selectedTitle}`);
+  memoryText.textContent = state.text;
+  memoryReadMore.hidden = !hasReader || state.readCursor === null;
+  memoryReadMore.disabled = !available || state.readPending;
+  memoryReadMore.textContent = state.readPending ? "Reading…" : "Continue reading";
+  if (
+    focusedResult !== null &&
+    state.selected !== null &&
+    focusedResult === `${state.selected.id}:${state.selected.revision}`
+  )
+    readerTitle.focus();
+}
+function updateClientCapabilityView(): void {
+  const enabled = authenticated && memoryConfigured();
+  app.classList.toggle("with-memory", enabled);
+  el("sidebar-heading", HTMLElement).textContent = "CONVERSATIONS";
+  el("session-count", HTMLElement).hidden = enabled;
+  el("session-list", HTMLElement).hidden = enabled;
+  memoryView.hidden = !enabled;
+  if (!enabled) {
+    memoryQuery.value = "";
+    memoryPanel.clear();
+  }
+  renderMemoryPanel();
+  navigation();
+}
+async function reloadClientCapabilities(force = false): Promise<void> {
+  if (clientCapabilityRequestPending && !force) return;
+  clientCapabilityRequestPending = true;
+  const authentication = authAttempt;
+  const attempt = ++clientCapabilityGeneration;
+  capabilityRetryPending = true;
+  renderMemoryPanel();
+  try {
+    const value = await api("/api/v1/client-capabilities");
+    if (authentication !== authAttempt || attempt !== clientCapabilityGeneration || !authenticated)
+      return;
+    if (!isClientCapabilities(value)) throw new Error("Invalid client capabilities.");
+    clientCapabilities = value;
+    clientCapabilitiesError = null;
+    if (notice.textContent === CLIENT_CAPABILITY_NOTICE) clearNotice();
+    if (!value.memory.configured) memoryPanel.clear();
+    updateClientCapabilityView();
+  } catch (error) {
+    if (authentication !== authAttempt || attempt !== clientCapabilityGeneration) return;
+    if (error instanceof ApiError && error.status === 401) {
+      showError(error);
+      return;
+    }
+    clientCapabilitiesError = CLIENT_CAPABILITY_NOTICE;
+    notice.textContent = CLIENT_CAPABILITY_NOTICE;
+    notice.hidden = false;
+    updateClientCapabilityView();
+  } finally {
+    if (attempt === clientCapabilityGeneration) {
+      clientCapabilityRequestPending = false;
+      capabilityRetryPending = false;
+      renderMemoryPanel();
+    }
+  }
 }
 const attachments = new Attachments({
   input: el("image-files", HTMLInputElement),
@@ -1006,14 +1205,20 @@ function navigation(): void {
     tab.dataset.sessionId = s.id;
     const selectButton = node("button", "", "tab-select");
     selectButton.type = "button";
+    const sessionLabel = label(s);
+    const memoryMode = memoryConfigured();
     selectButton.setAttribute(
       "aria-label",
-      `Session ${number}, ${description}${history === null ? "" : `, ${history}`}${selectedTab ? ", selected. Activate to show close." : ""}`,
+      memoryMode
+        ? `Session ${number}, ${sessionLabel}, ${description}, ${s.directory}${history === null ? "" : `, ${history}`}${selectedTab ? ", selected. Activate to show close." : ""}`
+        : `Session ${number}, ${description}${history === null ? "" : `, ${history}`}${selectedTab ? ", selected. Activate to show close." : ""}`,
     );
-    selectButton.title = `Session ${number} · ${description}${history === null ? "" : `\n${history}`}\n${s.directory}`;
+    selectButton.title = memoryMode
+      ? `${sessionLabel} · ${description}${history === null ? "" : `\n${history}`}\n${s.directory}`
+      : `Session ${number} · ${description}${history === null ? "" : `\n${history}`}\n${s.directory}`;
     selectButton.setAttribute("aria-current", String(selectedTab));
     selectButton.disabled = attachments.busy || closeDialog.open;
-    selectButton.append(node("span", number));
+    if (!memoryMode) selectButton.append(node("span", number));
     if (!armed) selectButton.append(tabSymbol(symbol));
     selectButton.onclick = () => {
       if (selectedTab) closeArmedSession = armed ? null : s.id;
@@ -1022,14 +1227,24 @@ function navigation(): void {
         void select(s.id);
       }
       navigation();
-      tabs.querySelector<HTMLButtonElement>(`[data-session-id="${s.id}"] .tab-select`)?.focus();
+      const focusSelector = memoryMode && closeArmedSession === s.id ? ".tab-close" : ".tab-select";
+      tabs
+        .querySelector<HTMLButtonElement>(`[data-session-id="${s.id}"] ${focusSelector}`)
+        ?.focus();
     };
-    tab.append(selectButton);
+    if (!memoryMode || !armed) tab.append(selectButton);
     if (armed) {
       const closeButton = node("button", "", "tab-close");
       closeButton.type = "button";
-      closeButton.setAttribute("aria-label", `Close session ${number}`);
-      closeButton.title = `Close session ${number}`;
+      closeButton.setAttribute(
+        "aria-label",
+        memoryMode
+          ? `Close current session, ${sessionLabel}, ${description}, ${s.directory}`
+          : `Close session ${number}`,
+      );
+      closeButton.title = memoryMode
+        ? `Close current session · ${sessionLabel} · ${description}\n${s.directory}`
+        : `Close session ${number}`;
       closeButton.disabled =
         closeBlockedReason() !== null ||
         closeDialog.open ||
@@ -1854,6 +2069,10 @@ async function stream(id: string, epoch: number): Promise<void> {
       throw new Error("Invalid event stream.");
     streamConnected = true;
     connection("Connected");
+    if (streamRecoveryPending) {
+      streamRecoveryPending = false;
+      void reloadClientCapabilities();
+    }
     const reader = response.body.getReader(),
       text = new TextDecoder(),
       decoder = new SSEDecoder();
@@ -1958,6 +2177,7 @@ async function stream(id: string, epoch: number): Promise<void> {
   } catch (error) {
     if (abort.signal.aborted || epoch !== generation) return;
     streamConnected = false;
+    streamRecoveryPending = true;
     connection("Reconnecting…");
     state = { ...state, cursor: null };
     if (error instanceof ApiError && error.status === 401) {
@@ -2083,12 +2303,26 @@ async function poll(): Promise<void> {
   polling = true;
   const attempt = authAttempt;
   try {
+    const hostStatus = await api("/api/v1/status");
+    if (!isHostStatus(hostStatus)) throw new Error("Incompatible Dwell host.");
+    if (attempt !== authAttempt || !authenticated) return;
+    const hostRestarted = hostInstanceId !== null && hostStatus.instanceId !== hostInstanceId;
+    hostInstanceId = hostStatus.instanceId;
     await refresh();
-    if (attempt === authAttempt && !selected) connection("Connected");
+    if (attempt === authAttempt && authenticated) {
+      if (hostRestarted || pollRecoveryPending) {
+        pollRecoveryPending = false;
+        void reloadClientCapabilities(hostRestarted);
+      }
+      if (!selected) connection("Connected");
+    }
   } catch (error) {
     if (attempt === authAttempt) {
       if (error instanceof ApiError && error.status === 401) showError(error);
-      else connection("Connection lost");
+      else {
+        pollRecoveryPending = true;
+        connection("Connection lost");
+      }
     }
   } finally {
     polling = false;
@@ -2103,6 +2337,16 @@ async function poll(): Promise<void> {
 function disconnect(reason: string): void {
   attachments.dispose();
   resetCapabilities();
+  clientCapabilityGeneration++;
+  clientCapabilityRequestPending = false;
+  hostInstanceId = null;
+  clientCapabilities = null;
+  clientCapabilitiesError = null;
+  capabilityRetryPending = false;
+  streamRecoveryPending = false;
+  pollRecoveryPending = false;
+  memoryQuery.value = "";
+  memoryPanel.clear();
   releaseImages();
   imageDialog.close();
   libraryDialog.close();
@@ -2124,6 +2368,7 @@ function disconnect(reason: string): void {
   app.hidden = true;
   gate.hidden = false;
   el("gate-message", HTMLElement).textContent = reason;
+  updateClientCapabilityView();
   navigation();
 }
 async function connect(): Promise<void> {
@@ -2135,13 +2380,15 @@ async function connect(): Promise<void> {
     if (attempt !== authAttempt) return;
     if (!isHostStatus(value)) throw new Error("Incompatible Dwell host.");
     hostMode = value.mode;
+    hostInstanceId = value.instanceId;
     authenticated = true;
-    gate.hidden = true;
-    app.hidden = false;
     clearNotice();
     connection("Connected");
     await refresh();
+    await reloadClientCapabilities();
     if (attempt !== authAttempt || !authenticated) return;
+    gate.hidden = true;
+    app.hidden = false;
     if (selected) {
       if (sessions.some((session) => session.id === selected)) {
         attachments.select(selected);
@@ -2565,6 +2812,21 @@ el("scrim", HTMLButtonElement).onclick = () => nav(false);
 el("new-mobile", HTMLButtonElement).onclick = () => {
   void newSession();
 };
+el("client-capabilities-retry", HTMLButtonElement).onclick = () => {
+  void reloadClientCapabilities();
+};
+el("memory-search-form", HTMLFormElement).onsubmit = (event) => {
+  event.preventDefault();
+  if (memoryReady()) void memoryPanel.search(memoryQuery.value);
+};
+memoryQuery.oninput = () => memoryPanel.setQuery(memoryQuery.value);
+memorySearchMore.onclick = () => void memoryPanel.continueSearch();
+memoryReadMore.onclick = () => void memoryPanel.continueReading();
+el("memory-reader-close", HTMLButtonElement).onclick = () => {
+  memoryPanel.closeReader();
+  memoryQuery.focus();
+};
+memoryRetry.onclick = () => void reloadClientCapabilities();
 for (const id of ["library-open", "library-open-mobile"])
   el(id, HTMLButtonElement).onclick = openLibrary;
 el("close-library", HTMLButtonElement).onclick = () => libraryDialog.close();
@@ -2735,8 +2997,12 @@ input.onkeydown = (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || closeDialog.open) return;
   if (closeArmedSession !== null) {
+    const armedSession = closeArmedSession;
     closeArmedSession = null;
     navigation();
+    el("status-list", HTMLElement)
+      .querySelector<HTMLButtonElement>(`[data-session-id="${armedSession}"] .tab-select`)
+      ?.focus();
   }
   if (rail.classList.contains("open")) nav(false);
 });
@@ -2784,6 +3050,7 @@ function resume(): void {
   modelDialog.close();
   availableModels = [];
   thinkingChoice = null;
+  void reloadClientCapabilities();
   releaseImages();
   streamConnected = false;
   connection("Reconnecting…");

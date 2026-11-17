@@ -20,6 +20,8 @@
 | [images.ts](../../../../src/shared/images.ts) | `ImageContent`、图片限制和 guards | Turn 与 Pi RPC 接受的 JSON-safe 图片数据。 |
 | [history.ts](../../../../src/shared/history.ts) | `HistoryEntry`、`HistoryPage`、`ContextSource` 和 `isHistoryPage` | 已保存 Pi branch 的有界 display projection。 |
 | [events.ts](../../../../src/shared/events.ts) | `StreamFrame`、turn/live projections、event budgets 和 `isStreamFrame` | 通过 SSE 使用的有界 JSON event 协议。 |
+| [memory.ts](../../../../src/shared/memory.ts) | Memory search/read shapes、client capabilities 与 runtime guards | 有界 Distill Memory access 和 integration availability。 |
+| [library.ts](../../../../src/shared/library.ts) | Library search/latest/reference contracts 与 `LibraryItemView` | Current saved content、discovery candidate 和 session reference。 |
 
 <a id="validation-rules-at-a-glance"></a>
 
@@ -83,6 +85,20 @@ Model-specific 行为和 thinking restoration 测试见 [session-discovery.test.
 - Session model list 还要求有效 session ID；其中每个 model 都必须有 boolean `supportsImages` 和 1 到 7 个互不重复的有效 thinking level。
 
 这些 validators 不保证目录或 provider/ID pair 唯一，也不证明 path 在文件系统中的实际含义。Absolute-path 处理、model list shape、extension model 和 capability discovery 测试见 [session-discovery.test.ts](../../../../tests/session-discovery.test.ts) 与 [session-models.test.ts](../../../../tests/session-models.test.ts)。
+
+## Memory search 与阅读
+
+[memory.ts](../../../../src/shared/memory.ts) 定义可选 Distill Memory reader 的 authenticated browser contracts。Search request 必须包含一个非空的 literal-substring query，最多 128 个 Unicode code points；默认每页 20 条，显式分页上限必须是 1 到 20 之间的 safe integer。Opaque cursor 最多 8,192 个 code points。Read request 必须包含非空 record ID，最多 512 个 code points，以及正的 safe-integer `expectedRevision`；cursor 可继续读取该 revision 的后续页面。
+
+Search response 最多包含 20 条结果。每项包含 ID、正 revision 和最多 500 个 code points 的 preview。Read response 标识同一 ID 和 revision，每页 text 最多 8,000 个 code points。两者都可包含 `nextCursor`。Host 会验证 Distill 返回的 response，包括 client 请求的结果上限；matching、cursor 语义、revision 检查和 conflict detection 由 Distill 负责。`memory_changed` 表示请求记录已不再匹配 search result revision。
+
+`ClientCapabilities` 报告 `memory` 和 `library`；每项 capability 都包含 `configured` 标志，以及 `disabled`、`ready` 或 `unavailable` 状态。未配置时必须为 `disabled`；已配置时则为 `ready` 或 `unavailable`。详见 [Memory HTTP routes](http-auth.md#complete-route-map) 和 [Memory 实现说明](implementation/memory.md)。
+
+## Library saved item 与 candidate
+
+[library.ts](../../../../src/shared/library.ts) 将 `LibraryItemView` 定义为 saved-content variant 或 discovery-candidate variant。两者都标识精确的 binding、item 和 version，并可包含 source、title、author 和 summary。Saved item 包含 article `text`、`retrievedAt`、`sourceCompleteness` 和 `truncated`；candidate 则包含 `candidate: true` 与 `discoveredAt`，并省略这些 saved-body fields。Dwell 不会为 candidate 合成 article text、retrieval time 或 completeness。
+
+Search 和 latest response 可以包含任一 variant。Search 和 latest 最多返回 20 项；saved excerpt 最多 2,000 个 Unicode code points，精确读取最多 20,000。Current 确认 item/version 后，可以将 candidate metadata 作为 exact reference 附加到 session，但不会把 article text 放进 Pi context。详见 [Current Library routes](http-auth.md#complete-route-map) 和 [Library 实现说明](implementation/library.md)。
 
 ## Turn submission
 

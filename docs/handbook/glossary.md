@@ -12,6 +12,8 @@ Session, turn, run, native execution, event sequence, and history cursor name di
 | --- | --- |
 | **Dwell** | The local host and browser client in this repository. Dwell keeps its own session/turn catalog, starts Pi processes, translates runtime activity into a bounded HTTP/SSE protocol, and projects Pi's saved history. It is not a second model runtime. |
 | **Pi** | The installed `@earendil-works/pi-coding-agent` package and executable used by Dwell. Pi owns model/provider behavior, its native session format, and extension/native execution. Dwell talks to the configured executable through the supported Pi 1.4.0 RPC protocol. |
+| **Distill** | An independent Pi extension and product that owns Memory records and source-retention coordination. Dwell connects through an explicitly configured local API. |
+| **Current** | An independent Pi extension and product that owns external-content discovery, saved article bodies and versions. Dwell provides a read-only library view and stores exact references. |
 | **Host** | The Node process serving Dwell's loopback HTTP interface and owning the active in-memory session service. The host can stop while the SQLite catalog and Pi JSONL files remain on disk. |
 | **Pi process / runtime** | A live child process speaking Pi RPC for a Dwell session or for isolated model discovery. A Dwell session can remain stored while its runtime is closed. |
 | **Pi RPC** | Pi's newline-delimited JSON request/response/event protocol over the child process's stdin/stdout. Dwell correlates command responses by generated RPC ID; RPC IDs are transport details, not Dwell request, turn, or native execution IDs. |
@@ -36,6 +38,13 @@ Session, turn, run, native execution, event sequence, and history cursor name di
 | **Latest turn** | The newest Dwell turn record, which may be terminal. “Latest” does not imply active. |
 
 The session and turn contracts are in [`shared/sessions.ts`](../../src/shared/sessions.ts) and [`shared/turns.ts`](../../src/shared/turns.ts); durable records and indexes are in [`storage/catalog.ts`](../../src/storage/catalog.ts).
+
+## Memory and external content
+
+| Term | Meaning and distinction |
+| --- | --- |
+| **Distill Memory record** | A Distill-owned record that Dwell can search and read. Its revision identifies the content returned by a particular search result; it is not a Dwell turn or Pi conversation entry. |
+| **Discovery candidate** | A Current item/version with source metadata that has not yet been saved with article text. It has discovery metadata and a source link, but no saved article body or retrieval provenance. Dwell can store an exact reference without adding content to Pi context. |
 
 ## Execution and recovery language
 

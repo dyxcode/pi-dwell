@@ -16,6 +16,8 @@ Session、turn、run、native execution、event sequence 和 history cursor 分�
 | --- | --- |
 | **Dwell** | 本 repo 中的本地 host 与 browser client。Dwell 维护自己的 session/turn catalog、启动 Pi 进程，将 runtime 活动转换为有大小限制的 HTTP/SSE protocol，并生成 Pi saved history 的 projection。它不额外实现一套 model runtime。 |
 | **Pi** | Dwell 使用的已安装 `@earendil-works/pi-coding-agent` package 和 executable。Pi 负责 model/provider 行为、native session format 以及 extension/native execution。Dwell 通过受支持的 Pi 1.4.0 RPC protocol 与配置的 executable 通信。 |
+| **Distill** | 独立的 Pi extension 和产品，负责 Memory record 与 source-retention coordination。Dwell 通过显式配置的本地 API 连接。 |
+| **Current** | 独立的 Pi extension 和产品，负责外部内容发现、已保存 article body 与版本。Dwell 提供只读 library view，并保存 exact reference。 |
 | **Host** | 提供 Dwell loopback HTTP 接口、管理内存中 active session service 的 Node 进程。Host 停止后，SQLite catalog 和 Pi JSONL 文件仍可保留在磁盘上。 |
 | **Pi process / runtime** | 为 Dwell session 或 isolated model discovery 提供 Pi RPC 通信的子进程。Runtime 关闭后，Dwell session 仍可保存在 storage 中。 |
 | **Pi RPC** | Pi 通过 child process 的 stdin/stdout 使用的、以换行分隔的 JSON request/response/event protocol。Dwell 用生成的 RPC ID 关联 command responses；RPC IDs 是 transport detail，不是 Dwell request ID、turn ID 或 native execution ID。 |
@@ -42,6 +44,13 @@ Session、turn、run、native execution、event sequence 和 history cursor 分�
 | **Latest turn** | 最新的 Dwell turn record；它可能已经是 terminal 状态。“Latest”不代表 active。 |
 
 Session 和 turn contracts 位于 [`shared/sessions.ts`](../../../../src/shared/sessions.ts) 和 [`shared/turns.ts`](../../../../src/shared/turns.ts)；持久化 records 和 indexes 位于 [`storage/catalog.ts`](../../../../src/storage/catalog.ts)。
+
+## Memory 与外部内容
+
+| 术语 | 含义与区别 |
+| --- | --- |
+| **Distill Memory record** | 由 Distill 持有、可供 Dwell 搜索和读取的记录。Revision 标识某条 search result 对应的内容；它不是 Dwell turn 或 Pi conversation entry。 |
+| **Discovery candidate** | Current 中带有 source metadata、尚未连同 article text 保存的 item/version。它有 discovery metadata 和 source link，但没有已保存的 article body 或 retrieval provenance。Dwell 可以保存 exact reference，而不将内容加入 Pi context。 |
 
 <a id="execution-and-recovery-language"></a>
 

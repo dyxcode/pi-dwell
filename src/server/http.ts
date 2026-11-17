@@ -1,14 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { readIntegrations } from "../integrations/configuration.ts";
-import { openDistill, type DistillStorage } from "../integrations/distill.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { HOST_PAGE, STYLE } from "../clients/web/page.ts";
 import { BROWSER_ASSETS } from "../clients/web/script.ts";
+import { readIntegrations } from "../integrations/configuration.ts";
 import { CurrentLibrary, CurrentLibraryError } from "../integrations/current.ts";
+import { type DistillStorage, openDistill } from "../integrations/distill.ts";
+import { type MemoryReader, MemoryReaderError, openMemoryReader } from "../integrations/memory.ts";
 import { prepareDataDirectory } from "../local/files.ts";
 import { dataDirectory, type HostMode } from "../local/paths.ts";
 import { SessionError, SessionService, type SessionServiceOptions } from "../sessions/service.ts";
 import type { LibraryLatestRequest } from "../shared/library.ts";
+import {
+  type ClientCapabilities,
+  isMemoryReadRequest,
+  isMemorySearchRequest,
+} from "../shared/memory.ts";
 import { DEFAULT_PORT, type HostStatus } from "../shared/protocol.ts";
 import {
   isRuntimeConfiguration,
@@ -148,6 +154,9 @@ export async function startHost({
   let sessions: SessionService | undefined;
   let distill: DistillStorage | undefined;
   let library: CurrentLibrary | undefined;
+  let memory: MemoryReader | undefined;
+  let memoryConfigured = false;
+  let libraryConfigured = false;
   let url = "";
   let stopping = false;
   let browserOrigin: string | undefined;
@@ -234,6 +243,9 @@ export async function startHost({
       const librarySearchPath = path === "/api/v1/library/search";
       const libraryReadMatch =
         /^\/api\/v1\/library\/([^/]+)\/items\/([^/]+)\/versions\/([^/]+)$/.exec(path);
+      const memorySearchPath = path === "/api/v1/memory/search";
+      const memoryReadPath = path === "/api/v1/memory/read";
+      const clientCapabilitiesPath = path === "/api/v1/client-capabilities";
       const sessionLibraryReferencesMatch =
         /^\/api\/v1\/sessions\/([a-f0-9-]+)\/library-references$/.exec(path);
       const sessionLibraryReferenceMatch =
@@ -303,7 +315,8 @@ export async function startHost({
         libraryReadMatch !== null ||
         sessionLibraryReferencesMatch !== null ||
         sessionLibraryReferenceMatch !== null;
-      const protectedRoute = sessionRoute || libraryRoute;
+      const memoryRoute = memorySearchPath || memoryReadPath || clientCapabilitiesPath;
+      const protectedRoute = sessionRoute || libraryRoute || memoryRoute;
       let method: string | undefined;
       if (protectedRoute) {
         if (
@@ -318,6 +331,8 @@ export async function startHost({
         ) {
           method = "POST";
         } else if (librarySearchPath) {
+          method = "POST";
+        } else if (memorySearchPath || memoryReadPath) {
           method = "POST";
         } else if (sessionLibraryReferencesMatch) {
           method = request.method === "POST" ? "POST" : "GET";
@@ -385,7 +400,35 @@ export async function startHost({
         if (stopping) fail(503, "unavailable", "Dwell is stopping.");
         // Body/header deadlines remain bounded; admitted RPC work has its own deadlines.
         request.socket.setTimeout(0);
-        if (libraryRoute) {
+        if (memoryRoute) {
+          if (clientCapabilitiesPath) {
+            const capabilities: ClientCapabilities = {
+              memory: {
+                configured: memoryConfigured,
+                state: !memoryConfigured ? "disabled" : memory ? "ready" : "unavailable",
+              },
+              library: {
+                configured: libraryConfigured,
+                state: !libraryConfigured ? "disabled" : library ? "ready" : "unavailable",
+              },
+            };
+            send(response, 200, capabilities);
+          } else if (memorySearchPath) {
+            if (!isMemorySearchRequest(body))
+              fail(400, "invalid_input", "Provide query and optional cursor and limit.");
+            if (!memory) throw new MemoryReaderError("memory_unavailable");
+            send(response, 200, await memory.search(body));
+          } else {
+            if (!isMemoryReadRequest(body))
+              fail(
+                400,
+                "invalid_input",
+                "Provide memory id, expected revision, and optional cursor.",
+              );
+            if (!memory) throw new MemoryReaderError("memory_unavailable");
+            send(response, 200, await memory.read(body));
+          }
+        } else if (libraryRoute) {
           if (sessionLibraryReferencesMatch || sessionLibraryReferenceMatch) {
             if (sessionLibraryReferencesMatch) {
               const id = sessionLibraryReferencesMatch[1];
@@ -687,6 +730,16 @@ export async function startHost({
                 ? 409
                 : 503;
         send(response, status, { error: { code: error.code, message: error.message } });
+      } else if (error instanceof MemoryReaderError) {
+        const status =
+          error.code === "invalid_input" || error.code === "invalid_cursor"
+            ? 400
+            : error.code === "memory_not_found"
+              ? 404
+              : error.code === "memory_changed"
+                ? 409
+                : 503;
+        send(response, status, { error: { code: error.code, message: error.message } });
       } else if (error instanceof AccessError || error instanceof SessionError) {
         if (error.status === 429)
           response.setHeader("Retry-After", error.code === "pairing_limit" ? "300" : "60");
@@ -736,18 +789,22 @@ export async function startHost({
           await sessions?.shutdown();
         } finally {
           try {
-            distill?.close();
+            memory?.close();
           } finally {
             try {
-              await auth?.drain();
+              distill?.close();
             } finally {
               try {
-                await library?.close();
+                await auth?.drain();
               } finally {
-                await new Promise<void>((resolve, reject) =>
-                  server.close((error) => (error ? reject(error) : resolve())),
-                );
-                server.closeAllConnections();
+                try {
+                  await library?.close();
+                } finally {
+                  await new Promise<void>((resolve, reject) =>
+                    server.close((error) => (error ? reject(error) : resolve())),
+                  );
+                  server.closeAllConnections();
+                }
               }
             }
           }
@@ -759,6 +816,8 @@ export async function startHost({
   try {
     const root = await prepareDataDirectory(dataDir);
     const integrations = await readIntegrations(root);
+    memoryConfigured = integrations.distill !== undefined;
+    libraryConfigured = integrations.current !== undefined;
     if (integrations.current) {
       try {
         library = await CurrentLibrary.open(integrations.current);
@@ -772,7 +831,14 @@ export async function startHost({
         "The HTTPS browserOrigin must use a different authority from the local listener.",
       );
     auth = await LocalAuth.open(dataDir, now);
-    if (integrations.distill) distill = await openDistill(integrations.distill);
+    if (integrations.distill) {
+      distill = await openDistill(integrations.distill);
+      try {
+        memory = await openMemoryReader(integrations.distill);
+      } catch {
+        memory = undefined;
+      }
+    }
     sessions = await SessionService.create({
       dataDir,
       ...sessionOptions,

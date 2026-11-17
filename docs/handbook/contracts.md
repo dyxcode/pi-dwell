@@ -22,6 +22,8 @@ canonicalization, or every application invariant.
 | [images.ts](../../src/shared/images.ts) | `ImageContent`, image limits and guards | JSON-safe image data accepted by turns and Pi RPC. |
 | [history.ts](../../src/shared/history.ts) | `HistoryEntry`, `HistoryPage`, `ContextSource` and `isHistoryPage` | Bounded display projection of a saved Pi branch. |
 | [events.ts](../../src/shared/events.ts) | `StreamFrame`, turn/live projections, event budgets and `isStreamFrame` | Bounded JSON event protocol used over SSE. |
+| [memory.ts](../../src/shared/memory.ts) | Memory search/read shapes, client capabilities and runtime guards | Bounded Distill Memory access and integration availability. |
+| [library.ts](../../src/shared/library.ts) | Library search/latest/reference contracts and `LibraryItemView` | Current saved content, discovery candidates and session references. |
 
 ## Validation rules at a glance
 
@@ -134,6 +136,20 @@ Discovery tests cover absolute-path handling, model list shape, extension
 models, and capability discovery in
 [session-discovery.test.ts](../../tests/session-discovery.test.ts) and
 [session-models.test.ts](../../tests/session-models.test.ts).
+
+## Memory search and reading
+
+[memory.ts](../../src/shared/memory.ts) defines the authenticated browser contracts for the optional Distill Memory reader. Search requests require one nonblank literal-substring query of at most 128 Unicode code points; the default page limit is 20, and explicit limits are safe integers from 1 to 20. Opaque cursors are limited to 8,192 code points. Read requests require a nonblank record ID of at most 512 code points and a positive safe-integer `expectedRevision`; a cursor may request a later page of that same revision.
+
+Search responses contain at most 20 items. Each item has an ID, positive revision, and preview of at most 500 code points. Read responses identify the same ID and revision and contain at most 8,000 code points per page. Both may include `nextCursor`. The Host validates the response from Distill, including the result limit requested by the client; Distill owns matching, cursor semantics, revision checks, and conflict detection. `memory_changed` means the requested record no longer matches the search result revision.
+
+`ClientCapabilities` reports `memory` and `library`; each capability has a `configured` flag and a state of `disabled`, `ready`, or `unavailable`. An unconfigured capability must be `disabled`; a configured capability is either ready or unavailable. See the [Memory HTTP routes](http-auth.md#complete-route-map) and [Memory implementation](implementation/memory.md).
+
+## Library saved items and candidates
+
+[library.ts](../../src/shared/library.ts) defines `LibraryItemView` as a saved-content variant or a discovery-candidate variant. Both identify the exact binding, item and version and may include source, title, author and summary. A saved item includes article `text`, `retrievedAt`, `sourceCompleteness` and `truncated`; a candidate includes `candidate: true` and `discoveredAt` and omits those saved-body fields. Dwell does not synthesize article text, retrieval time or completeness for a candidate.
+
+Search and latest responses may contain either variant. Search and latest are limited to 20 items; saved excerpts are limited to 2,000 Unicode code points, and an exact read is limited to 20,000. Candidate metadata can be attached to a session as an exact reference after Current confirms the item and version, but no article text enters Pi context. See [Current Library routes](http-auth.md#complete-route-map) and [Library implementation](implementation/library.md).
 
 ## Turn submission
 

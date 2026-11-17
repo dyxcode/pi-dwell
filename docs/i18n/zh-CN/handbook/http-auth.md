@@ -61,11 +61,14 @@
 | `GET /directories[?path=…]` | Either | Canonical host directory、parent、子目录和截断标志 |
 | `GET /models` | Either | 封装在 `models` 中的全局隔离发现结果 |
 | `POST /model-capabilities` | Either | Provider/model → thinking levels 和图片支持情况 |
-| `POST /library/search` | Either | `{query, source?, limit?}` → matching item views |
-| `GET /library/latest[?source=…&limit=…]` | Either | Latest batch and bounded item views |
-| `GET /library/:binding/items/:item/versions/:version` | Either | Exact Current version |
+| `GET /client-capabilities` | Either | Memory 与 Current Library 的 configured/ready/unavailable 状态 |
+| `POST /memory/search` | Either | `{query, cursor?, limit?}` → 有界 Distill 匹配结果、revision、preview 和可选 next cursor |
+| `POST /memory/read` | Either | `{id, expectedRevision, cursor?}` → 对应精确 revision 的有界 text page |
+| `POST /library/search` | Either | `{query, source?, limit?}` → saved item 或 discovery-candidate views |
+| `GET /library/latest[?source=…&limit=…]` | Either | Latest batch，包含 saved item 或 discovery candidate |
+| `GET /library/:binding/items/:item/versions/:version` | Either | 精确 Current item/version；discovery candidate 只有 metadata，不含 article text |
 | `GET /sessions/:id/library-references` | Either | Persisted exact-version references |
-| `POST /sessions/:id/library-references` | Either | `{binding,itemId,versionId}` → saved references |
+| `POST /sessions/:id/library-references` | Either | `{binding,itemId,versionId}` → saved references；Current 可确认 candidate identity |
 | `DELETE /sessions/:id/library-references/:binding/items/:item/versions/:version` | Either | Remove the exact reference |
 | `GET /sessions` | Either | Session list |
 | `POST /sessions` | Either | requestId、directory、可选的 provider+model → 201 ready session；创建失败/中断时返回 typed error |
@@ -154,4 +157,4 @@ Event hub 拥有排序和 replay；`createSseConnection` 拥有单个 HTTP respo
 
 传输与认证边界可读 [host.test.ts](../../../../tests/host.test.ts)、[auth.test.ts](../../../../tests/auth.test.ts) 和 [access.test.ts](../../../../tests/access.test.ts)；操作 route 可读 [sessions-http.test.ts](../../../../tests/sessions-http.test.ts)、[turns-http.test.ts](../../../../tests/turns-http.test.ts)、[history-http.test.ts](../../../../tests/history-http.test.ts) 和 [images-http.test.ts](../../../../tests/images-http.test.ts)；stream 测试见 [events-http.test.ts](../../../../tests/events-http.test.ts)；隔离发现见 [session-discovery.test.ts](../../../../tests/session-discovery.test.ts)。
 
-Library routes 使用同一 authentication 和 browser mutation checks。Latest 接受可选 `source` 与 `limit` query；exact reference routes 不接受 query。完整行为见 [library HTTP/browser](implementation/library.md#mechanisms)。
+Memory 与 Library routes 使用同一 authentication 和 browser mutation checks。Memory error 会将 invalid input/cursor 映射为 400、record missing 映射为 404、revision changed 映射为 409、reader unavailable 映射为 503。Library search/latest result 可能包含 `candidate: true` view，仅带 discovery metadata，不含已保存 article body；关联这一 exact identity 不会把内容加入 Pi context。Latest 接受可选 `source` 与 `limit` query；exact reference routes 不接受 query。完整行为见 [Memory](implementation/memory.md#mechanisms) 和 [library HTTP/browser](implementation/library.md#mechanisms)。

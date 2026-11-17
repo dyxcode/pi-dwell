@@ -33,19 +33,34 @@ export interface LibraryLatestRequest {
   limit?: number;
 }
 
-export interface LibraryItemView {
+interface LibraryItemBase {
   reference: LibraryReference;
   sourceId: string;
   title: string;
   url: string;
   author?: string;
   summary?: string;
-  text: string;
-  retrievedAt: string;
-  sourceCompleteness: LibraryCompleteness;
-  truncated: boolean;
   displayTruncated: boolean;
 }
+
+export type LibraryItemView = LibraryItemBase &
+  (
+    | {
+        candidate?: false;
+        text: string;
+        retrievedAt: string;
+        sourceCompleteness: LibraryCompleteness;
+        truncated: boolean;
+      }
+    | {
+        candidate: true;
+        discoveredAt: string;
+        text?: never;
+        retrievedAt?: never;
+        sourceCompleteness?: never;
+        truncated?: never;
+      }
+  );
 
 export interface LibraryItemsResponse {
   binding: string;
@@ -155,35 +170,39 @@ export function isLibraryItemView(
   value: unknown,
   maxTextCharacters = LIBRARY_READ_CHARACTERS,
 ): value is LibraryItemView {
+  if (!record(value)) return false;
+  const common = ["reference", "sourceId", "title", "url", "displayTruncated"];
+  const candidate = value.candidate === true;
   if (
-    !record(value) ||
     !keysWithOptional(
       value,
       [
-        "reference",
-        "sourceId",
-        "title",
-        "url",
-        "text",
-        "retrievedAt",
-        "sourceCompleteness",
-        "truncated",
-        "displayTruncated",
+        ...common,
+        ...(candidate
+          ? ["candidate", "discoveredAt"]
+          : ["text", "retrievedAt", "sourceCompleteness", "truncated"]),
       ],
-      ["author", "summary"],
+      ["author", "summary", ...(candidate ? [] : ["candidate"])],
     ) ||
     !isLibraryReference(value.reference) ||
     !source(value.sourceId) ||
     !text(value.title, 500, true) ||
     !text(value.url, 8_192) ||
+    typeof value.displayTruncated !== "boolean" ||
+    (value.author !== undefined && !text(value.author, 250, true)) ||
+    (value.summary !== undefined && !text(value.summary, 1_000, true))
+  )
+    return false;
+  if (candidate) {
+    if (!text(value.discoveredAt, 40) || !Number.isFinite(Date.parse(value.discoveredAt)))
+      return false;
+  } else if (
+    (value.candidate !== undefined && value.candidate !== false) ||
     !text(value.text, maxTextCharacters) ||
     !text(value.retrievedAt, 40) ||
     !Number.isFinite(Date.parse(value.retrievedAt)) ||
     (value.sourceCompleteness !== "unknown" && value.sourceCompleteness !== "known-partial") ||
-    typeof value.truncated !== "boolean" ||
-    typeof value.displayTruncated !== "boolean" ||
-    (value.author !== undefined && !text(value.author, 250, true)) ||
-    (value.summary !== undefined && !text(value.summary, 1_000, true))
+    typeof value.truncated !== "boolean"
   )
     return false;
 

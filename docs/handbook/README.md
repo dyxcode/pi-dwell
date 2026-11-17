@@ -31,6 +31,7 @@ Use Dwell, understand its behavior, and follow its implementation from browser c
 | Create, return to and name a conversation | [Session lifecycle](implementation/session-lifecycle.md), [shared names](implementation/session-names.md) |
 | Send, stop and reconnect | [Send a message](implementation/send-message.md), [stop work](implementation/stop-work.md), [reconnect](implementation/reconnect.md) |
 | Read content and manage history | [History and context](implementation/saved-history.md), [Library](implementation/library.md), [history cleanup](implementation/history-retirement.md) |
+| Search and read Distill Memory | [Memory](implementation/memory.md) |
 
 ## Reference
 
@@ -48,7 +49,7 @@ Use Dwell, understand its behavior, and follow its implementation from browser c
 
 ## Scope and maintenance
 
-The documentation covers current Dwell source and its user-facing capabilities. Node.js 22.19+ and Pi 1.4.0 are the implemented compatibility requirements. The browser conversation client and administrative CLI are available; Current Library and Distill storage coordination are optional integrations; an interactive Dwell TUI and scheduled tasks remain future work.
+The documentation covers current Dwell source and its user-facing capabilities. Node.js 22.19+ and Pi 1.4.0 are the implemented compatibility requirements. The browser conversation client and administrative CLI are available; Distill Memory and source coordination, and the Current Library, are optional integrations. An interactive Dwell TUI and scheduled tasks remain future work.
 
 Guide and Tutorials explain tasks; Reference defines exact interfaces; Implementation explains how each feature works. The source atlas connects declarations to their feature context.
 

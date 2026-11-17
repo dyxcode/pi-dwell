@@ -69,6 +69,12 @@ The sidebar lists session identities; the top status tabs show sessions
 Dwell currently considers open, including sessions that need attention.
 Statuses include Ready, Working, Needs attention, Stopped, and Opening.
 
+With Distill configured, the sidebar becomes Memory search and reading. The
+conversation list is replaced by icon-only session controls; the main view
+continues to show the selected conversation and composer, and **New** remains
+available. Without Distill, the sidebar remains the conversation list. See
+[Search and read Memory](#distill-memory).
+
 - Choose a sidebar item to select an already-open session.
 - Choose a closed session in the sidebar to explicitly reopen it.
 - A closed session keeps its saved history. Reloading the browser does not
@@ -103,6 +109,23 @@ The **Context** disclosure shows a bounded preview of project instruction
 sources that Pi saved as system context. It may say that content was shortened
 or omitted. It is not a complete view of the prompt sent to a model.
 
+<a id="distill-memory"></a>
+
+## Search and read Distill Memory
+
+When Dwell is explicitly connected to Distill, use **Memory** in the sidebar to
+search saved records and open a result for reading. Search results include a
+short preview; selecting one reads the corresponding record revision. Search
+pages can be empty and still have more results, so continue while the page
+offers that option. If the reader is temporarily unavailable, Memory stays in
+the sidebar and offers **Retry**. The conversation view and its controls remain
+available.
+
+Memory is separate from a conversation and from the Current Library. Reading a
+record does not add it to the Pi prompt or saved conversation. To browse
+collected external sources and attach exact-version references, continue to use
+the separate [Current Library](#current-library).
+
 ## Stay connected
 
 The browser reconnects its live event stream after a connection interruption
@@ -131,7 +154,9 @@ coverage, see [web client internals](web-client.md),
 [shared contracts](contracts.md), and the [handbook index](README.md).
 
 
-## Distill storage coordination
+<a id="distill-configuration"></a>
+
+## Configure Distill Memory and source coordination
 
 Build Distill's public Node API with `npm run build:package` in its checkout. In Dwell's data directory, create `integrations.json` with owner-only `0600` permissions:
 
@@ -145,7 +170,9 @@ Build Distill's public Node API with `npm run build:package` in its checkout. In
 }
 ```
 
-Point `database` at the Distill store that manages these Pi sessions, then restart Dwell. Dwell coordinates file reads and hosted Pi processes with that store's cleanup. Omitting the Distill entry disables source coordination; omitting the file selects standalone operation. Configuration and module-opening errors stop startup. See [the access lifecycle](implementation/history-retirement.md#behavior).
+Point `database` at the Distill store that manages these Pi sessions, then restart Dwell. This explicit host configuration enables source coordination and the Memory reader exposed by that Distill module; installing or registering the Pi extension alone does not configure Dwell. Dwell coordinates file reads and hosted Pi processes with the store's cleanup. Omitting the Distill entry disables both integrations; with no Distill entry, the existing Conversations sidebar remains.
+
+Source-access configuration or module-opening errors still stop startup. Memory reader initialization is optional: when that reader is absent or cannot open, Dwell starts with working source coordination and the sidebar shows Memory as unavailable with **Retry**. See [Memory](implementation/memory.md) and [the access lifecycle](implementation/history-retirement.md#behavior).
 
 <a id="current-library"></a>
 
@@ -167,7 +194,7 @@ Run `npm run build:library` in the Current checkout, then add a `current` object
 Replace both paths with the absolute paths on this host. Keep the same binding for the same canonical root; when Current opens, Dwell rejects a binding that points at a different root. The configuration file is read from Dwell's data directory and must satisfy its private-file permission checks. Omitting `current` leaves the session host available and library routes report `library_unavailable`.
 
 
-Open **Library** to browse latest items, search, and read an exact version. With a session selected, use **Attach to session** to save its reference. This leaves the Pi prompt unchanged. Saved references remain available for listing and removal while Current is unavailable.
+Open **Library** to browse latest items, search, and read an exact version. Candidate results show **Article text has not been saved.**, their discovery time, and a link to the original source. Saved items provide article text for reading. With a session selected, use **Attach to session** to save the exact item/version reference, including a confirmed candidate. This leaves the Pi prompt unchanged and does not fetch candidate text. Saved references remain available for listing and removal while Current is unavailable.
 
 `current` and `distill` may share one version 1 configuration. See [Library access](implementation/library.md) and [history cleanup](implementation/history-retirement.md).
 

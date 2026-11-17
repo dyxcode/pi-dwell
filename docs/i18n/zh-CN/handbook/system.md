@@ -39,10 +39,14 @@ flowchart LR
 | Request identity 与 turn outcome | Turn ledger | SQLite；retry 可以找到原 request |
 | 实际 model/tool execution | Pi child process | 直到完成、取消、失败或 host shutdown |
 | Conversation branch 与 saved content | Pi | Native JSONL |
+| Memory records、matching、cursor 与 revision | Distill | Distill 显式配置的本地 store 和 API |
+| Discovery candidate 与已保存 article content | Current | Current 配置的 library；Dwell 只保存 session reference |
 | Live deltas 与 reconnect replay | Session event hub | 有界内存；不是 transcript |
 | Composer text、image drafts、selected tab、disclosures | Browser | Browser state；draft attachments 不属于 saved transcript |
 
 Dwell 使用 RPC 保留 Pi 的 tools、model 行为和 session 格式。Agent loop 仍由 Pi 负责；Dwell 增加 process supervision、request admission、持久 outcome tracking、history projection 和 client coordination。
+
+可选的 Distill reader 和 source-access coordination 共用显式配置的本地 Distill module 与 store，但属于不同 capability：Memory reader 出错时，source coordination 和 Dwell Host 仍可用。Current Library 是另一项独立集成。Dwell 可以展示 discovery candidate 的 metadata 并保存 exact reference；article body 仍由 Current 持有，是否保存由 Current 决定。
 
 <a id="startup-claim-the-listener-before-touching-state"></a>
 

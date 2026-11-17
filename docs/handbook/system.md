@@ -35,10 +35,14 @@ flowchart LR
 | Request identity and turn outcome | Turn ledger | SQLite; a retry can find its existing request |
 | Actual model/tool execution | Pi child process | Until completion, cancellation, failure, or host shutdown |
 | Conversation branch and saved content | Pi | Native JSONL |
+| Memory records, matching, cursors and revisions | Distill | Distill's configured local store and API |
+| Discovered candidates and saved article content | Current | Current's configured library; Dwell stores session references only |
 | Live deltas and reconnect replay | Session event hub | Bounded memory; not the transcript |
 | Composer text, image drafts, selected tab, disclosures | Browser | Browser state; draft attachments are not a saved transcript |
 
 Dwell uses RPC to preserve Pi's tools, model behavior, and session format. Pi remains responsible for the agent loop; Dwell adds process supervision, request admission, persistent outcome tracking, history projection, and client coordination.
+
+The optional Distill reader and source-access coordination use the explicitly configured local Distill module and store. They are separate capabilities: a Memory reader failure can leave source coordination and the Dwell Host available. The Current Library is a separate integration. Dwell can show a discovery candidate's metadata and store an exact reference, while Current retains the article body and decides when it is saved.
 
 ## Startup: claim the listener before touching state
 

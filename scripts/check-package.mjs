@@ -19,6 +19,7 @@ const handbookFiles = [
   "docs/handbook/implementation/saved-history.md",
   "docs/handbook/implementation/compose-message.md",
   "docs/handbook/implementation/read-conversation.md",
+  "docs/handbook/implementation/memory.md",
   "docs/handbook/implementation/library.md",
   "docs/handbook/implementation/history-retirement.md",
   "docs/handbook/cli-service.md",

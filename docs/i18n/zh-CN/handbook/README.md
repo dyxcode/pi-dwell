@@ -42,6 +42,7 @@
 | 创建、继续和命名会话 | [会话生命周期](implementation/session-lifecycle.md)、[共享名称](implementation/session-names.md) |
 | 发送、停止与重连 | [发送消息](implementation/send-message.md)、[停止工作](implementation/stop-work.md)、[重连](implementation/reconnect.md) |
 | 阅读内容与管理历史 | [历史与上下文](implementation/saved-history.md)、[Library](implementation/library.md)、[历史清理](implementation/history-retirement.md) |
+| 搜索与阅读 Distill Memory | [Memory](implementation/memory.md) |
 
 <a id="reference"></a>
 
@@ -65,7 +66,7 @@
 
 ## 范围与维护
 
-这套文档覆盖 Dwell 当前源码及其面向用户的能力。已实现的兼容要求是 Node.js 22.19+ 和 Pi 1.4.0。Browser conversation client 与管理用 CLI 已可用；Current Library 和 Distill 存储协调可按需启用；交互式 Dwell TUI 和 scheduled task 仍属于后续工作。
+这套文档覆盖 Dwell 当前源码及其面向用户的能力。已实现的兼容要求是 Node.js 22.19+ 和 Pi 1.4.0。Browser conversation client 与管理用 CLI 已可用；Distill Memory 与 source coordination、Current Library 均可按需启用；交互式 Dwell TUI 和 scheduled task 仍属于后续工作。
 
 Guide 和 Tutorials 解释如何完成任务；Reference 定义准确接口；Implementation 解释每项功能如何工作。Source atlas 将源码声明连接到对应功能。
 

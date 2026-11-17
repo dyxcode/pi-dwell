@@ -8,6 +8,7 @@ const modules = {
   "/tool-command.js": new URL("./tool-command.ts", import.meta.url),
   "/icons.js": new URL("./icons.ts", import.meta.url),
   "/client.js": new URL("./client.ts", import.meta.url),
+  "/memory.js": new URL("./memory.ts", import.meta.url),
   "/events.js": new URL("./events.ts", import.meta.url),
   "/conversation.js": new URL("./conversation.ts", import.meta.url),
   "/markdown.js": new URL("./markdown.ts", import.meta.url),
@@ -22,6 +23,7 @@ const modules = {
   "/shared/history.js": new URL("../../shared/history.ts", import.meta.url),
   "/shared/events.js": new URL("../../shared/events.ts", import.meta.url),
   "/shared/library.js": new URL("../../shared/library.ts", import.meta.url),
+  "/shared/memory.js": new URL("../../shared/memory.ts", import.meta.url),
   "/shared/protocol.js": new URL("../../shared/protocol.ts", import.meta.url),
 };
 export const BROWSER_ASSETS = new Map<string, string>(

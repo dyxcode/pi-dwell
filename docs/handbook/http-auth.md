@@ -53,11 +53,14 @@ All API paths below are relative to `/api/v1`. **Either** means local bearer aut
 | `GET /directories[?path=…]` | Either | Canonical host directory, parent, child directories, truncation flag |
 | `GET /models` | Either | Global isolated discovery result wrapped in `models` |
 | `POST /model-capabilities` | Either | Provider/model → thinking levels and image support |
-| `POST /library/search` | Either | `{query, source?, limit?}` → matching item views |
-| `GET /library/latest[?source=…&limit=…]` | Either | Latest batch and bounded item views |
-| `GET /library/:binding/items/:item/versions/:version` | Either | Exact Current version |
+| `GET /client-capabilities` | Either | Memory and Current Library configured/ready/unavailable states |
+| `POST /memory/search` | Either | `{query, cursor?, limit?}` → bounded Distill matches, revisions, previews and optional next cursor |
+| `POST /memory/read` | Either | `{id, expectedRevision, cursor?}` → bounded text page for that exact revision |
+| `POST /library/search` | Either | `{query, source?, limit?}` → saved item or discovery-candidate views |
+| `GET /library/latest[?source=…&limit=…]` | Either | Latest batch of saved items or discovery candidates |
+| `GET /library/:binding/items/:item/versions/:version` | Either | Exact Current item/version; a discovery candidate has metadata without article text |
 | `GET /sessions/:id/library-references` | Either | Persisted exact-version references |
-| `POST /sessions/:id/library-references` | Either | `{binding,itemId,versionId}` → saved references |
+| `POST /sessions/:id/library-references` | Either | `{binding,itemId,versionId}` → saved references; Current may confirm a candidate identity |
 | `DELETE /sessions/:id/library-references/:binding/items/:item/versions/:version` | Either | Remove the exact reference |
 | `GET /sessions` | Either | Session list |
 | `POST /sessions` | Either | requestId, directory, optional provider+model → 201 ready session; failed/interrupted creation returns a typed error |
@@ -134,4 +137,4 @@ Public errors use `{error: {code, message}}`. AccessError and SessionError prese
 
 Read [host.test.ts](../../tests/host.test.ts), [auth.test.ts](../../tests/auth.test.ts), and [access.test.ts](../../tests/access.test.ts) for transport and authentication boundaries; [sessions-http.test.ts](../../tests/sessions-http.test.ts), [turns-http.test.ts](../../tests/turns-http.test.ts), [history-http.test.ts](../../tests/history-http.test.ts), and [images-http.test.ts](../../tests/images-http.test.ts) for operation routes; [events-http.test.ts](../../tests/events-http.test.ts) for streams; [session-discovery.test.ts](../../tests/session-discovery.test.ts) for isolated discovery.
 
-Library routes use the same authentication and browser mutation checks. Latest accepts optional `source` and `limit` query fields; exact reference routes accept no query. See [library HTTP/browser](implementation/library.md#mechanisms).
+Memory and Library routes use the same authentication and browser mutation checks. Memory errors map invalid input/cursor to 400, missing records to 404, changed revisions to 409, and unavailable readers to 503. Search/latest Library results can include a `candidate: true` view with discovery metadata and no saved article body; attaching that exact identity does not add content to Pi context. Latest accepts optional `source` and `limit` query fields; exact reference routes accept no query. See [Memory](implementation/memory.md#mechanisms) and [Library HTTP/browser](implementation/library.md#mechanisms).

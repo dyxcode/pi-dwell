@@ -18,6 +18,7 @@ Error codes are plain strings carried alongside an HTTP status or stream event. 
 | A request gets `429` such as `history_busy`, `subscriber_limit`, or `model_discovery_busy`. | A bounded read, event subscription, or discovery slot is occupied. | Honor `Retry-After` when present, or retry after the active operation ends. The current HTTP handler sets 300 seconds for `pairing_limit` and 60 seconds for other `429` responses. |
 | History returns `410 history_unavailable`. | Dwell expected saved Pi history for this session but could not read the recorded file. | Keep the session and its original Pi history intact. Check that the same session file is present and readable before reopening or retrying. Do not create a replacement session and treat it as the old conversation. |
 | History returns `409 history_changed` or `400 invalid_cursor`. | The saved file changed during a bounded read, a history cursor is no longer valid, or an event cursor is malformed or belongs to another session. Stale/ahead/old-epoch event cursors instead receive resync plus a snapshot. | Reload the latest history or reconnect the event stream so the client receives a fresh snapshot. A history-page cursor and an event cursor are different values. |
+| Memory returns `503 memory_unavailable` or `409 memory_changed`. | The configured Distill reader cannot currently serve Memory, or a record's revision changed after search. | Retry the Memory reader. For a revision conflict, refresh the search and open the current result. Conversation work and Distill source coordination remain separate. |
 | History returns `409 invalid_history` or `413 history_limit`. | The native JSONL branch/records could not be safely projected, or the saved history exceeds the reader's configured limits. | Preserve the native file and note the session ID. Use the source and tests below to diagnose its shape/size; do not edit or delete it as a first response. |
 | A turn is `interrupted` with `outcome_unknown`, or the UI says it could not confirm a send. | The host durably marked the turn `dispatching` but could not establish the final Pi outcome. The prompt may or may not have reached Pi. Dwell does not automatically replay it. | Inspect the existing turn and saved history first. Retry with the same `requestId` to retrieve the retained turn; use a new ID only if you deliberately intend a new execution after reconciling the old one. |
 | A turn is `failed` with `execution_rejected` or `provider_error`. | Pi explicitly rejected the prompt, or Pi settled the execution as failed. These are terminal turn outcomes, not HTTP error codes. | Read the turn's message and inspect saved history. A retry with the same `requestId` retrieves the same record; a deliberate new attempt needs a new request ID. |
@@ -48,7 +49,7 @@ These are literal codes currently emitted through the HTTP JSON error envelope, 
 | `duplicate_header` | 400 | A security-sensitive request header appeared more than once. |
 | `invalid_input` | 400 | A JSON body, identifier, model selection, or operation-specific value failed validation. |
 | `invalid_json` | 400 | The body is not valid JSON. |
-| `invalid_cursor` | 400 | A history cursor fails parsing/signature/boundary checks, or an event cursor is malformed or cross-session. A stale event cursor normally triggers resync rather than this error. |
+| `invalid_cursor` | 400 | A history or Memory cursor fails its boundary checks, or an event cursor is malformed or cross-session. A stale event cursor normally triggers resync rather than this error. |
 | `method_not_allowed` | 405 | The route exists but requires another HTTP method; the response includes `Allow`. |
 | `not_found` | 404 | The route or requested saved image does not exist. More specific session/turn lookups use their own codes. |
 | `unexpected_body` | 400 | A body was sent to a GET; nonempty objects on empty-object POST operations instead produce `invalid_input`. |
@@ -96,7 +97,7 @@ These errors are raised by `SessionService` or by its delegated history/discover
 | `history_unavailable` | 410 | The expected native history file cannot be read or is no longer available. |
 | `home_directory_unavailable` | 503 | Dwell cannot determine the host home directory required for discovery. |
 | `invalid_catalog` | 500 | A catalog record contains an invalid identity or path. |
-| `invalid_cursor` | 400 | History pagination or event subscription supplied an invalid cursor. |
+| `invalid_cursor` | 400 | History/Memory pagination or event subscription supplied an invalid cursor. |
 | `invalid_directory` | 400 | The selected project path is not an absolute existing directory. |
 | `invalid_history` | 409 | Saved JSONL/branch identity is invalid, inconsistent, or claimed by multiple files. |
 | `invalid_model` | 400 | A model-capabilities discovery request has an invalid provider/model pair. |
@@ -180,6 +181,8 @@ Pi RPC transport errors such as `Pi RPC connection closed`, `Pi RPC record excee
 | SSE replay, overload, and browser decoding | [server event HTTP](../../tests/events-http.test.ts), [session events](../../tests/session-events.test.ts), [event hub](../../tests/events.test.ts), [browser SSE](../../tests/web-events.test.ts) |
 | Pi RPC and runtime failure | [runtime failure](../../tests/runtime-failure.test.ts), [runtime](../../tests/runtime.test.ts) |
 | Durable turn results and restart recovery | [turns](../../tests/turns.test.ts), [turn catalog](../../tests/turn-catalog.test.ts), [turn recovery](../../tests/turn-recovery.test.ts) |
+| Distill Memory route validation, revision conflicts and pagination | [Memory HTTP](../../tests/memory-http.test.ts) |
+| Memory search/read presentation and recovery | [Memory Web](../../tests/memory-web.test.ts) |
 | Browser handling of host errors and retry states | [web client](../../tests/web-client.test.ts) |
 
 For a type inventory and endpoint schemas, use [shared contracts](contracts.md). For the detailed dispatch/recovery algorithm, read [sessions and storage](sessions-storage.md); for route and access checks, read [HTTP and authentication](http-auth.md).
@@ -193,3 +196,15 @@ For a type inventory and endpoint schemas, use [shared contracts](contracts.md).
 | `library_unavailable` | 503 | Current is unconfigured or unavailable. |
 | `library_not_found` | 404 | The exact item version is absent; its saved reference can still be removed. |
 | `library_binding_mismatch` | 409 | The reference belongs to another library, or the binding is associated with a different root. |
+
+<a id="memory-errors"></a>
+
+### Distill Memory
+
+| Code | HTTP | Meaning |
+| --- | --- | --- |
+| `memory_not_found` | 404 | The requested record is unavailable in Distill. |
+| `memory_changed` | 409 | The record revision differs from the revision selected from search results; search again before reading. |
+| `memory_unavailable` | 503 | The configured Distill Memory reader cannot currently serve the request. |
+
+Invalid Memory request shapes use `invalid_input`; invalid continuation cursors use `invalid_cursor`. A Memory reader can be unavailable while Dwell's Host and Distill source coordination remain usable.

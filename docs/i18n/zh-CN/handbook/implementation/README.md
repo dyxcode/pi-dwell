@@ -23,6 +23,7 @@
 | [重新连接正在进行的工作](reconnect.md) | 实时事件、快照、重放与已保存状态合并 |
 | [阅读已保存的历史与上下文](saved-history.md) | Pi 文件、分支、分页、图片与并发读取 |
 | [阅读与浏览对话](read-conversation.md) | Markdown、工具、thinking、导航与稳定渲染 |
+| [搜索与阅读 Memory](memory.md) | Distill 记录、有界搜索、revision-aware 阅读与 Host 集成 |
 | [阅读 Library 内容与关联引用](library.md) | Current 搜索、精确版本、绑定与离线引用 |
 | [协调历史清理](history-retirement.md) | Distill 读取租约、运行保留、历史清理与恢复 |
 

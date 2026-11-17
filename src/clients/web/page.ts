@@ -35,13 +35,35 @@ export const HOST_PAGE = `<!doctype html>
 <button class="new" id="new-session">New conversation <span>＋</span>
 </button>
 <div class="section-head">
-<span>CONVERSATIONS</span>
+<span id="sidebar-heading">CONVERSATIONS</span>
 <span id="session-count">00</span>
 </div>
 <nav id="session-list" class="session-names" aria-label="Session names">
 </nav>
+<section id="memory-view" aria-labelledby="memory-title" hidden>
+<div class="memory-heading"><h2 id="memory-title">Memory</h2></div>
+<p id="memory-capability-status" class="memory-caption" role="status" hidden></p>
+<form id="memory-search-form" class="memory-search">
+<label class="sr-only" for="memory-query">Search memory</label>
+<input id="memory-query" type="search" autocomplete="off" placeholder="Search memory…">
+<button id="memory-search" class="action" type="submit">Search</button>
+</form>
+<p class="memory-caption">Search saved memories.</p>
+<p id="memory-search-error" class="feedback" role="status"></p>
+<div id="memory-results" aria-live="polite"></div>
+<button id="memory-search-more" class="text-button memory-more" type="button" hidden>Continue search</button>
+<section id="memory-reader" aria-labelledby="memory-reader-title" hidden>
+<div class="memory-reader-heading"><h3 id="memory-reader-title" tabindex="-1"></h3><button id="memory-reader-close" class="icon" type="button" aria-label="Close memory">×</button></div>
+<p id="memory-read-error" class="feedback" role="status"></p>
+<pre id="memory-text"></pre>
+<button id="memory-read-more" class="text-button memory-more" type="button" hidden>Continue reading</button>
+</section>
+<button id="memory-retry" class="text-button memory-more" type="button" hidden>Retry Memory</button>
+</section>
 <div class="rail-foot">
 <button id="library-open" class="text-button library-launch" type="button" aria-haspopup="dialog">Browse library</button>
+<p id="client-capabilities-error" class="footnote" role="status" hidden></p>
+<button id="client-capabilities-retry" class="text-button" type="button" hidden>Retry integration status</button>
 <button id="connection-badge" class="text-button" type="button">Connecting…</button>
 </div>
 </aside>
@@ -959,5 +981,45 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  #library-dialog{width:100%;max-width:none;padding:12px 16px max(18px,env(safe-area-inset-bottom));box-shadow:0 -3px var(--lilac)}
  #library-dialog .handle{margin-bottom:12px}
  #library-text{max-height:34dvh}
+}
+
+/* Distill replaces the sidebar conversation list while the selected Pi session stays active. */
+#app.with-memory #session-list,#session-list[hidden]{display:none}
+#app.with-memory .section-head{display:none}
+#memory-view{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;gap:0;overflow-y:auto}
+#memory-view[hidden]{display:none}
+#memory-view .memory-heading{margin:0 8px 6px}
+#memory-view .memory-heading h2{margin:0;font:600 17px/1.5 var(--mono);letter-spacing:-.5px}
+#memory-view .memory-caption{margin:4px 8px 10px;font:10px/1.6 var(--sans);color:var(--muted)}
+#memory-search-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin:6px 0 4px}
+#memory-query{width:100%;min-width:0;height:36px;padding:7px;border:1px solid var(--line);border-radius:0;background:var(--surface);color:var(--ink);font:11px var(--sans)}
+#memory-search{min-height:36px;padding:6px 8px;font:10px var(--mono)}
+#memory-search:disabled,#memory-query:disabled,#memory-retry:disabled,#memory-search-more:disabled,#memory-read-more:disabled{opacity:.55;cursor:wait}
+#memory-search-error:empty,#memory-read-error:empty{display:none}
+#memory-search-error,#memory-read-error{margin:4px 0;padding:0 2px;font-size:10px}
+#memory-results{display:grid;gap:0;min-width:0}
+.memory-result{display:block;width:100%;min-width:0;padding:10px 4px;text-align:left;border:0;border-top:1px solid var(--line);background:none;box-shadow:none}
+.memory-result strong,.memory-result small,.memory-result span{display:block;overflow-wrap:anywhere}
+.memory-result strong{font:10px/1.5 var(--mono);color:var(--dark)}
+.memory-result small{margin-top:2px;font:9px/1.5 var(--mono);color:var(--muted)}
+.memory-result span{margin-top:5px;font:11px/1.6 var(--sans);color:var(--ink)}
+.memory-empty{margin:10px 4px;padding:8px 0;border-top:1px solid var(--line);font:10px/1.6 var(--sans);color:var(--muted)}
+.memory-more{min-height:34px;align-self:flex-start;margin:3px 0;padding:7px 4px;font:10px/1.5 var(--mono);color:var(--dark)}
+#memory-reader{margin-top:12px;padding:11px 0 0;border-top:1px solid var(--line)}
+#memory-reader[hidden]{display:none}
+.memory-reader-heading{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.memory-reader-heading h3{min-width:0;margin:0;font:600 11px/1.6 var(--mono);overflow-wrap:anywhere}
+#memory-reader-close{flex:0 0 28px;width:28px;height:28px;min-height:28px}
+#memory-reader-revision{margin:3px 0 7px;font-size:9px}
+#memory-text{margin:0;padding:8px;background:var(--paper);max-height:36dvh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.7 var(--sans)}
+#app.with-memory #status-list .status-tab{display:grid;grid-template-columns:1fr;column-gap:0;padding:0;width:40px;flex:0 0 40px}
+#app.with-memory #status-list .status-tab .tab-select{grid-column:1;display:flex;justify-content:center;padding:0}
+#app.with-memory #status-list .status-tab .tab-close{grid-column:1;justify-content:center;width:100%;padding:0}
+@media(max-width:760px){
+ #memory-view .memory-heading{margin:0 4px 6px}
+ #memory-search-form{gap:5px}
+ #memory-query{height:36px}
+ #app.with-memory #status-list{gap:6px}
+ #app.with-memory #status-list .status-tab{width:36px;flex-basis:36px;height:34px}
 }
 `;

@@ -35,12 +35,12 @@ test("library references accept the configured binding shape", () => {
   );
 });
 
-test("Current rejects a module that does not publish API v1", async () => {
+test("Current rejects a module that does not publish a supported library API", async () => {
   const root = await mkdtemp(join(tmpdir(), "dwell-current-invalid-module-"));
   const wrongVersion = join(root, "wrong-version.mjs");
   await writeFile(
     wrongVersion,
-    "export const contentLibraryApiVersion = 2; export function openContentLibrary() { return {}; }",
+    "export const contentLibraryApiVersion = 3; export function openContentLibrary() { return {}; }",
   );
   const incompleteApi = join(root, "incomplete-api.mjs");
   await writeFile(
@@ -117,7 +117,7 @@ test("Current reads exact saved versions and reports removed items", async (t) =
       versionId: original.versionId,
     });
     assert.equal(originalView.text, originalExcerpt);
-    assert.equal(originalView.text.length, 20_000);
+    assert.equal(originalView.text?.length, 20_000);
     assert.equal(originalView.displayTruncated, true);
     assert.equal(Object.hasOwn(originalView, "metadata"), false);
     assert.equal(isLibraryItemView(originalView), true);
@@ -151,7 +151,7 @@ test("Current reads exact saved versions and reports removed items", async (t) =
     const latest = await library.latest();
     assert.ok(isLibraryLatestResponse(latest));
     assert.equal(latest.items[0]?.reference.versionId, revised.items[0]?.versionId);
-    assert.equal(latest.items[0]?.text.length, 2_000);
+    assert.equal(latest.items[0]?.text?.length, 2_000);
     assert.equal(latest.items[0]?.text, updatedText.slice(0, 2_000));
     assert.equal(latest.items[0]?.displayTruncated, true);
     const matches = await library.search({ query: "updated" });
@@ -179,6 +179,41 @@ test("Current reads exact saved versions and reports removed items", async (t) =
     );
     assert.equal((await library.search({ query: "updated" })).items.length, 0);
 
+    if (current.contentLibraryApiVersion === 2) {
+      const candidateBatch = await seed.save({
+        batch: {
+          id: randomUUID(),
+          sourceId: "sample",
+          collectedAt: timestamp,
+          items: [
+            {
+              sourceId: "sample",
+              externalId: "candidate",
+              url: "https://example.com/candidate",
+              title: "Candidate observation",
+              discoveredAt: timestamp,
+              summary: "Discovered candidate summary",
+            },
+          ],
+          failures: [],
+          stopReason: "complete",
+        },
+        requestedCount: 1,
+        startedAt: timestamp,
+      });
+      const candidate = candidateBatch.items[0];
+      assert.ok(candidate);
+      const candidateView = await library.read({
+        binding: library.binding,
+        itemId: candidate.itemId,
+        versionId: candidate.versionId,
+      });
+      assert.equal(candidateView.candidate, true);
+      assert.equal(Object.hasOwn(candidateView, "text"), false);
+      assert.equal(isLibraryItemView(candidateView), true);
+      assert.equal((await library.search({ query: "Candidate" })).items[0]?.candidate, true);
+    }
+
     await library.close();
     await library.close();
     await assert.rejects(library.latest(), (error: unknown) =>
@@ -189,4 +224,39 @@ test("Current reads exact saved versions and reports removed items", async (t) =
     await seed.close();
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("Current API v2 preserves candidate discovery without inventing article content", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "dwell-current-candidate-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const module = join(root, "current.mjs");
+  const item = {
+    itemId: randomUUID(),
+    versionId: randomUUID(),
+    sourceId: "sample",
+    title: "A discovered article",
+    url: "https://example.com/candidate",
+    discoveredAt: "2026-11-17T00:00:00.000Z",
+    summary: "A feed summary",
+  };
+  await writeFile(
+    module,
+    `export const contentLibraryApiVersion=2;
+export function openContentLibrary(){return {apiVersion:2,
+search:async()=>[${JSON.stringify(item)}],latest:async()=>({collectedAt:${JSON.stringify(item.discoveredAt)},items:[${JSON.stringify(item)}]}),
+read:async()=>(${JSON.stringify(item)}),close:async()=>{}}}`,
+  );
+  const library = await CurrentLibrary.open({ module, root: join(root, "data"), binding: "main" });
+  assert.ok(library);
+  t.after(() => library.close());
+  const search = await library.search({ query: "discovered" });
+  assert.equal(isLibraryItemsResponse(search), true);
+  const result = search.items[0];
+  assert.ok(result);
+  assert.equal("candidate" in result && result.candidate, true);
+  for (const field of ["text", "retrievedAt", "sourceCompleteness", "truncated"])
+    assert.equal(Object.hasOwn(result, field), false);
+  assert.equal(isLibraryLatestResponse(await library.latest()), true);
+  assert.deepEqual(await library.read(result.reference), result);
+  assert.equal(isLibraryItemView({ ...result, text: "fabricated" }), false);
 });

@@ -1022,4 +1022,71 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  #app.with-memory #status-list{gap:6px}
  #app.with-memory #status-list .status-tab{width:36px;flex-basis:36px;height:34px}
 }
+
+#memory-view :is(input,button):focus-visible{outline-offset:-2px}
+
+@media(min-width:761px){
+ :root{--type-reading:17px;--type-ui:15px;--type-meta:13px}
+ body{font-size:var(--type-reading)}
+ #rail{width:clamp(260px,24vw,340px);padding:26px 20px 20px}
+ .section-head,.section-head small,.name-index,.sidebar-slot,.sidebar-state,.selected-directory,#connection-badge,.footnote,.eyebrow,.date,.byline{font-size:var(--type-meta)}
+ .section-head{letter-spacing:.5px}
+ .name-row{min-height:50px}
+ .name-row .session-title,.text-button,.library-launch,.action,.new{font-size:var(--type-ui);line-height:1.5}
+ #status-list .tab-select{font-size:14px}
+ #conversation .user .message-body,#conversation .assistant .message-body{font-size:var(--type-reading);line-height:1.75}
+ #conversation .message+.message{margin-top:22px}
+ #conversation .user+.assistant{margin-top:16px}
+ #conversation .markdown p{margin-bottom:12px}
+ .markdown h1{font-size:28px}.markdown h2{font-size:24px}.markdown h3{font-size:20px}
+ .markdown h4,.markdown h5,.markdown h6{font-size:18px}
+ .markdown code,.code-block pre code{font-size:14px}
+ .code-block figcaption,.session-details>summary,.session-details-caption,.context-source>summary{font-size:var(--type-meta)}
+ .markdown table,.context-content{font-size:var(--type-ui)}
+ .context-content.markdown h1,.context-content.markdown h2{font-size:var(--type-reading)}
+ #conversation .thinking-run>summary,#conversation .tool-run>summary,#conversation .tool-run .tool-output,#conversation .tool-run .tool-command-full{font-size:14px}
+ #conversation .thinking-content,#conversation .thinking-content :is(h1,h2,h3){font-size:var(--type-ui)}
+ #conversation .tool-run :is(.tool-status,.tool-caption,.tool-command-lines),.history-recovery{font-size:var(--type-meta)}
+ #composer #message,#composer.expanded #message{font-size:var(--type-reading);line-height:28px;min-height:32px}
+ #message::placeholder{font-size:var(--type-ui)}
+ .text-editor{padding:9px 12px}
+ .composer-context{gap:12px;margin-bottom:6px}
+ #composer-directory,#choose-model,#thinking-label{font-size:var(--type-meta);line-height:20px}
+ #choose-model{min-height:36px}
+ #composer #attach-image,#composer #send,.image-chip-preview{font-size:14px;height:38px;min-height:38px}
+ .icon-label .control-label,#composer #send .control-label{line-height:20px}
+ #attachment-notice,.feedback,.panel-copy,#session-name-dialog .panel-copy{font-size:var(--type-ui)}
+ dialog{width:min(520px,calc(100vw - 40px));padding:24px}
+ #new-dialog,#session-name-dialog{width:min(480px,calc(100vw - 40px));padding:22px}
+ #model-dialog{width:min(460px,calc(100vw - 40px));padding:22px}
+ #library-dialog{width:min(760px,calc(100vw - 40px));padding:24px}
+ #close-session-dialog{width:min(420px,calc(100vw - 40px))}
+ #new-dialog h2,#session-name-dialog h2,#model-dialog h2,#library-dialog h2,#close-session-title{font-size:22px}
+ #image-dialog h2{font-size:var(--type-ui)}
+ .form label,.gate label,#new-dialog label,#session-name-dialog label,#close-session-number{font-size:var(--type-meta);line-height:1.5}
+ .form input,.form select,.gate input,#new-dialog #directory,#session-name-dialog #session-name-input,#model-dialog #model-search,.library-search input{font-size:var(--type-ui);height:44px}
+ #new-dialog #browse,#new-dialog .directory-row,#new-dialog #create-button,.directory-choice{font-size:var(--type-ui);min-height:44px}
+ #model-dialog .model-option{min-height:56px;padding:10px}
+ #model-dialog .model-option strong,#thinking-model{font-size:var(--type-ui)}
+ #model-dialog .model-option small,#model-dialog .back-models{font-size:var(--type-meta)}
+ .close-actions button,.session-name-actions .close-actions button,.session-name-actions .text-button{font-size:14px;min-height:40px}
+ #close-session-copy{font-size:var(--type-reading)}
+ .gate-card{max-width:520px}.gate p,.empty p{font-size:var(--type-reading)}.gate code{font-size:14px}
+ .library-search .action,#library-reference-action{font-size:var(--type-ui);min-height:44px}
+ .library-section h3,.library-reader h3,.library-result small,.library-reference-row small,.library-reference-row>button:first-child,.library-reference-row .library-remove,#library-source-link{font-size:var(--type-meta)}
+ .library-result strong,.library-result span,.library-summary{font-size:var(--type-ui)}
+ .library-reader h3{font-size:var(--type-reading)}
+ #library-text{font-size:var(--type-reading);line-height:1.75;padding:16px}
+ #memory-view .memory-heading h2{font-size:22px;letter-spacing:-.3px}
+ #memory-view .memory-caption,.memory-empty,.memory-result small,#memory-search-error,#memory-read-error{font-size:var(--type-meta)}
+ #memory-search-form{gap:8px;margin:10px 0 6px}
+ #memory-query{font-size:var(--type-ui);height:44px;padding:9px}
+ #memory-search{font-size:14px;min-height:44px;padding:8px 10px}
+ .memory-result{padding:14px 4px}
+ .memory-result strong,.memory-result span,.memory-reader-heading h3{font-size:var(--type-ui);line-height:1.65}
+ .memory-reader-heading h3{font-size:var(--type-reading)}
+ .memory-more{font-size:14px;min-height:40px}
+ #memory-reader-close{width:32px;height:32px;min-height:32px;flex-basis:32px}
+ #memory-text{font-size:var(--type-reading);line-height:1.75;padding:10px}
+}
 `;

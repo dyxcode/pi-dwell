@@ -237,13 +237,13 @@ async function assertComposerLayout(page: BrowserPage, viewport: string): Promis
   assert.equal(await page.evaluate("innerWidth > 760"), viewport === "desktop");
   assert.equal(
     await page.evaluate('getComputedStyle(document.querySelector("#message")).fontSize'),
-    "15px",
+    viewport === "desktop" ? "17px" : "15px",
   );
   assert.equal(
     await page.evaluate(
       'getComputedStyle(document.querySelector("#message"),"::placeholder").fontSize',
     ),
-    "13px",
+    viewport === "desktop" ? "15px" : "13px",
   );
   assert.equal(
     await page.evaluate('getComputedStyle(document.querySelector(".tab-symbol")).width'),
@@ -399,10 +399,10 @@ async function assertDesktopSidebarWidth(page: BrowserPage): Promise<void> {
       })()`),
     );
     assert.equal(width.viewportWidth, viewportWidth);
-    const expected = Math.min(280, viewportWidth * 0.25);
+    const expected = Math.max(260, Math.min(340, viewportWidth * 0.24));
     assert.ok(
       Math.abs(Number(width.width) - expected) < 0.5,
-      `the desktop sidebar follows min(280px, 25vw): ${JSON.stringify(width)}`,
+      `the desktop sidebar gives larger text bounded space: ${JSON.stringify(width)}`,
     );
   };
 
@@ -449,7 +449,7 @@ async function assertNewSessionHeading(page: BrowserPage, viewport: string): Pro
   );
   assert.equal(presentation.tag, "H2", `${viewport} new-session title remains a heading`);
   assert.equal(presentation.text, "New session", `${viewport} new-session title is concise`);
-  assert.equal(presentation.fontSize, "18px", `${viewport} new-session title uses 18px type`);
+  assert.equal(presentation.fontSize, viewport === "desktop" ? "22px" : "18px");
   assert.equal(presentation.buttonText, "Start session");
   assert.equal(presentation.iconSize, "12px");
   const label = record(presentation.label);
@@ -510,7 +510,7 @@ async function assertActionIconGeometry(page: BrowserPage, viewport: string): Pr
     const button = record(control.button);
     const icon = record(control.icon);
     assert.equal(control.text, text, `${viewport} ${name} action keeps its short label`);
-    assert.equal(control.fontSize, "11px", `${viewport} ${name} action label stays 11px`);
+    assert.equal(control.fontSize, viewport === "desktop" ? "14px" : "11px");
     assert.equal(control.iconDisplay, "block");
     assert.equal(icon.width, 12);
     assert.equal(icon.height, 12);
@@ -953,8 +953,8 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.ok(String(bodies[2]).includes("Reasoning without a heading."));
     assert.ok(String(bodies[3]).includes("L".repeat(73)));
     assert.ok(String(bodies[3]).includes("Long heading body stays intact."));
-    assert.equal(presentation.thinkingTitleSize, "12px");
-    assert.equal(presentation.thinkingBodySize, "13px");
+    assert.equal(presentation.thinkingTitleSize, viewport === "desktop" ? "14px" : "12px");
+    assert.equal(presentation.thinkingBodySize, viewport === "desktop" ? "15px" : "13px");
     assert.equal(presentation.successOpen, false);
     assert.equal(presentation.errorOpen, true);
     assert.equal(presentation.successStatus, "");
@@ -964,10 +964,10 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.notEqual(presentation.successStatusColor, presentation.errorStatusColor);
     assert.equal(presentation.toolBackground, "rgba(0, 0, 0, 0)");
     assert.equal(presentation.toolErrorBackground, "rgba(0, 0, 0, 0)");
-    assert.equal(presentation.toolTitleSize, "12px");
-    assert.equal(presentation.toolOutputSize, "12px");
+    assert.equal(presentation.toolTitleSize, viewport === "desktop" ? "14px" : "12px");
+    assert.equal(presentation.toolOutputSize, viewport === "desktop" ? "14px" : "12px");
     assert.equal(presentation.markdownCodeBackground, "rgb(235, 230, 219)");
-    assert.equal(presentation.markdownCodeSize, "12px");
+    assert.equal(presentation.markdownCodeSize, viewport === "desktop" ? "14px" : "12px");
     assert.equal(presentation.markdownCodeText, "const answer = 42;");
 
     const commands = record(
@@ -1081,9 +1081,9 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.equal(rhythm.messageCount, 4);
     assert.equal(rhythm.paragraphCount, 2);
     for (const [key, label, expected] of [
-      ["userToAssistant", "user reply gap", 10],
-      ["assistantToUser", "between-turn gap", 16],
-      ["paragraphGap", "paragraph gap", 8],
+      ["userToAssistant", "user reply gap", viewport === "desktop" ? 16 : 10],
+      ["assistantToUser", "between-turn gap", viewport === "desktop" ? 22 : 16],
+      ["paragraphGap", "paragraph gap", viewport === "desktop" ? 12 : 8],
       ["thinkingGap", "thinking detail gap", 4],
       ["toolGap", "tool detail gap", 6],
     ] as const) {
@@ -2049,7 +2049,7 @@ async function writeMemoryBrowserConfiguration(
 async function assertMemoryBrowserMode(page: BrowserPage, mode: MemoryBrowserMode): Promise<void> {
   const fixture = MEMORY_CAPABILITY_FIXTURES[mode];
   await page.until(
-    `document.querySelector("#app").classList.contains("with-memory")===${JSON.stringify(fixture.memory.configured)} && document.querySelector("#memory-view").hidden===${JSON.stringify(!fixture.memory.configured)} && document.querySelector("#session-list").hidden===${JSON.stringify(fixture.memory.configured)}`,
+    `document.querySelector("#app").classList.contains("with-memory")===${JSON.stringify(fixture.memory.configured)} && document.querySelector("#memory-view").hidden===${JSON.stringify(!fixture.memory.configured)} && document.querySelector("#session-list").hidden===${JSON.stringify(fixture.memory.configured)} && !document.querySelector("#message").disabled`,
   );
   const view = record(
     await page.evaluate(`(()=>{
@@ -2105,6 +2105,21 @@ async function assertBrowserControlReachable(
     true,
     `${context} ${selector} receives pointer hits: ${String(result.hit)}`,
   );
+}
+
+async function assertMemoryFocusOutline(page: BrowserPage): Promise<void> {
+  const visible = await page.evaluate(`(()=>{
+    const input=document.querySelector("#memory-query");
+    input.focus();
+    const bounds=input.getBoundingClientRect();
+    const clip=document.querySelector("#memory-view").getBoundingClientRect();
+    const style=getComputedStyle(input);
+    const outside=Math.max(0,parseFloat(style.outlineWidth)+parseFloat(style.outlineOffset));
+    return input.matches(":focus-visible") && parseFloat(style.outlineWidth)>=2 &&
+      bounds.left-outside>=clip.left && bounds.right+outside<=clip.right &&
+      bounds.top-outside>=clip.top && bounds.bottom+outside<=clip.bottom;
+  })()`);
+  assert.equal(visible, true, "Memory search keeps its entire keyboard focus outline visible");
 }
 
 async function runMemoryBrowserAcceptance(
@@ -2365,6 +2380,7 @@ async function runMemoryBrowserAcceptance(
     );
     console.log("PASS HTTP Chrome Memory tab close control restores selection focus on Escape");
     await assertBrowserControlReachable(page, "#memory-query", "desktop Memory");
+    await assertMemoryFocusOutline(page);
     await assertBrowserControlReachable(page, "#memory-search", "desktop Memory");
     await page.type("#memory-query", "BrowserMemoryToken");
     await page.click("#memory-search");
@@ -2398,6 +2414,7 @@ async function runMemoryBrowserAcceptance(
       'document.querySelector("#rail").classList.contains("open") && document.activeElement.id==="close-nav"',
     );
     await assertBrowserControlReachable(page, "#memory-query", "mobile Memory drawer");
+    await assertMemoryFocusOutline(page);
     await assertBrowserControlReachable(page, "#memory-search", "mobile Memory drawer");
     await assertBrowserControlReachable(
       page,

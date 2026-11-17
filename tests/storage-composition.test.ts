@@ -22,7 +22,7 @@ interface CurrentWriter {
 }
 
 interface CurrentModule {
-  contentLibraryApiVersion: 1;
+  contentLibraryApiVersion: 1 | 2;
   openContentLibrary(options: { root: string }): unknown;
 }
 
@@ -322,7 +322,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isCurrentModule(value: unknown): value is CurrentModule {
   return (
     isRecord(value) &&
-    value.contentLibraryApiVersion === 1 &&
+    (value.contentLibraryApiVersion === 1 || value.contentLibraryApiVersion === 2) &&
     typeof value.openContentLibrary === "function"
   );
 }
@@ -333,7 +333,7 @@ function isCurrentWriter(value: unknown): value is CurrentWriter {
 
 function openCurrentWriter(moduleValue: unknown, root: string): CurrentWriter {
   if (!isCurrentModule(moduleValue))
-    throw new Error("Current module does not expose content library API v1.");
+    throw new Error("Current module does not expose a supported content library API.");
   const writer = moduleValue.openContentLibrary({ root });
   if (!isCurrentWriter(writer))
     throw new Error("Current library does not expose save and close operations.");

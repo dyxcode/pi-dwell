@@ -2,57 +2,32 @@
 
 [English](../../../../handbook/implementation/README.md) | 简体中文
 
-[Implementation](README.md) · [Handbook](../README.md)
+[文档目录](../README.md)
 
-<a id="start"></a>
+<a id="features"></a>
 
-## 理解 implementation
+## 按功能理解实现
 
-先读 [运行中的系统](overview.md)，再追踪一个完整 workflow，随后深入负责相关步骤的模块。正文用文字解释当前 implementation 的 input、decisions、state changes、outcomes、failure paths 和 cleanup。Source citations 直接打开相关 declarations。
+每章沿一个功能解释用户操作、模块职责、数据归属、执行流程、内部机制、技术取舍和关键验证场景。可以从当前关心的功能直接开始阅读。
 
-准确 public interfaces 见 [Reference](../reference.md)，fields/limits 见 [contracts](../contracts.md)。查找某个 file/function 的文字解释，使用 [coverage](coverage.md) 和 [source atlas](../source-map.md)。
-
-<a id="workflows"></a>
-
-## 追踪完整 workflow
-
-| 阅读 | 追踪 state changes |
+| 功能 | 内容 |
 | --- | --- |
-| [Startup 与 session lifetime](workflow-lifecycle.md) | CLI → listener → pairing → session creation → model/images → close/reopen → shutdown |
-| [一条 message](workflow-message.md) | Browser request → admission → durable intent → RPC → settlement → saved result，以及各 interruption points |
-| [Observation 与 reconnect](workflow-observation.md) | Subscription → live projection → saved branch → reconciliation → reconnect/resync |
+| [运行与管理 Host](host-service.md) | 后台服务、私有存储、配置与关闭 |
+| [连接浏览器](pairing.md) | 配对、凭据、来源校验与撤销访问 |
+| [创建与继续会话](session-lifecycle.md) | 会话身份、Pi 进程、项目资源与重启恢复 |
+| [修改会话名称](session-names.md) | 共享名称、版本、并发编辑与迟到响应 |
+| [选择目录、模型与 thinking level](models.md) | 发现、能力检查、选择与配置保存 |
+| [编写消息与添加图片](compose-message.md) | 草稿、附件、键盘输入与移动布局 |
+| [发送消息与跟踪执行](send-message.md) | 接收、重试、持久化调度与结果 |
+| [停止工作与关闭会话](stop-work.md) | 取消、原生执行、关闭与中断结果 |
+| [重新连接正在进行的工作](reconnect.md) | 实时事件、快照、重放与已保存状态合并 |
+| [阅读已保存的历史与上下文](saved-history.md) | Pi 文件、分支、分页、图片与并发读取 |
+| [阅读与浏览对话](read-conversation.md) | Markdown、工具、thinking、导航与稳定渲染 |
+| [阅读 Library 内容与关联引用](library.md) | Current 搜索、精确版本、绑定与离线引用 |
+| [协调历史清理](history-retirement.md) | Distill 读取租约、运行保留、历史清理与恢复 |
 
-第一次阅读时，先完整走完 message workflow，再进入单个模块章节。Overview 区分 Pi 及其 session files，与 Dwell 的进程管理、请求记录和 browser client。
+<a id="reference"></a>
 
-<a id="modules"></a>
+## 相关参考
 
-## 深入职责与 functions
-
-| 章节 | 职责 |
-| --- | --- |
-| [CLI 与 local files](cli.md) | 命令解析、本地 HTTP administration、paths 与 permissions |
-| [Operating-system services](services.md) | Registration ownership、readiness、boot 与 stop behavior |
-| [HTTP 与 SSE transport](http.md) | Admission、route dispatch、有界 bodies、streaming 与 shutdown |
-| [Authentication 与 authority](authentication.md) | Pairing、credential state、browser binding 与 HTTPS authority |
-| [Directory 与 model discovery](discovery.md) | Directory listing、isolated probes 与 capability extraction |
-| [Shared data 与 validation](validators.md) | Field checks、identities、image decoding 与 event/history contracts |
-| [Catalog 与 durable records](catalog.md) | Schema validation、migrations、transactions 与 turn transitions |
-| [Session coordination](sessions.md) | Pi process 管理、请求接受、dispatch、cancellation 与 recovery |
-| [Local storage integrations](storage-integrations.md) | Optional module configuration、source read lease 与 Pi process reservation |
-| [Pi process 与 execution](runtime.md) | Launch、readiness、prompt disposition、native execution 与 stop |
-| [JSONL RPC transport](rpc.md) | Correlation、buffering、deadlines 与 transport failure |
-| [读取 Pi session files](history.md) | Branch reading、scan budgets、identity、cursors 与 images |
-| [Session events](events.md) | Visible messages/tools、replay、limits 与 subscriptions |
-| [Browser coordination](browser-controller.md) | Session views、async generations、pending requests 与 model selection |
-| [Browser event state](browser-events.md) | SSE decoding、reducer state 与 live/saved reconciliation |
-| [Rendering 与 assets](browser-rendering.md) | Markdown、DOM reuse、conversation grouping、HTML/CSS 与 asset serving |
-| [Composer 与 attachments](browser-input.md) | Keyboard/viewport behavior、draft ownership 与 image previews |
-| [Build 与 verification machinery](tooling.md) | Package contents、documentation checks、Pi 与 Chrome acceptance |
-
-<a id="citations"></a>
-
-## 如何使用 source 与 verification citations
-
-Relative links 打开同一 checkout 或 repository view 中的 source。`#L…` anchor 标识核对过的 declaration 或 behavior；GitHub 支持跳行，部分 local Markdown viewers 只打开文件。Symbol 名称仍可见，viewer 忽略行号时也能搜索。Helper group 附近的 citation 可能指向该 group 的起点；source atlas 提供每个 declaration 的独立行号和 explanation section。
-
-Verification links 指向相关 tests 与 [test atlas](../test-map.md)。Code 改变时同步更新 prose、source positions 和两种语言；需要运行的 checks 见 [coverage 与维护](coverage.md#verification)。
+[技术参考](../reference.md)提供准确接口与配置，[源码索引](../source-map.md)用于定位实现，[开发说明](../development.md)介绍构建和验证。

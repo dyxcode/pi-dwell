@@ -2,7 +2,7 @@
 
 English | [简体中文](../i18n/zh-CN/handbook/web-client.md)
 
-Detailed prose walkthrough: [Implementation](implementation/browser-controller.md).
+Detailed prose walkthrough: [Implementation](implementation/read-conversation.md#behavior).
 
 The web client is the browser-facing conversation surface for a host-owned Pi
 session. Use the [handbook index](README.md)
@@ -380,4 +380,4 @@ command input, so it is not a general Pi terminal or command surface.
 
 ## Shared session names
 
-Use the selected session’s name action to rename it across browsers. Reset restores its directory label. If this browser contains an older local name, the editor offers an explicit import action. A concurrent edit loads the latest shared name for review. See the [editor workflow](implementation/browser-controller.md#browser-shared-session-names).
+Use the selected session’s name action to rename it across browsers. Reset restores its directory label. If this browser contains an older local name, the editor offers an explicit import action. A concurrent edit loads the latest shared name for review. See the [editor workflow](implementation/session-names.md#mechanisms).

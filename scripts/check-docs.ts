@@ -153,6 +153,7 @@ for (const path of documents) {
 
 const sourceFiles = files(join(root, "src")).filter((path) => path.endsWith(".ts"));
 const declarations = sourceFiles.flatMap(callables);
+const featureContexts = new Map<string, string>();
 for (const edition of ["docs/handbook", "docs/i18n/zh-CN/handbook"]) {
   const atlasPath = join(root, edition, "source-map.md");
   const atlas = read(atlasPath);
@@ -186,6 +187,9 @@ for (const edition of ["docs/handbook", "docs/i18n/zh-CN/handbook"]) {
     const key = `${item.source}:${item.symbol}`;
     const entry = mapped.get(key);
     assert.ok(entry, `Missing callable explanation: ${key}`);
+    const firstContext = featureContexts.get(key);
+    if (firstContext === undefined) featureContexts.set(key, entry.explanation);
+    else assert.equal(entry.explanation, firstContext, `Locale feature mappings differ: ${key}`);
     assert.equal(entry.line, item.line, `Stale callable source line: ${key}`);
     checkLink(atlasPath, entry.explanation);
     const [page = "", anchor = ""] = entry.explanation.split("#");
@@ -195,14 +199,20 @@ for (const edition of ["docs/handbook", "docs/i18n/zh-CN/handbook"]) {
     const start = explanation.indexOf(marker);
     assert.ok(start >= 0, `Callable explanation needs an explicit anchor: ${key}`);
     const end = explanation.indexOf("<a id=", start + marker.length);
-    const section = explanation.slice(start, end < 0 ? undefined : end);
-    const parts = item.symbol.split(".");
-    const name = parts.at(-1) === "constructor" ? parts.at(-2) : parts.at(-1);
-    assert.ok(name && section.includes(name), `Explanation section does not name callable: ${key}`);
+    const section = explanation.slice(start + marker.length, end < 0 ? undefined : end);
+    assert.ok(
+      Lexer.lex(section).some(
+        (token) =>
+          (token.type === "paragraph" && token.text.trim().length > 0) ||
+          (token.type === "table" && token.rows.length > 0) ||
+          (token.type === "list" && token.items.length > 0),
+      ),
+      `Feature section needs explanatory content: ${key}`,
+    );
     mapped.delete(key);
   }
   assert.equal(mapped.size, 0, `Stale callable entries: ${[...mapped.keys()].join(", ")}`);
 }
 console.log(
-  `Documentation checked: ${documents.length} pages, ${linkCount} local links, ${sourceFiles.length} source files, ${declarations.length} callable explanations in both locales.`,
+  `Documentation checked: ${documents.length} pages, ${linkCount} local links, ${sourceFiles.length} source files, ${declarations.length} callable feature mappings in both locales.`,
 );

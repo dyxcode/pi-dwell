@@ -2,7 +2,7 @@
 
 English | [简体中文](../i18n/zh-CN/handbook/cli-service.md)
 
-Detailed prose walkthrough: [Implementation](implementation/cli.md).
+Detailed prose walkthrough: [Implementation](implementation/host-service.md#behavior).
 
 [Documentation index](README.md) · [Command reference](reference.md)
 

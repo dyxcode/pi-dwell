@@ -4,7 +4,7 @@
 
 [English](../../../handbook/sessions-storage.md) | 简体中文
 
-详细文字解释：[Implementation](implementation/sessions.md).
+详细文字解释：[Implementation](implementation/session-lifecycle.md#behavior).
 
 [手册索引](README.md) · [Pi runtime 边界](runtime.md)
 
@@ -43,7 +43,7 @@ flowchart TD
 
 [`SessionCatalog`](../../../../src/storage/catalog.ts) 负责 Dwell 的 SQLite 文件，并验证其 schema 和每条解码后的 record。当前 schema 版本为 8。所有 statements 都使用 Node 的同步 `DatabaseSync`；写入数据时，SQL values 使用 parameterization。
 
-Schema v6 增加 shared display name 与 metadata revision；[name updates](implementation/catalog.md#catalog-session-names) 会原子地比较 revision。Schema v5 新增 nullable `history_check_state` 与 `history_checked_at`；旧 session 的 observation 初始为空，由下一次文件读取更新。详见 [catalog migration](implementation/catalog.md#catalog-schema-and-migrations)。
+Schema v6 增加 shared display name 与 metadata revision；[name updates](implementation/session-names.md#mechanisms) 会原子地比较 revision。Schema v5 新增 nullable `history_check_state` 与 `history_checked_at`；旧 session 的 observation 初始为空，由下一次文件读取更新。详见 [catalog migration](implementation/session-lifecycle.md#mechanisms)。
 
 <a id="tables-and-invariants"></a>
 
@@ -377,4 +377,4 @@ Shutdown 时，service 会关闭 admission，持久化 cancellation，并先 abo
 | Sessions、turns、saved history 和 event streams 的 HTTP adapters：authentication、request bounds、client disconnects 和 socket behavior | [`tests/sessions-http.test.ts`](../../../../tests/sessions-http.test.ts)、[`tests/turns-http.test.ts`](../../../../tests/turns-http.test.ts)、[`tests/history-http.test.ts`](../../../../tests/history-http.test.ts) 与 [`tests/events-http.test.ts`](../../../../tests/events-http.test.ts) |
 | Runtime RPC/process 与 native JSONL edge cases | [Runtime 测试图](runtime.md#runtime-test-map) |
 
-Current bindings 与 exact-version references 使用独立 table；详见 [library reference storage](implementation/storage-integrations.md#library-reference-storage)。
+Current bindings 与 exact-version references 使用独立 table；详见 [library reference storage](implementation/library.md#mechanisms)。

@@ -24,17 +24,13 @@ Use Dwell, understand its behavior, and follow its implementation from browser c
 
 ## Implementation
 
-[Read the implementation handbook](implementation/README.md) to understand the running system, follow complete workflows, and explore module/function behavior in prose. Source and test citations link each explanation to its implementation and checks.
+[Read by feature](implementation/README.md). Each chapter independently explains responsibilities, data ownership, the complete flow, internal mechanisms, technology trade-offs and verification scenarios.
 
-| Reading route | Start here |
+| Feature to understand | Start here |
 | --- | --- |
-| Understand the system | [Processes, ownership and state](implementation/overview.md) |
-| Follow a workflow | [One message](implementation/workflow-message.md), [startup/session lifetime](implementation/workflow-lifecycle.md), [observation/reconnect](implementation/workflow-observation.md) |
-| Explore a module | [Responsibility-based module chapters](implementation/README.md#modules) |
-| Find a function | [Source and explanation atlas](source-map.md) |
-| Check coverage | [43 production files and callable coverage](implementation/coverage.md) |
-
-The [system overview](system.md), [CLI/service](cli-service.md), [HTTP/authentication](http-auth.md), [sessions/storage](sessions-storage.md), [runtime](runtime.md), and [browser](web-client.md) chapters provide compact orientation and reference. The implementation handbook explains each workflow and module in detail.
+| Create, return to and name a conversation | [Session lifecycle](implementation/session-lifecycle.md), [shared names](implementation/session-names.md) |
+| Send, stop and reconnect | [Send a message](implementation/send-message.md), [stop work](implementation/stop-work.md), [reconnect](implementation/reconnect.md) |
+| Read content and manage history | [History and context](implementation/saved-history.md), [Library](implementation/library.md), [history cleanup](implementation/history-retirement.md) |
 
 ## Reference
 
@@ -52,8 +48,8 @@ The [system overview](system.md), [CLI/service](cli-service.md), [HTTP/authentic
 
 ## Scope and maintenance
 
-The documentation covers current Dwell source and its user-facing capabilities. Node.js 22.19+ and Pi 1.4.0 are the implemented compatibility requirements. The browser conversation client and administrative CLI are available; an interactive Dwell TUI, scheduled tasks and domain integrations remain future work.
+The documentation covers current Dwell source and its user-facing capabilities. Node.js 22.19+ and Pi 1.4.0 are the implemented compatibility requirements. The browser conversation client and administrative CLI are available; Current Library and Distill storage coordination are optional integrations; an interactive Dwell TUI and scheduled tasks remain future work.
 
-Guide and Tutorials explain tasks; Reference defines exact interfaces; Implementation explains workflows, module logic and callable behavior in prose. Function bodies remain in source files, reached through citations and the source atlas. External dependencies are documented at Dwell's boundary.
+Guide and Tutorials explain tasks; Reference defines exact interfaces; Implementation explains how each feature works. The source atlas connects declarations to their feature context.
 
 Update affected sections together when behavior changes, and refresh source/test atlas anchors when declarations move.

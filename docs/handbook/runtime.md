@@ -2,7 +2,7 @@
 
 English | [简体中文](../i18n/zh-CN/handbook/runtime.md)
 
-Detailed prose walkthrough: [Implementation](implementation/runtime.md).
+Detailed prose walkthrough: [Implementation](implementation/session-lifecycle.md#behavior).
 
 [Handbook index](README.md) · [Session ownership, storage, history, and events](sessions-storage.md)
 

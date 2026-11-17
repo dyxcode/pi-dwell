@@ -4,7 +4,7 @@
 
 [English](../../../handbook/runtime.md) | 简体中文
 
-详细文字解释：[Implementation](implementation/runtime.md).
+详细文字解释：[Implementation](implementation/session-lifecycle.md#behavior).
 
 [手册索引](README.md) · [Session 所有权、存储、history 与 events](sessions-storage.md)
 

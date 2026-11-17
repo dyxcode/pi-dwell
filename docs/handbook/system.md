@@ -2,7 +2,7 @@
 
 English | [简体中文](../i18n/zh-CN/handbook/system.md)
 
-Detailed prose walkthrough: [Implementation](implementation/overview.md).
+Detailed prose walkthrough: [Implementation](implementation/README.md).
 
 [Handbook index](README.md)
 

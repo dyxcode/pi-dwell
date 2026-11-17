@@ -65,6 +65,13 @@ This inventory covers every file under `tests/`. Scenario names below are extrac
 - [tool results pair by call id across intervening messages and leave orphans visible](../../tests/conversation.test.ts#L116)
 - [context and diagnostic blocks do not split a response before the next user](../../tests/conversation.test.ts#L148)
 
+## tests/docs.test.ts
+
+[Open source](../../tests/docs.test.ts)
+
+- [documentation maps source declarations to feature prose without exposing symbols](../../tests/docs.test.ts#L11)
+- [accepts a conceptual explanation without the function name](../../tests/docs.test.ts#L50)
+
 ## tests/events-http.test.ts
 
 [Open source](../../tests/events-http.test.ts)

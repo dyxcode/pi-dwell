@@ -4,7 +4,7 @@
 
 [English](../../../handbook/cli-service.md) | 简体中文
 
-详细文字解释：[Implementation](implementation/cli.md).
+详细文字解释：[Implementation](implementation/host-service.md#behavior).
 
 [文档索引](README.md) · [命令参考](reference.md)
 

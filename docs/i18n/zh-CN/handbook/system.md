@@ -4,7 +4,7 @@
 
 [English](../../../handbook/system.md) | 简体中文
 
-详细文字解释：[Implementation](implementation/overview.md).
+详细文字解释：[Implementation](implementation/README.md).
 
 [手册索引](README.md)
 

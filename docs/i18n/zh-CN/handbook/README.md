@@ -35,17 +35,13 @@
 
 ## Implementation 实现手册
 
-[开始阅读 implementation handbook](implementation/README.md)：通过文字理解运行中的系统、追踪完整 workflows，并深入模块与 function behavior。Source/test citations 将解释链接到对应实现与 checks。
+[按功能阅读实现](implementation/README.md)：每章独立解释模块职责、数据归属、完整流程、内部机制、技术取舍和验证场景。
 
-| 阅读路线 | 入口 |
+| 想理解的功能 | 入口 |
 | --- | --- |
-| 理解系统 | [Processes、ownership 与 state](implementation/overview.md) |
-| 追踪 workflow | [一条 message](implementation/workflow-message.md)、[startup/session lifetime](implementation/workflow-lifecycle.md)、[observation/reconnect](implementation/workflow-observation.md) |
-| 深入模块 | [按职责组织的模块章节](implementation/README.md#modules) |
-| 查找 function | [Source 与 explanation atlas](source-map.md) |
-| 检查覆盖 | [43 个 production files 与 callable coverage](implementation/coverage.md) |
-
-[System overview](system.md)、[CLI/service](cli-service.md)、[HTTP/authentication](http-auth.md)、[sessions/storage](sessions-storage.md)、[runtime](runtime.md)、[browser](web-client.md) 提供紧凑的概览与参考；implementation handbook 详细解释各 workflow 与 module。
+| 创建、继续和命名会话 | [会话生命周期](implementation/session-lifecycle.md)、[共享名称](implementation/session-names.md) |
+| 发送、停止与重连 | [发送消息](implementation/send-message.md)、[停止工作](implementation/stop-work.md)、[重连](implementation/reconnect.md) |
+| 阅读内容与管理历史 | [历史与上下文](implementation/saved-history.md)、[Library](implementation/library.md)、[历史清理](implementation/history-retirement.md) |
 
 <a id="reference"></a>
 
@@ -69,8 +65,8 @@
 
 ## 范围与维护
 
-这套文档覆盖 Dwell 当前源码及其面向用户的能力。已实现的兼容要求是 Node.js 22.19+ 和 Pi 1.4.0。Browser conversation client 与管理用 CLI 已可用；交互式 Dwell TUI、scheduled task 和 domain integration 仍属于后续工作。
+这套文档覆盖 Dwell 当前源码及其面向用户的能力。已实现的兼容要求是 Node.js 22.19+ 和 Pi 1.4.0。Browser conversation client 与管理用 CLI 已可用；Current Library 和 Distill 存储协调可按需启用；交互式 Dwell TUI 和 scheduled task 仍属于后续工作。
 
-Guide 和 Tutorials 解释如何完成任务；Reference 定义准确接口；Implementation 用文字解释 workflows、module logic 与 callable behavior。Function bodies 保留在源码中，通过 citations 和 source atlas 跳转核对。External dependency 只解释 Dwell 与其交互的边界。
+Guide 和 Tutorials 解释如何完成任务；Reference 定义准确接口；Implementation 解释每项功能如何工作。Source atlas 将源码声明连接到对应功能。
 
 行为变化时同步更新相关章节；declaration 移动时刷新 source/test 索引的 anchor。

@@ -75,6 +75,15 @@
 - [tool results pair by call id across intervening messages and leave orphans visible](../../../../tests/conversation.test.ts#L116)
 - [context and diagnostic blocks do not split a response before the next user](../../../../tests/conversation.test.ts#L148)
 
+## tests/docs.test.ts
+
+验证概念正文的功能映射，以及源码位置、anchors、双语一致性和空章节的拒绝行为。
+
+[查看源码](../../../../tests/docs.test.ts)
+
+- [documentation maps source declarations to feature prose without exposing symbols](../../../../tests/docs.test.ts#L11)
+- [accepts a conceptual explanation without the function name](../../../../tests/docs.test.ts#L50)
+
 ## tests/events-http.test.ts
 
 通过真实 loopback connection 验证 SSE authentication、event 顺序、cursor、revocation 与 slow-reader backpressure。

@@ -26,7 +26,7 @@ Choose where Pi lives and which capabilities it uses. Bring conversations, sched
 
 Read the [documentation](docs/handbook/README.md) for Quick Start, Guide, Tutorials, Examples, API and error references, architecture, code walkthroughs, and development.
 
-The [Implementation handbook](docs/handbook/implementation/README.md) explains workflows and function behavior in prose, with clickable source and test citations.
+The [Implementation handbook](docs/handbook/implementation/README.md) explains each feature through module responsibilities, data ownership, execution mechanisms, technology trade-offs and verification scenarios.
 
 ## Installation
 

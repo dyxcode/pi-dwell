@@ -4,7 +4,7 @@
 
 [English](../../../handbook/contracts.md) | 简体中文
 
-详细文字解释：[Implementation](implementation/validators.md).
+详细文字解释：[Implementation](implementation/README.md).
 
 共享 contracts 定义 host、browser 和 Pi adapter 使用的 runtime-checked shapes。来自 HTTP、saved history 和 event stream 的值在经过 validator 收窄前都属于不可信输入。每个 validator 都有自己的严格程度和预算；TypeScript interface 本身不保证 key 完全匹配、path 已 canonicalize，或应用层的每条不变量都已检查。
 

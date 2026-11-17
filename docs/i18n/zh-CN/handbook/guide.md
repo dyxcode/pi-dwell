@@ -103,7 +103,7 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 }
 ```
 
-`database` 指向管理这些 Pi sessions 的 Distill store，然后 restart Dwell。Dwell 的文件读取与 hosted Pi processes 会参与该 store 的 cleanup coordination。省略 Distill entry 时不启用 source coordination；省略整个文件时采用 standalone operation。Configuration 或 module opening 失败会停止 startup。详见 [access lifecycle](implementation/storage-integrations.md)。
+`database` 指向管理这些 Pi sessions 的 Distill store，然后 restart Dwell。Dwell 的文件读取与 hosted Pi processes 会参与该 store 的 cleanup coordination。省略 Distill entry 时不启用 source coordination；省略整个文件时采用 standalone operation。Configuration 或 module opening 失败会停止 startup。详见 [access lifecycle](implementation/history-retirement.md#behavior)。
 
 <a id="current-library"></a>
 
@@ -126,7 +126,7 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 
 打开 **Library** 可查看 latest items、搜索和读取 exact version。选中 session 后，使用 **Attach to session** 保存 reference；该操作不会改变 Pi prompt。已保存的 reference 可在 Current 暂不可用时继续查看和移除。
 
-`current` 和 `distill` 可放在同一个 version 1 configuration 中。详见 [storage integrations](implementation/storage-integrations.md)。
+`current` 和 `distill` 可放在同一个 version 1 configuration 中。详见 [Library](implementation/library.md) 与 [历史清理](implementation/history-retirement.md)。
 
 <a id="retired-history"></a>
 

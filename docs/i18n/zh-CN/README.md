@@ -26,7 +26,7 @@ Pi Dwell 希望让 Pi 成为一个可以从不同设备随时回到的个人 age
 
 [完整文档](handbook/README.md)包含快速上手、功能指南、教程、示例、API 与错误参考、架构与源码详解，以及开发与测试说明。
 
-[Implementation 实现手册](handbook/implementation/README.md)用文字解释 workflows 与 function behavior，并提供可点击的 source/test citations。
+[Implementation 实现手册](handbook/implementation/README.md)按功能解释模块职责、数据归属、执行机制、技术取舍和关键验证场景。
 
 ## 安装
 

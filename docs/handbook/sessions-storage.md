@@ -2,7 +2,7 @@
 
 English | [简体中文](../i18n/zh-CN/handbook/sessions-storage.md)
 
-Detailed prose walkthrough: [Implementation](implementation/sessions.md).
+Detailed prose walkthrough: [Implementation](implementation/session-lifecycle.md#behavior).
 
 [Handbook index](README.md) · [Pi runtime boundary](runtime.md)
 
@@ -39,7 +39,7 @@ flowchart TD
 
 [`SessionCatalog`](../../src/storage/catalog.ts) owns Dwell's SQLite file and validates both its schema and every decoded record. The current schema is version 8. All statements use Node's synchronous `DatabaseSync`; SQL values are parameterized for data writes.
 
-Schema v6 adds shared display names and metadata revisions; [name updates](implementation/catalog.md#catalog-session-names) compare revisions atomically. Schema v5 adds nullable `history_check_state` and `history_checked_at`; migrated sessions remain unchecked until their next read. See [catalog migration](implementation/catalog.md#catalog-schema-and-migrations).
+Schema v6 adds shared display names and metadata revisions; [name updates](implementation/session-names.md#mechanisms) compare revisions atomically. Schema v5 adds nullable `history_check_state` and `history_checked_at`; migrated sessions remain unchecked until their next read. See [catalog migration](implementation/session-lifecycle.md#mechanisms).
 
 ### Tables and invariants
 
@@ -341,4 +341,4 @@ On shutdown, the service closes admission, persists cancellation and aborts work
 | HTTP adapters for sessions, turns, saved history, and event streams: authentication, request bounds, client disconnects, and socket behavior | [`tests/sessions-http.test.ts`](../../tests/sessions-http.test.ts), [`tests/turns-http.test.ts`](../../tests/turns-http.test.ts), [`tests/history-http.test.ts`](../../tests/history-http.test.ts), and [`tests/events-http.test.ts`](../../tests/events-http.test.ts) |
 | Runtime RPC/process and native JSONL edge cases | [Runtime test map](runtime.md#runtime-test-map) |
 
-Current bindings and exact-version references use dedicated tables; see [library reference storage](implementation/storage-integrations.md#library-reference-storage).
+Current bindings and exact-version references use dedicated tables; see [library reference storage](implementation/library.md#mechanisms).

@@ -94,10 +94,22 @@ English pages in `docs/handbook/` have matching Simplified Chinese pages in `doc
 
 The source and test atlases are snapshots of current declarations and test names. Refresh affected entries and line anchors whenever code moves, and verify coverage against the files under `src/` and `tests/`. A source line anchor is a navigation aid; the source at the current revision remains authoritative.
 
-Run `npm run check:docs` to validate both handbook file sets, local links and anchors, source line positions, and callable-to-explanation coverage. The [implementation coverage page](implementation/coverage.md) explains the maintenance contract; [tooling](implementation/tooling.md) explains the checker.
+Run `npm run check:docs` to validate locale file sets and anchors, relative links, source positions and callable-to-feature mappings. Each declaration maps to a feature section containing explanatory prose.
 
 Actual Distill integration tests use `DWELL_TEST_DISTILL_MODULE=/absolute/path/to/pi-distill/dist/host-storage.js npm run check` after building that API. Without this variable the cross-product cases are explicitly skipped; standalone checks still run. Fixtures use temporary synthetic databases and Pi sessions.
 
 Set `DWELL_TEST_CURRENT_MODULE` to the absolute built `pi-current/library` JavaScript entry to run actual Current adapter, HTTP, and reference tests. `npm run check:web -- --http` also uses it for Library browser acceptance. It may be combined with `DWELL_TEST_DISTILL_MODULE`. Tests use temporary synthetic storage.
 
 The retirement fixture also loads the matching Distill checkout's `src/` modules to perform actual cleanup; point `DWELL_TEST_DISTILL_MODULE` at that checkout's built `dist/host-storage.js`. Dwell production loads only the public storage API.
+
+<a id="documentation-maintenance"></a>
+
+## Feature chapters and verification tooling
+
+Implementation is organized by feature. Each chapter independently explains user behavior, module responsibilities, data and persistence, the complete flow, internal mechanisms, technology trade-offs and verification scenarios. Function names, field types, HTTP addresses, exact error codes and test files belong in the Source atlas and Reference. Include numeric limits when they affect user behavior or design decisions.
+
+After each revision, check every sentence for purpose. Remove work narration, preemptive justification and generic verification reminders. Express consequential limitations as concrete conditions and outcomes. Chapters omit Change guidance.
+
+The documentation checker uses the TypeScript parser to inventory named production callables. Each locale atlas must cite the correct source file and declaration line and map each callable to an explicit feature section containing prose, a table or a list. Link checks validate files, Markdown anchors and source line bounds; implementation mirrors must have matching anchors. Checker regressions cover conceptual prose, empty sections, wrong source files, stale lines, missing mappings, missing anchors, locale anchor and feature-mapping drift, and copied code. Review behavioral accuracy against source and tests.
+
+The package check inspects the npm dry-run manifest and requires both editions of each feature chapter. Update the public allowlist and navigation when adding, removing or renaming pages. Default checks use temporary synthetic data; Pi compatibility and real-browser checks exercise their respective execution boundaries.

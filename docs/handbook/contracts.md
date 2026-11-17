@@ -2,7 +2,7 @@
 
 English | [简体中文](../i18n/zh-CN/handbook/contracts.md)
 
-Detailed prose walkthrough: [Implementation](implementation/validators.md).
+Detailed prose walkthrough: [Implementation](implementation/README.md).
 
 The shared contracts define runtime-checked shapes used by the host, browser,
 and Pi adapter. Values from HTTP, saved history, and event streams are

@@ -2,7 +2,7 @@
 
 English | [简体中文](../i18n/zh-CN/handbook/http-auth.md)
 
-Detailed prose walkthrough: [Implementation](implementation/http.md).
+Detailed prose walkthrough: [Implementation](implementation/host-service.md#behavior).
 
 [Handbook index](README.md) · [Source atlas](source-map.md)
 
@@ -134,4 +134,4 @@ Public errors use `{error: {code, message}}`. AccessError and SessionError prese
 
 Read [host.test.ts](../../tests/host.test.ts), [auth.test.ts](../../tests/auth.test.ts), and [access.test.ts](../../tests/access.test.ts) for transport and authentication boundaries; [sessions-http.test.ts](../../tests/sessions-http.test.ts), [turns-http.test.ts](../../tests/turns-http.test.ts), [history-http.test.ts](../../tests/history-http.test.ts), and [images-http.test.ts](../../tests/images-http.test.ts) for operation routes; [events-http.test.ts](../../tests/events-http.test.ts) for streams; [session-discovery.test.ts](../../tests/session-discovery.test.ts) for isolated discovery.
 
-Library routes use the same authentication and browser mutation checks. Latest accepts optional `source` and `limit` query fields; exact reference routes accept no query. See [library HTTP/browser](implementation/storage-integrations.md#library-http-browser).
+Library routes use the same authentication and browser mutation checks. Latest accepts optional `source` and `limit` query fields; exact reference routes accept no query. See [library HTTP/browser](implementation/library.md#mechanisms).

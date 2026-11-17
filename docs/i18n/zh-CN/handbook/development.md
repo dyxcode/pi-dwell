@@ -110,10 +110,22 @@
 
 Source 和 test atlases 是当前 declaration 和 test name 的 snapshot。代码移动时，刷新受影响的条目和行锚点，并对照 `src/` 与 `tests/` 下的文件核验覆盖范围。Source line anchor 只是导航辅助；当前 revision 的源码仍是权威依据。
 
-运行 `npm run check:docs` 验证两种 handbook file sets、local links/anchors、source line positions 和 callable-to-explanation coverage。[Implementation coverage](implementation/coverage.md) 解释维护约定，[tooling](implementation/tooling.md) 解释 checker。
+运行 `npm run check:docs` 验证双语文件集合与 anchors、相对链接、源码行号和 callable-to-feature mappings。每个源码声明都关联到一个包含解释内容的功能段落。
 
 构建 Distill API 后，使用 `DWELL_TEST_DISTILL_MODULE=/absolute/path/to/pi-distill/dist/host-storage.js npm run check` 执行实际 integration tests。未设置该变量时，跨产品 cases 会明确 skip，standalone checks 仍会运行。Fixtures 使用临时 synthetic databases 与 Pi sessions。
 
 设置 `DWELL_TEST_CURRENT_MODULE` 为 built `pi-current/library` JavaScript entry 的 absolute path，可运行真实 Current adapter、HTTP 和 reference 测试；`npm run check:web -- --http` 也使用该变量运行 Library browser acceptance。可以同时设置 `DWELL_TEST_DISTILL_MODULE`。测试使用临时 synthetic storage。
 
 Retirement fixture 还会加载同一 Distill checkout 的 `src/` modules 来执行实际 cleanup；请将 `DWELL_TEST_DISTILL_MODULE` 指向该 checkout 构建的 `dist/host-storage.js`。Dwell production 只加载 public storage API。
+
+<a id="documentation-maintenance"></a>
+
+## 功能章节与检查工具
+
+Implementation 按功能组织，每章独立解释用户操作、模块职责、数据与持久化、完整流程、内部机制、技术取舍及验证场景。正文省略函数名、字段类型、HTTP 地址、具体错误码和测试文件；Source atlas 与 Reference 提供这些查阅入口。数字只保留影响用户行为或设计判断的限制。
+
+每次改写后逐句检查表达目的：删除工作过程叙述、预先辩解和泛泛的验证提醒；将影响功能理解的限制写成具体条件和结果。章节不包含 Change guidance。
+
+文档检查器使用 TypeScript parser 枚举 production source 中的具名 callable，核对两种语言的 Source atlas 是否完整、声明位置是否准确，以及每项功能链接是否指向包含正文、表格或列表的显式段落。链接检查同时验证文件、Markdown anchors 和源码行号；双语 Implementation 页具有相同 anchors。检查器的回归场景覆盖概念正文、空段落、错误源码、过期行号、缺失映射、失效 anchor、双语 anchor 与功能映射差异，以及复制代码。功能解释的准确性通过对照实现与测试审阅。
+
+Package check 通过 npm dry-run 检查公开文件清单，要求每个功能章都包含英文与中文版本。新增、删除或改名时同步更新公开清单和导航链接。默认检查使用临时合成数据；Pi compatibility 和真实浏览器检查提供各自的执行边界验证。

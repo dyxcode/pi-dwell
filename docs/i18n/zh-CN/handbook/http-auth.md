@@ -4,7 +4,7 @@
 
 [English](../../../handbook/http-auth.md) | 简体中文
 
-详细文字解释：[Implementation](implementation/http.md).
+详细文字解释：[Implementation](implementation/host-service.md#behavior).
 
 [手册索引](README.md) · [源码索引](source-map.md)
 
@@ -154,4 +154,4 @@ Event hub 拥有排序和 replay；`createSseConnection` 拥有单个 HTTP respo
 
 传输与认证边界可读 [host.test.ts](../../../../tests/host.test.ts)、[auth.test.ts](../../../../tests/auth.test.ts) 和 [access.test.ts](../../../../tests/access.test.ts)；操作 route 可读 [sessions-http.test.ts](../../../../tests/sessions-http.test.ts)、[turns-http.test.ts](../../../../tests/turns-http.test.ts)、[history-http.test.ts](../../../../tests/history-http.test.ts) 和 [images-http.test.ts](../../../../tests/images-http.test.ts)；stream 测试见 [events-http.test.ts](../../../../tests/events-http.test.ts)；隔离发现见 [session-discovery.test.ts](../../../../tests/session-discovery.test.ts)。
 
-Library routes 使用同一 authentication 和 browser mutation checks。Latest 接受可选 `source` 与 `limit` query；exact reference routes 不接受 query。完整行为见 [library HTTP/browser](implementation/storage-integrations.md#library-http-browser)。
+Library routes 使用同一 authentication 和 browser mutation checks。Latest 接受可选 `source` 与 `limit` query；exact reference routes 不接受 query。完整行为见 [library HTTP/browser](implementation/library.md#mechanisms)。

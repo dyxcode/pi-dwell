@@ -145,7 +145,7 @@ Build Distill's public Node API with `npm run build:package` in its checkout. In
 }
 ```
 
-Point `database` at the Distill store that manages these Pi sessions, then restart Dwell. Dwell coordinates file reads and hosted Pi processes with that store's cleanup. Omitting the Distill entry disables source coordination; omitting the file selects standalone operation. Configuration and module-opening errors stop startup. See [the access lifecycle](implementation/storage-integrations.md).
+Point `database` at the Distill store that manages these Pi sessions, then restart Dwell. Dwell coordinates file reads and hosted Pi processes with that store's cleanup. Omitting the Distill entry disables source coordination; omitting the file selects standalone operation. Configuration and module-opening errors stop startup. See [the access lifecycle](implementation/history-retirement.md#behavior).
 
 <a id="current-library"></a>
 
@@ -169,7 +169,7 @@ Replace both paths with the absolute paths on this host. Keep the same binding f
 
 Open **Library** to browse latest items, search, and read an exact version. With a session selected, use **Attach to session** to save its reference. This leaves the Pi prompt unchanged. Saved references remain available for listing and removal while Current is unavailable.
 
-`current` and `distill` may share one version 1 configuration. See [storage integrations](implementation/storage-integrations.md).
+`current` and `distill` may share one version 1 configuration. See [Library access](implementation/library.md) and [history cleanup](implementation/history-retirement.md).
 
 <a id="retired-history"></a>
 

@@ -4,7 +4,7 @@
 
 [English](../../../handbook/web-client.md) | 简体中文
 
-详细文字解释：[Implementation](implementation/browser-controller.md).
+详细文字解释：[Implementation](implementation/read-conversation.md#behavior).
 
 Web client 是面向浏览器的对话界面，连接由 host 所拥有的 Pi session。使用[手册索引](README.md)浏览各章节，使用[项目 README](../README.md)了解项目概览。
 
@@ -204,4 +204,4 @@ Pi extension confirmation dialog 需要 interactive Pi observer。Runtime test �
 
 ## Shared session names
 
-使用 selected session 的 name action 修改共享 name，其他 browser 会收到更新。Reset 恢复 directory 标签。如果当前 browser 保存过旧 local name，editor 会提供显式 import action。发生并发编辑时，会载入最新共享 name 供查看。参见 [editor workflow](implementation/browser-controller.md#browser-shared-session-names)。
+使用 selected session 的 name action 修改共享 name，其他 browser 会收到更新。Reset 恢复 directory 标签。如果当前 browser 保存过旧 local name，editor 会提供显式 import action。发生并发编辑时，会载入最新共享 name 供查看。参见 [editor workflow](implementation/session-names.md#mechanisms)。

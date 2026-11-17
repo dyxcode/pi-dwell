@@ -103,7 +103,7 @@ const record = {
 };
 appendFileSync(process.env.DISCOVERY_TEST_REPORT, JSON.stringify(record) + "\\n");
 if (args.length === 1 && args[0] === "--version") {
-  process.stdout.write("1.4.0\\n");
+  process.stdout.write("1.5.2\\n");
 } else if (args.includes("--list-models")) {
   process.stdout.write("provider   model             context  max-out  thinking  images\\nanthropic  claude synthetic  200K     8K       yes       yes\\n");
 } else {
@@ -286,7 +286,7 @@ test("Pi discovery recognizes an empty model list and sanitizes process failures
     `import { appendFileSync } from "node:fs";
 const args = process.argv.slice(2);
 appendFileSync(process.env.DISCOVERY_TEST_REPORT, JSON.stringify(args) + "\\n");
-if (args.includes("--version")) process.stdout.write("1.4.0\\n");
+if (args.includes("--version")) process.stdout.write("1.5.2\\n");
 else if (args.includes("--list-models")) process.stdout.write("No models available.\\n");
 else { process.stderr.write("synthetic-secret-from-stderr"); process.exitCode = 1; }
 `,
@@ -300,7 +300,7 @@ else { process.stderr.write("synthetic-secret-from-stderr"); process.exitCode = 
   await writeFile(
     entryPoint,
     `const args = process.argv.slice(2);
-if (args.includes("--version")) process.stdout.write("1.4.0\\n");
+if (args.includes("--version")) process.stdout.write("1.5.2\\n");
 else { process.stderr.write("synthetic-secret-from-stderr"); process.exitCode = 1; }
 `,
   );
@@ -311,7 +311,7 @@ else { process.stderr.write("synthetic-secret-from-stderr"); process.exitCode = 
   });
 });
 
-test("Pi 1.4.0 lists a synthetic configured model without provider access", async (t) => {
+test("Pi 1.5.2 lists a synthetic configured model without provider access", async (t) => {
   const root = await temporaryDirectory();
   t.after(() => rm(root, { recursive: true, force: true }));
   const home = join(root, "home");
@@ -391,7 +391,7 @@ test("session discovery coalesces model scans and drains one before shutdown", a
     entryPoint,
     `import { appendFileSync } from "node:fs";
 const args = process.argv.slice(2);
-if (args.includes("--version")) process.stdout.write("1.4.0\\n");
+if (args.includes("--version")) process.stdout.write("1.5.2\\n");
 else if (args.includes("--list-models")) {
   appendFileSync(${JSON.stringify(report)}, "listed\\n");
   await new Promise((resolve) => setTimeout(resolve, 100));

@@ -11,10 +11,10 @@ import {
   type ThinkingContent,
   type ToolCall,
   type TranscriptContext,
-  Type,
   uuidv7,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 
 const PROVIDER = "dwell-test";
 const MODEL = "dwell-test";

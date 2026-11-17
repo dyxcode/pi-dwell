@@ -355,7 +355,7 @@ test("sessions without context files retain Pi's default prompt and complete tur
   });
   assert.equal((await pi.run("hello")).outcome, "completed");
   const prompt = await readFile(join(environment.root, "prompt.txt"), "utf8");
-  assert.match(prompt, /You are an expert coding assistant operating inside pi/);
+  assert.match(prompt, /You are a coding assistant running inside pi, a coding agent harness/);
 });
 
 test("native context remains additive to global SYSTEM and APPEND_SYSTEM customization", async (t) => {

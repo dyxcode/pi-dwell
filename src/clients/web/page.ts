@@ -954,8 +954,8 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #library-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:38dvh;overflow:auto;padding:12px;background:var(--paper);font:12px/1.7 var(--sans)}
 #library-reference-action{min-height:38px;padding:8px 12px;font:11px var(--mono);margin-top:8px}
 #library-reference-action:disabled{opacity:.6}
+#library-open-mobile{display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:36px;height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:17px var(--mono)}
 @media(max-width:760px){
- #library-open-mobile{display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:36px;height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:17px var(--mono)}
  #library-dialog{width:100%;max-width:none;padding:12px 16px max(18px,env(safe-area-inset-bottom));box-shadow:0 -3px var(--lilac)}
  #library-dialog .handle{margin-bottom:12px}
  #library-text{max-height:34dvh}

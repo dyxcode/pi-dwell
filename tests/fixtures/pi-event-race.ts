@@ -1,7 +1,7 @@
 const output = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}\n`);
 
 if (process.argv.includes("--version")) {
-  console.log("1.5.2");
+  console.log("1.6.0");
   process.exit(0);
 }
 

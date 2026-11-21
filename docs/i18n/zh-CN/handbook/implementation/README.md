@@ -15,7 +15,7 @@
 | [运行与管理 Host](host-service.md) | 后台服务、私有存储、配置与关闭 |
 | [连接浏览器](pairing.md) | 配对、凭据、来源校验与撤销访问 |
 | [创建与继续会话](session-lifecycle.md) | 会话身份、Pi 进程、项目资源与重启恢复 |
-| [修改会话名称](session-names.md) | 共享名称、版本、并发编辑与迟到响应 |
+| [会话名称元数据](session-names.md) | 会话标签、共享名称和版本同步 |
 | [选择目录、模型与 thinking level](models.md) | 发现、能力检查、选择与配置保存 |
 | [编写消息与添加图片](compose-message.md) | 草稿、附件、键盘输入与移动布局 |
 | [发送消息与跟踪执行](send-message.md) | 接收、重试、持久化调度与结果 |

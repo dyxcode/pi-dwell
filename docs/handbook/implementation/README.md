@@ -15,7 +15,7 @@ Each chapter follows a feature through user behavior, module responsibilities, d
 | [Run and manage the Host](host-service.md) | Background service, private storage, configuration and shutdown |
 | [Connect a browser](pairing.md) | Pairing, credentials, trusted origins and revocation |
 | [Create and return to a conversation](session-lifecycle.md) | Session identity, Pi processes, project resources and restart recovery |
-| [Rename a conversation](session-names.md) | Shared names, revisions, concurrent edits and late responses |
+| [Session name metadata](session-names.md) | Conversation labels, shared names and revision handling |
 | [Choose a directory, model and thinking level](models.md) | Discovery, capability checks, selection and saved configuration |
 | [Compose a message with images](compose-message.md) | Drafts, attachments, keyboard input and mobile layout |
 | [Send a message and follow its execution](send-message.md) | Acceptance, retries, durable dispatch and results |

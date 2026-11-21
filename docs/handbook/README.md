@@ -28,7 +28,7 @@ Use Dwell, understand its behavior, and follow its implementation from browser c
 
 | Feature to understand | Start here |
 | --- | --- |
-| Create, return to and name a conversation | [Session lifecycle](implementation/session-lifecycle.md), [shared names](implementation/session-names.md) |
+| Create and return to a conversation | [Session lifecycle](implementation/session-lifecycle.md), [shared names](implementation/session-names.md) |
 | Send, stop and reconnect | [Send a message](implementation/send-message.md), [stop work](implementation/stop-work.md), [reconnect](implementation/reconnect.md) |
 | Read content and manage history | [History and context](implementation/saved-history.md), [Library](implementation/library.md), [history cleanup](implementation/history-retirement.md) |
 | Search and read Distill Memory | [Memory](implementation/memory.md) |

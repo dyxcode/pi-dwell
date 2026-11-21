@@ -378,6 +378,6 @@ command input, so it is not a general Pi terminal or command surface.
 | Pi transcript reopen, session close/reopen, and missing-history safety | [runtime.test.ts](../../tests/runtime.test.ts), [sessions.test.ts](../../tests/sessions.test.ts) |
 | Desktop/mobile browser acceptance using a synthetic Pi environment and Chrome CDP | [check-web.ts](../../scripts/check-web.ts) |
 
-## Shared session names
+## Conversation labels
 
-Use the selected session’s name action to rename it across browsers. Reset restores its directory label. If this browser contains an older local name, the editor offers an explicit import action. A concurrent edit loads the latest shared name for review. See the [editor workflow](implementation/session-names.md#mechanisms).
+Conversation rows use the directory name, model and thinking level to identify sessions. Existing custom names remain visible. The composer shows the directory name and provides the full path in its tooltip and accessible label.

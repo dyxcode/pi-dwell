@@ -39,7 +39,7 @@
 
 | 想理解的功能 | 入口 |
 | --- | --- |
-| 创建、继续和命名会话 | [会话生命周期](implementation/session-lifecycle.md)、[共享名称](implementation/session-names.md) |
+| 创建和继续会话 | [会话生命周期](implementation/session-lifecycle.md)、[共享名称](implementation/session-names.md) |
 | 发送、停止与重连 | [发送消息](implementation/send-message.md)、[停止工作](implementation/stop-work.md)、[重连](implementation/reconnect.md) |
 | 阅读内容与管理历史 | [历史与上下文](implementation/saved-history.md)、[Library](implementation/library.md)、[历史清理](implementation/history-retirement.md) |
 | 搜索与阅读 Distill Memory | [Memory](implementation/memory.md) |

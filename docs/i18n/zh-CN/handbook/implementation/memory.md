@@ -9,7 +9,7 @@
 
 ## 行为
 
-为 Dwell 显式配置 Distill 后，browser sidebar 会切换为只读 Memory view，用于搜索和阅读已保存的记录。原有的 conversation list 会由 icon-only session controls 取代；**New** 仍可创建 conversation，conversation composer 和 transcript 继续显示在主视图中。未配置 Distill 时，现有 Conversations sidebar 保持不变。配置了 Current 时，其 Library 仍在独立 dialog 中。
+为 Dwell 显式配置 Distill 后，browser sidebar 会切换为只读 Memory view，用于搜索和阅读已保存的记录。手机端通过顶栏的 **Memory** 打开侧栏。原有的 conversation list 会由 icon-only session controls 取代；**New** 仍可创建 conversation，conversation composer 和 transcript 继续显示在主视图中。未配置 Distill 时，现有 Conversations sidebar 保持不变。配置了 Current 时，其 Library 仍在独立 dialog 中。
 
 如果已经配置 Distill，但 Memory reader 暂不可用，sidebar 仍显示 Memory，并提供 **Retry**。这样可以保持集成入口一致，同时让 reader 状态清晰可见。
 

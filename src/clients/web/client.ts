@@ -23,12 +23,7 @@ import {
   libraryItemPath,
 } from "../../shared/library.ts";
 import { isHostStatus } from "../../shared/protocol.ts";
-import {
-  isSessionInfo,
-  isSessionNameRequest,
-  mergeSessionMetadata,
-  type SessionInfo,
-} from "../../shared/sessions.ts";
+import { isSessionInfo, mergeSessionMetadata, type SessionInfo } from "../../shared/sessions.ts";
 import {
   isModelCapabilitiesResponse,
   type ModelCapabilitiesResponse,
@@ -95,13 +90,7 @@ const closeCopy = el("close-session-copy", HTMLElement);
 const closeError = el("close-session-error", HTMLElement);
 const cancelClose = el("cancel-session-close", HTMLButtonElement);
 const confirmClose = el("confirm-session-close", HTMLButtonElement);
-const sessionNameDialog = el("session-name-dialog", HTMLDialogElement);
-const sessionNameInput = el("session-name-input", HTMLInputElement);
-const sessionNameError = el("session-name-error", HTMLElement);
-const editSessionName = el("edit-session-name", HTMLButtonElement);
-const saveSessionName = el("save-session-name", HTMLButtonElement);
-const resetSessionName = el("reset-session-name", HTMLButtonElement);
-const importLocalName = el("import-local-name", HTMLButtonElement);
+
 const modelDialog = el("model-dialog", HTMLDialogElement);
 const modelSearch = el("model-search", HTMLInputElement);
 const chooseModel = el("choose-model", HTMLButtonElement);
@@ -574,15 +563,12 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
       : null;
   memoryResults.replaceChildren();
   if (state.items.length === 0) {
-    const empty = state.searchPending
-      ? "Searching memory…"
-      : state.query.trim().length === 0
-        ? "Search for a memory to carry forward."
-        : state.nextCursor !== null
-          ? "No matches in this batch. Continue search to check more memories."
-          : state.searchError === null
-            ? "No matching memories."
-            : "";
+    const empty =
+      state.searchComplete && state.searchError === null && !state.searchPending
+        ? state.nextCursor !== null
+          ? "No matches in this batch."
+          : "No matching memories."
+        : "";
     if (empty) memoryResults.append(node("p", empty, "memory-empty"));
   } else {
     for (const item of state.items) {
@@ -594,11 +580,7 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
       result.setAttribute("aria-label", `Read memory: ${item.preview}`);
       result.title = item.preview;
       result.disabled = !available || state.readPending;
-      const title = item.preview.replace(/\s+/g, " ").trim();
-      result.append(
-        node("strong", [...title].slice(0, 80).join("") || "Saved memory"),
-        node("span", item.preview),
-      );
+      result.textContent = item.preview;
       result.onclick = () => void memoryPanel.read(item);
       memoryResults.append(result);
     }
@@ -633,8 +615,10 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
 function updateClientCapabilityView(): void {
   const enabled = authenticated && memoryConfigured();
   app.classList.toggle("with-memory", enabled);
-  el("sidebar-heading", HTMLElement).textContent = "CONVERSATIONS";
-  el("session-count", HTMLElement).hidden = enabled;
+  el("open-nav", HTMLButtonElement).setAttribute(
+    "aria-label",
+    enabled ? "Memory" : "Open navigation",
+  );
   el("session-list", HTMLElement).hidden = enabled;
   memoryView.hidden = !enabled;
   if (!enabled) {
@@ -857,87 +841,7 @@ function savePreference(key: string, value: string): void {
   try {
     localStorage.setItem("dwell.web.preferences.v1", JSON.stringify(localPreferences));
   } catch {
-    /* names and selection can remain in memory */
-  }
-}
-let editingSessionId: string | null = null;
-let editingSessionRevision = 0;
-let sessionNameEditorGeneration = 0;
-function invalidateSessionNameEditor(): void {
-  sessionNameEditorGeneration++;
-  editingSessionId = null;
-}
-function closeSessionNameEditor(): void {
-  invalidateSessionNameEditor();
-  if (sessionNameDialog.open) sessionNameDialog.close();
-}
-function openSessionNameEditor(): void {
-  const session = activeSession();
-  if (!session || !authenticated) return;
-  sessionNameEditorGeneration++;
-  editingSessionId = session.id;
-  editingSessionRevision = session.metadataRevision;
-  sessionNameInput.value = session.displayName ?? "";
-  sessionNameError.textContent = "";
-  sessionNameError.hidden = true;
-  saveSessionName.disabled = false;
-  resetSessionName.disabled = false;
-  importLocalName.disabled = false;
-  const localName = localPreferences[session.id];
-  importLocalName.hidden = typeof localName !== "string" || localName.trim().length === 0;
-  sessionNameDialog.showModal();
-  sessionNameInput.focus();
-}
-async function saveSessionNameValue(displayName: string | null): Promise<void> {
-  const id = editingSessionId;
-  if (id === null) return;
-  const generation = sessionNameEditorGeneration;
-  const currentEditor = () =>
-    generation === sessionNameEditorGeneration && editingSessionId === id && sessionNameDialog.open;
-  const normalized = displayName === null ? null : displayName.trim();
-  const request = { displayName: normalized, expectedRevision: editingSessionRevision };
-  if (!isSessionNameRequest(request)) {
-    sessionNameError.textContent = "Enter a name up to 80 characters, or reset the name.";
-    sessionNameError.hidden = false;
-    return;
-  }
-  saveSessionName.disabled = true;
-  resetSessionName.disabled = true;
-  importLocalName.disabled = true;
-  try {
-    const value = await api(`/api/v1/sessions/${id}/name`, request);
-    if (!currentEditor()) return;
-    if (!isSessionInfo(value) || value.id !== id) throw new Error("Invalid session name response.");
-    updatedSession(value);
-    navigation();
-    closeSessionNameEditor();
-  } catch (error) {
-    if (!currentEditor()) return;
-    if (error instanceof ApiError && error.code === "metadata_conflict") {
-      try {
-        const latest = await api(`/api/v1/sessions/${id}`);
-        if (!currentEditor()) return;
-        if (!isSessionInfo(latest) || latest.id !== id)
-          throw new Error("Invalid session response after a name conflict.");
-        updatedSession(latest);
-        navigation();
-        closeSessionNameEditor();
-        notice.textContent = "Another browser changed this name. The latest shared name is loaded.";
-        notice.hidden = false;
-      } catch (refreshError) {
-        if (currentEditor()) showError(refreshError);
-      }
-    } else {
-      sessionNameError.textContent = message(error);
-      sessionNameError.hidden = false;
-      if (error instanceof ApiError && error.status === 401) showError(error);
-    }
-  } finally {
-    if (currentEditor()) {
-      saveSessionName.disabled = false;
-      resetSessionName.disabled = false;
-      importLocalName.disabled = false;
-    }
+    /* Selection can remain in memory. */
   }
 }
 function activeSession(): SessionInfo | undefined {
@@ -1021,10 +925,16 @@ function probeCurrentModel(sessionId: string | null = selected): void {
   });
 }
 function label(s: SessionInfo): string {
-  const directory = s.directory.split(/[\\/]/).filter(Boolean).pop() || s.directory;
-  return [s.displayName ?? directory, s.model, s.thinkingLevel ? levelNames[s.thinkingLevel] : null]
+  return [
+    s.displayName ?? directoryName(s.directory),
+    s.model,
+    s.thinkingLevel ? levelNames[s.thinkingLevel] : null,
+  ]
     .filter(Boolean)
     .join(" · ");
+}
+function directoryName(directory: string): string {
+  return directory.split(/[\\/]/).filter(Boolean).pop() || directory;
 }
 function savedHistoryWarning(s: SessionInfo): string | null {
   switch (s.historyCheck?.state) {
@@ -1260,16 +1170,14 @@ function navigation(): void {
   }
   reconcileChildren(list, listNodes);
   reconcileChildren(tabs, tabNodes);
-  el("session-count", HTMLElement).textContent = String(sessions.length).padStart(2, "0");
   const s = activeSession();
-  editSessionName.disabled = !s || !authenticated;
-  editSessionName.title = s ? `Rename ${label(s)}` : "Select a conversation to rename";
   el("composer-footer", HTMLElement).hidden = !s;
   el("composer-context", HTMLElement).hidden = !s;
   const contextDirectory = el("composer-directory", HTMLElement);
-  contextDirectory.textContent = s?.directory ?? "";
-  contextDirectory.title = s?.directory ?? "";
-  contextDirectory.setAttribute("aria-label", `Current directory: ${s?.directory ?? ""}`);
+  const directory = s?.directory ?? "";
+  contextDirectory.textContent = directoryName(directory);
+  contextDirectory.title = directory;
+  contextDirectory.setAttribute("aria-label", `Current directory: ${directory}`);
   el("model-label", HTMLElement).textContent = s?.model ?? "Choose model";
   el("thinking-label", HTMLElement).textContent = s?.thinkingLevel
     ? `· ${levelNames[s.thinkingLevel]}`
@@ -1729,12 +1637,14 @@ function renderConversation(): void {
   const desired = document.createDocumentFragment();
   if (!selected) {
     const empty = node("div", "", "empty");
-    empty.append(
-      node("h1", "A little room to think."),
-      node("p", "Open a directory to start a conversation."),
-    );
+    empty.append(node("p", "Start a conversation."));
     desired.append(empty);
   } else {
+    if (activeSession()?.historyState === "retired") {
+      const retired = node("p", "Distill removed the saved history.", "feedback");
+      retired.setAttribute("role", "status");
+      desired.append(retired);
+    }
     desired.append(
       savedRenderer.render(
         entries,
@@ -1853,15 +1763,6 @@ function renderConversation(): void {
       recovery.append(retry);
       desired.append(recovery);
     }
-    if (
-      !entries.length &&
-      !state.messages.length &&
-      !state.tools.length &&
-      !state.activeTurn &&
-      !nativeRunning(state.session ?? undefined) &&
-      retryMore === null
-    )
-      desired.append(node("p", "Start a conversation in this directory.", "empty-copy"));
   }
   reconcileChildren(conversation, desired);
   if (focusedToolKey && focused && !focused.isConnected) {
@@ -2354,7 +2255,6 @@ function disconnect(reason: string): void {
   authAttempt++;
   generation++;
   dialog.close();
-  closeSessionNameEditor();
   modelDialog.close();
   closeDialog.close();
   closeArmedSession = null;
@@ -2846,30 +2746,6 @@ el("new-session", HTMLButtonElement).onclick = () => {
   void newSession();
 };
 el("close-new", HTMLButtonElement).onclick = () => dialog.close();
-editSessionName.onclick = openSessionNameEditor;
-el("close-session-name", HTMLButtonElement).onclick = closeSessionNameEditor;
-el("session-name-form", HTMLFormElement).onsubmit = (event) => {
-  event.preventDefault();
-  void saveSessionNameValue(sessionNameInput.value);
-};
-resetSessionName.onclick = () => {
-  void saveSessionNameValue(null);
-};
-importLocalName.onclick = () => {
-  const saved = editingSessionId === null ? undefined : localPreferences[editingSessionId];
-  if (saved === undefined) return;
-  sessionNameInput.value = saved;
-  const request = { displayName: saved.trim(), expectedRevision: editingSessionRevision };
-  const valid = isSessionNameRequest(request);
-  sessionNameError.textContent = valid
-    ? "Saved browser name copied. Save it to share it with other browsers."
-    : "This saved browser name is blank or longer than 80 characters. Edit it before saving.";
-  sessionNameError.hidden = false;
-};
-sessionNameDialog.addEventListener("cancel", invalidateSessionNameEditor);
-sessionNameDialog.addEventListener("close", () => {
-  if (!sessionNameDialog.open) invalidateSessionNameEditor();
-});
 cancelClose.onclick = dismissCloseDialog;
 confirmClose.onclick = () => {
   void confirmSessionClose();

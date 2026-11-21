@@ -17,6 +17,7 @@ export interface MemoryPanelState {
   selected: { id: string; revision: number } | null;
   text: string;
   readCursor: string | null;
+  searchComplete: boolean;
   searchPending: boolean;
   readPending: boolean;
   searchError: string | null;
@@ -34,6 +35,7 @@ function emptyState(query = ""): MemoryPanelState {
     selected: null,
     text: "",
     readCursor: null,
+    searchComplete: false,
     searchPending: false,
     readPending: false,
     searchError: null,
@@ -128,6 +130,7 @@ export class MemoryPanel {
         ...this.#state,
         items: value.items,
         nextCursor: value.nextCursor ?? null,
+        searchComplete: true,
         searchPending: false,
       };
       this.#emit();

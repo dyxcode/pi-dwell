@@ -35,20 +35,18 @@ export const HOST_PAGE = `<!doctype html>
 <button class="new" id="new-session">New conversation <span>＋</span>
 </button>
 <div class="section-head">
-<span id="sidebar-heading">CONVERSATIONS</span>
-<span id="session-count">00</span>
+<span>Conversations</span>
 </div>
-<nav id="session-list" class="session-names" aria-label="Session names">
+<nav id="session-list" class="session-names" aria-label="Conversations">
 </nav>
 <section id="memory-view" aria-labelledby="memory-title" hidden>
 <div class="memory-heading"><h2 id="memory-title">Memory</h2></div>
 <p id="memory-capability-status" class="memory-caption" role="status" hidden></p>
 <form id="memory-search-form" class="memory-search">
 <label class="sr-only" for="memory-query">Search memory</label>
-<input id="memory-query" type="search" autocomplete="off" placeholder="Search memory…">
+<input id="memory-query" type="search" autocomplete="off">
 <button id="memory-search" class="action" type="submit">Search</button>
 </form>
-<p class="memory-caption">Search saved memories.</p>
 <p id="memory-search-error" class="feedback" role="status"></p>
 <div id="memory-results" aria-live="polite"></div>
 <button id="memory-search-more" class="text-button memory-more" type="button" hidden>Continue search</button>
@@ -69,7 +67,7 @@ export const HOST_PAGE = `<!doctype html>
 <main id="chat-main">
 <header>
 <button id="open-nav" aria-label="Open navigation" aria-expanded="false">
-<span class="menu">☰</span>
+<span class="menu" aria-hidden="true">☰</span><span class="nav-memory-label">Memory</span>
 </button>
 <nav id="status-list" aria-label="Session status">
 </nav>
@@ -92,7 +90,6 @@ export const HOST_PAGE = `<!doctype html>
 <div id="composer-context" class="composer-context" hidden>
 <span id="composer-directory" aria-label="Current directory"></span>
 <button id="choose-model" type="button" aria-label="Choose model" aria-haspopup="dialog" disabled><span id="model-label"></span><span id="thinking-label"></span><svg class="model-chevron" aria-hidden="true" viewBox="0 0 12 12" fill="none"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-<button id="edit-session-name" class="icon" type="button" aria-label="Rename conversation" aria-haspopup="dialog" disabled>✎</button>
 </div>
 <form id="composer">
 <label for="message" class="sr-only">Message Pi</label>
@@ -111,26 +108,6 @@ export const HOST_PAGE = `<!doctype html>
 <p id="close-session-copy" hidden></p>
 <p id="close-session-error" class="feedback" role="status" hidden></p>
 <div class="close-actions"><button id="cancel-session-close" type="button">Keep open</button><button id="confirm-session-close" type="button">Close</button></div>
-</dialog>
-<dialog id="session-name-dialog" aria-labelledby="session-name-title">
-<div class="handle"></div>
-<div class="panel-heading">
-<h2 id="session-name-title">Conversation name</h2>
-<button id="close-session-name" class="icon" type="button" aria-label="Close name editor">×</button>
-</div>
-<p class="panel-copy">Names are shared by every browser connected to this host.</p>
-<form id="session-name-form">
-<label for="session-name-input">Name</label>
-<input id="session-name-input" autocomplete="off">
-<p id="session-name-error" class="feedback" role="status" hidden></p>
-<div class="session-name-actions">
-<button id="import-local-name" class="text-button" type="button" hidden>Import this browser's saved name</button>
-<div class="close-actions">
-<button id="reset-session-name" type="button">Reset name</button>
-<button id="save-session-name" class="action" type="submit">Save</button>
-</div>
-</div>
-</form>
 </dialog>
 <dialog id="new-dialog" aria-labelledby="new-title">
 <div class="handle">
@@ -164,7 +141,6 @@ export const HOST_PAGE = `<!doctype html>
 <input id="model-search" type="search" placeholder="Search models…" autocomplete="off">
 <div id="model-options"></div>
 <p id="model-error" class="feedback" role="status"></p>
-<p class="footnote">Applies to your next message.</p>
 </dialog>
 <dialog id="host-dialog" aria-labelledby="host-title">
 <div class="panel-heading">
@@ -243,6 +219,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
 #extensions:empty{display:none}
 #extensions button{font:10px var(--mono);padding:8px 0;min-height:38px}
 #extensions span{color:var(--teal);margin-right:5px}
+.nav-memory-label{display:none}
 main{flex:1;min-width:0;display:flex;flex-direction:column}
 header{display:flex;align-items:center}
 #desktop-context{font:10px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -307,7 +284,6 @@ dialog{background:var(--surface);color:var(--ink);border:1px solid #9d917e;box-s
 dialog::backdrop{background:#29231765}
 .panel-heading{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:24px}
 h2{font:600 24px/1.4 var(--mono);letter-spacing:-.8px;margin:7px 0 0}
-.panel-copy{font:13px/1.8 var(--sans);color:var(--muted);margin:0 0 20px}
 .memory-item{border-top:1px solid var(--line);padding:17px 0}
 .memory-item .eyebrow{font-size:8px;color:var(--teal)}
 .memory-item p{font:14px/1.7 var(--sans);margin:7px 0}
@@ -521,7 +497,6 @@ textarea{min-height:28px;height:32px}
 .message-body p{margin-top:0;white-space:pre-wrap}
 .tool-body{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
 .system .byline{color:var(--muted);background:var(--rail)}
-.empty-copy{color:var(--muted);padding:12vh 0}
 .history-controls{max-width:960px;margin:auto;padding:0 28px}
 .history-controls:has(button[hidden]){display:none}
 .directory-input{display:flex;gap:10px}
@@ -930,24 +905,6 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 .history-retry{min-height:28px;padding:0 4px;font:inherit;color:var(--dark)}
 .history-entry-anchor{display:block;height:0}
 .markdown>.history-entry-anchor:first-child+*{margin-top:0}
-#edit-session-name{display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:16px var(--mono)}
-#edit-session-name:disabled{opacity:.45}
-@media(max-width:760px){#edit-session-name{flex-basis:26px;width:26px;height:26px;min-height:26px;font-size:14px}}
-#session-name-dialog{position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 32px));max-width:none;height:fit-content;max-height:calc(100dvh - 32px);padding:20px;border:1px solid var(--line);border-radius:0;background:var(--surface);box-shadow:4px 4px var(--lilac);color:var(--ink)}
-#session-name-dialog .panel-heading{margin-bottom:10px;gap:12px}
-#session-name-dialog h2{font:600 18px/1.4 var(--sans);letter-spacing:0;margin:0}
-#session-name-dialog #close-session-name{width:32px;height:32px;margin:0}
-#session-name-dialog .panel-copy{font-size:12px;margin:0 0 12px}
-#session-name-dialog label{display:block;margin:8px 0 6px;font:11px/1.5 var(--mono);color:var(--muted)}
-#session-name-dialog #session-name-input{width:100%;height:40px;padding:8px;border:1px solid var(--line);border-radius:0;background:var(--paper);font:13px var(--sans)}
-#session-name-error{margin:8px 0 0}
-.session-name-actions{display:grid;gap:8px;margin-top:14px}
-.session-name-actions .text-button{justify-self:start;min-height:32px;padding:0;font-size:10px}
-.session-name-actions .close-actions{margin-top:0;gap:12px}
-.session-name-actions .close-actions button{min-height:38px;padding:0 10px;font:11px var(--mono)}
-#save-session-name{border:1px solid var(--dark);background:var(--dark);color:var(--surface);box-shadow:2px 2px var(--lilac)}
-@media(max-width:760px){#session-name-dialog{inset:auto 0 0;margin:0;width:100%;max-width:none;max-height:86dvh;padding:14px 20px max(24px,env(safe-area-inset-bottom));border:0;border-top:1px solid var(--line);box-shadow:0 -3px var(--lilac)}#session-name-dialog .handle{margin-bottom:14px}}
-
 #library-dialog{width:min(620px,calc(100vw - 32px));padding:18px;box-shadow:4px 4px var(--lilac)}
 #library-dialog .panel-heading{margin-bottom:12px;gap:12px;align-items:flex-start}
 #library-dialog h2{font:600 18px/1.4 var(--sans);letter-spacing:0;margin:0}
@@ -996,11 +953,7 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #memory-search-error:empty,#memory-read-error:empty{display:none}
 #memory-search-error,#memory-read-error{margin:4px 0;padding:0 2px;font-size:10px}
 #memory-results{display:grid;gap:0;min-width:0}
-.memory-result{display:block;width:100%;min-width:0;padding:10px 4px;text-align:left;border:0;border-top:1px solid var(--line);background:none;box-shadow:none}
-.memory-result strong,.memory-result small,.memory-result span{display:block;overflow-wrap:anywhere}
-.memory-result strong{font:10px/1.5 var(--mono);color:var(--dark)}
-.memory-result small{margin-top:2px;font:9px/1.5 var(--mono);color:var(--muted)}
-.memory-result span{margin-top:5px;font:11px/1.6 var(--sans);color:var(--ink)}
+.memory-result{display:block;width:100%;min-width:0;padding:10px 4px;text-align:left;border:0;border-top:1px solid var(--line);background:none;box-shadow:none;font:12px/1.6 var(--sans);color:var(--ink);overflow-wrap:anywhere}
 .memory-empty{margin:10px 4px;padding:8px 0;border-top:1px solid var(--line);font:10px/1.6 var(--sans);color:var(--muted)}
 .memory-more{min-height:34px;align-self:flex-start;margin:3px 0;padding:7px 4px;font:10px/1.5 var(--mono);color:var(--dark)}
 #memory-reader{margin-top:12px;padding:11px 0 0;border-top:1px solid var(--line)}
@@ -1014,6 +967,9 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #app.with-memory #status-list .status-tab .tab-select{grid-column:1;display:flex;justify-content:center;padding:0}
 #app.with-memory #status-list .status-tab .tab-close{grid-column:1;justify-content:center;width:100%;padding:0}
 @media(max-width:760px){
+ #app.with-memory #open-nav{width:auto;height:36px;min-height:36px;padding:0 8px;border:1px solid var(--line);background:var(--surface);color:var(--dark)}
+ #app.with-memory #open-nav .menu{display:none}
+ #app.with-memory #open-nav .nav-memory-label{display:block}
  #memory-view .memory-heading{margin:0 4px 6px}
  #memory-search-form{gap:5px}
  #memory-query{height:36px}
@@ -1053,21 +1009,21 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  #choose-model{min-height:36px}
  #composer #attach-image,#composer #send,.image-chip-preview{font-size:14px;height:38px;min-height:38px}
  .icon-label .control-label,#composer #send .control-label{line-height:20px}
- #attachment-notice,.feedback,.panel-copy,#session-name-dialog .panel-copy{font-size:var(--type-ui)}
+ #attachment-notice,.feedback{font-size:var(--type-ui)}
  dialog{width:min(520px,calc(100vw - 40px));padding:24px}
- #new-dialog,#session-name-dialog{width:min(480px,calc(100vw - 40px));padding:22px}
+ #new-dialog{width:min(480px,calc(100vw - 40px));padding:22px}
  #model-dialog{width:min(460px,calc(100vw - 40px));padding:22px}
  #library-dialog{width:min(760px,calc(100vw - 40px));padding:24px}
  #close-session-dialog{width:min(420px,calc(100vw - 40px))}
- #new-dialog h2,#session-name-dialog h2,#model-dialog h2,#library-dialog h2,#close-session-title{font-size:22px}
+ #new-dialog h2,#model-dialog h2,#library-dialog h2,#close-session-title{font-size:22px}
  #image-dialog h2{font-size:var(--type-ui)}
- .form label,.gate label,#new-dialog label,#session-name-dialog label,#close-session-number{font-size:var(--type-meta);line-height:1.5}
- .form input,.form select,.gate input,#new-dialog #directory,#session-name-dialog #session-name-input,#model-dialog #model-search,.library-search input{font-size:var(--type-ui);height:44px}
+ .form label,.gate label,#new-dialog label,#close-session-number{font-size:var(--type-meta);line-height:1.5}
+ .form input,.form select,.gate input,#new-dialog #directory,#model-dialog #model-search,.library-search input{font-size:var(--type-ui);height:44px}
  #new-dialog #browse,#new-dialog .directory-row,#new-dialog #create-button,.directory-choice{font-size:var(--type-ui);min-height:44px}
  #model-dialog .model-option{min-height:56px;padding:10px}
  #model-dialog .model-option strong,#thinking-model{font-size:var(--type-ui)}
  #model-dialog .model-option small,#model-dialog .back-models{font-size:var(--type-meta)}
- .close-actions button,.session-name-actions .close-actions button,.session-name-actions .text-button{font-size:14px;min-height:40px}
+ .close-actions button{font-size:14px;min-height:40px}
  #close-session-copy{font-size:var(--type-reading)}
  .gate-card{max-width:520px}.gate p,.empty p{font-size:var(--type-reading)}.gate code{font-size:14px}
  .library-search .action,#library-reference-action{font-size:var(--type-ui);min-height:44px}
@@ -1076,12 +1032,12 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  .library-reader h3{font-size:var(--type-reading)}
  #library-text{font-size:var(--type-reading);line-height:1.75;padding:16px}
  #memory-view .memory-heading h2{font-size:22px;letter-spacing:-.3px}
- #memory-view .memory-caption,.memory-empty,.memory-result small,#memory-search-error,#memory-read-error{font-size:var(--type-meta)}
+ #memory-view .memory-caption,.memory-empty,#memory-search-error,#memory-read-error{font-size:var(--type-meta)}
  #memory-search-form{gap:8px;margin:10px 0 6px}
  #memory-query{font-size:var(--type-ui);height:44px;padding:9px}
  #memory-search{font-size:14px;min-height:44px;padding:8px 10px}
  .memory-result{padding:14px 4px}
- .memory-result strong,.memory-result span,.memory-reader-heading h3{font-size:var(--type-ui);line-height:1.65}
+ .memory-result,.memory-reader-heading h3{font-size:var(--type-ui);line-height:1.65}
  .memory-reader-heading h3{font-size:var(--type-reading)}
  .memory-more{font-size:14px;min-height:40px}
  #memory-reader-close{width:32px;height:32px;min-height:32px;flex-basis:32px}

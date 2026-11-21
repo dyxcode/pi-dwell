@@ -26,7 +26,7 @@ test("the browser exposes a real Memory search and reader surface", () => {
   ])
     assert.match(HOST_PAGE, new RegExp(`id="${id}"`));
   assert.match(HOST_PAGE, /aria-labelledby="memory-title"/);
-  assert.match(HOST_PAGE, /Search saved memories\./);
+  assert.match(HOST_PAGE, /<label class="sr-only" for="memory-query">Search memory<\/label>/);
   assert.doesNotMatch(HOST_PAGE, /not added to Pi context/i);
   assert.ok(HOST_PAGE.indexOf('id="memory-view"') < HOST_PAGE.indexOf("</aside>"));
   assert.ok(HOST_PAGE.indexOf('id="conversation"') > HOST_PAGE.indexOf("<main id="));

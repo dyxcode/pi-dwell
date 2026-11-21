@@ -202,6 +202,6 @@ Pi extension confirmation dialog 需要 interactive Pi observer。Runtime test �
 | Pi transcript reopen、session close/reopen 和缺失 history 的安全处理 | [runtime.test.ts](../../../../tests/runtime.test.ts)、[sessions.test.ts](../../../../tests/sessions.test.ts) |
 | 使用 synthetic Pi 环境和 Chrome CDP 的 desktop/mobile browser acceptance | [check-web.ts](../../../../scripts/check-web.ts) |
 
-## Shared session names
+## 会话标签
 
-使用 selected session 的 name action 修改共享 name，其他 browser 会收到更新。Reset 恢复 directory 标签。如果当前 browser 保存过旧 local name，editor 会提供显式 import action。发生并发编辑时，会载入最新共享 name 供查看。参见 [editor workflow](implementation/session-names.md#mechanisms)。
+Conversations 使用工作目录名、模型和 thinking level 标识会话。已保存的自定义名称会继续显示。输入框上方显示目录名，完整路径可通过提示和辅助技术读取。

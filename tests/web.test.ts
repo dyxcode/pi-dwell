@@ -53,7 +53,7 @@ test("creation asks only for a directory and model selection sits above the comp
   assert.match(row, /id="choose-model"/);
 });
 
-test("shared session names have explicit rename, reset and browser-name import controls", () => {
+test("the Web client has no conversation name editor", () => {
   for (const id of [
     "edit-session-name",
     "session-name-dialog",
@@ -62,15 +62,13 @@ test("shared session names have explicit rename, reset and browser-name import c
     "reset-session-name",
     "import-local-name",
   ])
-    assert.match(HOST_PAGE, new RegExp(`id="${id}"`));
-  assert.match(HOST_PAGE, /Import this browser's saved name/);
-  const composerContext = HOST_PAGE.slice(
-    HOST_PAGE.indexOf('id="composer-context"'),
-    HOST_PAGE.indexOf('id="composer"'),
-  );
-  assert.match(composerContext, /id="edit-session-name"/);
-  assert.match(BROWSER_SCRIPT, /metadataRevision/);
-  assert.match(BROWSER_SCRIPT, /displayName/);
-  assert.match(BROWSER_SCRIPT, /s\.displayName \?\? directory/);
-  assert.doesNotMatch(BROWSER_SCRIPT, /names\.get\(s\.id\)/);
+    assert.doesNotMatch(HOST_PAGE, new RegExp(`id="${id}"`));
+  assert.doesNotMatch(BROWSER_SCRIPT, /\/sessions\/\$\{[^}]+\}\/name/);
+});
+
+test("the sidebars use one heading and avoid duplicate search instructions", () => {
+  assert.doesNotMatch(HOST_PAGE, /id="session-count"|Search saved memories\./);
+  assert.match(HOST_PAGE, /id="memory-title">Memory</);
+  assert.match(HOST_PAGE, /id="memory-search"[^>]+>Search</);
+  assert.doesNotMatch(BROWSER_SCRIPT, /Search for a memory to carry forward\./);
 });

@@ -9,7 +9,7 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/memory.md)
 
 ## Behavior
 
-When Distill is explicitly configured for Dwell, the browser sidebar becomes a read-only Memory view for searching and reading saved records. The conversation list is replaced by icon-only session controls; **New** still starts a conversation, and the conversation composer and transcript remain available in the main view. Without Distill, the existing Conversations sidebar remains. The Current Library stays in its separate dialog when configured.
+When Distill is explicitly configured for Dwell, the browser sidebar becomes a read-only Memory view for searching and reading saved records. On mobile, **Memory** in the top bar opens the sidebar. The conversation list is replaced by icon-only session controls; **New** still starts a conversation, and the conversation composer and transcript remain available in the main view. Without Distill, the existing Conversations sidebar remains. The Current Library stays in its separate dialog when configured.
 
 If Distill is configured but its Memory reader is unavailable, the sidebar remains in Memory and offers **Retry**. This keeps the navigation consistent with the selected integration while making reader availability visible.
 

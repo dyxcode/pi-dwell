@@ -2069,7 +2069,7 @@ async function assertMemoryBrowserMode(page: BrowserPage, mode: MemoryBrowserMod
       const select=document.querySelector(".status-tab.active .tab-select");
       return {
         sidebarHeading:getComputedStyle(document.querySelector(".section-head")).display,
-        sessionCountHidden:document.querySelector("#session-count").hidden,
+        renameEditor:document.querySelector("#edit-session-name, #session-name-dialog")!==null,
         composer:getComputedStyle(document.querySelector("#composer")).display,
         conversation:getComputedStyle(document.querySelector("#conversation")).display,
         messageDisabled:document.querySelector("#message").disabled,
@@ -2085,7 +2085,7 @@ async function assertMemoryBrowserMode(page: BrowserPage, mode: MemoryBrowserMod
     fixture.memory.configured ? "none" : "flex",
     `${mode} toggles the conversation section with Memory`,
   );
-  assert.equal(view.sessionCountHidden, fixture.memory.configured, `${mode} session count`);
+  assert.equal(view.renameEditor, false, `${mode} has no rename editor`);
   assert.notEqual(view.composer, "none", `${mode} keeps the Pi composer available`);
   assert.notEqual(view.conversation, "none", `${mode} keeps the selected Pi conversation`);
   assert.equal(view.messageDisabled, false, `${mode} keeps the selected Pi composer usable`);
@@ -2395,7 +2395,9 @@ async function runMemoryBrowserAcceptance(
     await assertBrowserControlReachable(page, "#memory-query", "desktop Memory");
     await assertMemoryFocusOutline(page);
     await assertBrowserControlReachable(page, "#memory-search", "desktop Memory");
+    assert.equal(await page.evaluate('document.querySelector("#memory-results").textContent'), "");
     await page.type("#memory-query", "BrowserMemoryToken");
+    assert.equal(await page.evaluate('document.querySelector("#memory-results").textContent'), "");
     await page.click("#memory-search");
     await page.until(
       'document.querySelector("#memory-search-more").hidden===false && document.querySelector("#memory-results .memory-empty")?.textContent.includes("No matches in this batch")',
@@ -2422,6 +2424,12 @@ async function runMemoryBrowserAcceptance(
       mobile: true,
     });
     await page.until("innerWidth===390");
+    assert.equal(
+      await page.evaluate('document.querySelector("#open-nav").innerText.trim()'),
+      "Memory",
+    );
+    await assertBrowserControlReachable(page, "#open-nav", "mobile Memory entry");
+    await saveScreenshotIfRequested(page, "memory-mobile-entry.png");
     await page.click("#open-nav");
     await page.until(
       'document.querySelector("#rail").classList.contains("open") && document.activeElement.id==="close-nav"',
@@ -2699,8 +2707,6 @@ for (const mode of modes) {
       }),
     );
     assert.equal(typeof session.id, "string");
-    const namedSessionId = String(session.id);
-    const browserLegacyName = "Browser-only legacy name";
     const settingsPath = join(environment.agentDir, "settings.json");
     const settings = record(JSON.parse(await readFile(settingsPath, "utf8")));
     settings.defaultModel = "dwell-test-image";
@@ -2767,7 +2773,6 @@ for (const mode of modes) {
       return result;
     }
     const first = await page(`(()=>{
-      localStorage.setItem("dwell.web.preferences.v1",JSON.stringify({[${JSON.stringify(namedSessionId)}]:${JSON.stringify(browserLegacyName)}}));
       const original=window.fetch.bind(window);
       let release=()=>{};
       const gate=new Promise(resolve=>{release=resolve;});
@@ -2827,45 +2832,6 @@ for (const mode of modes) {
       false,
       "the existing default text model is reported as image-incompatible",
     );
-    const workspace = String(session.directory).split(/[\\/]/).filter(Boolean).at(-1);
-    await first.until(
-      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(workspace)}) && !row.textContent.includes(${JSON.stringify(browserLegacyName)}))`,
-    );
-    await first.click("#edit-session-name");
-    await first.until('document.querySelector("#session-name-dialog").open');
-    assert.equal(await first.evaluate('document.querySelector("#session-name-input").value'), "");
-    assert.equal(
-      await first.evaluate('!document.querySelector("#import-local-name").hidden'),
-      true,
-      "legacy browser names are offered only through an explicit import button",
-    );
-    await first.click("#import-local-name");
-    assert.equal(
-      await first.evaluate('document.querySelector("#session-name-input").value'),
-      browserLegacyName,
-    );
-    await first.click("#save-session-name");
-    await first.until(
-      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(browserLegacyName)}))`,
-    );
-    assert.equal(
-      record(await request(`/sessions/${namedSessionId}`)).displayName,
-      browserLegacyName,
-    );
-    const savedPreferences = JSON.parse(
-      String(await first.evaluate('localStorage.getItem("dwell.web.preferences.v1")')),
-    ) as Record<string, unknown>;
-    assert.equal(savedPreferences[namedSessionId], browserLegacyName);
-    await first.click("#edit-session-name");
-    await first.until('document.querySelector("#session-name-dialog").open');
-    await first.click("#reset-session-name");
-    await first.until(
-      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(workspace)}) && !row.textContent.includes(${JSON.stringify(browserLegacyName)}))`,
-    );
-    const resetName = record(await request(`/sessions/${namedSessionId}`));
-    assert.equal(resetName.displayName, null);
-    assert.equal(resetName.metadataRevision, 2);
-    console.log(`PASS ${mode} shared conversation names, explicit browser-name import, and reset`);
     console.log(`PASS ${mode} real browser pairing and session selection`);
     await assertStatusCloseGeometry(first, "desktop");
     await assertSavedRendererCacheAndImageGeneration(first);
@@ -2964,7 +2930,7 @@ for (const mode of modes) {
     assert.equal(created.model, "dwell-test-image");
     assert.equal(
       await first.evaluate('document.querySelector("#composer-directory").textContent.trim()'),
-      longDirectory,
+      longPathParts.at(-1),
     );
     await first.until(
       'document.querySelector("#model-label").textContent.trim()==="dwell-test-image" && !document.querySelector("#attach-image").disabled && document.querySelector("#attach-image").title==="Add images"',
@@ -2994,136 +2960,6 @@ for (const mode of modes) {
     await assertComposerLayout(first, "desktop");
     await assertDesktopSidebarWidth(first);
     await assertActionIconGeometry(first, "desktop");
-    const secondSessionId = String(session.id);
-    const originalDirectory = String((await request(`/sessions/${namedSessionId}`)).directory);
-    await first.evaluate(
-      `document.querySelector('#session-list .name-row[data-session-id="${namedSessionId}"]').click()`,
-    );
-    await first.until(
-      `document.querySelector('#session-list .name-row.active')?.dataset.sessionId===${JSON.stringify(namedSessionId)} && document.querySelector("#composer-directory").textContent===${JSON.stringify(originalDirectory)}`,
-    );
-    await first.click("#edit-session-name");
-    await first.until('document.querySelector("#session-name-dialog").open');
-    await first.type("#session-name-input", "Stale browser name");
-    await first.evaluate(`(()=>{
-      const original=window.fetch.bind(window);
-      let release=()=>{};
-      const gate=new Promise(resolve=>{release=resolve;});
-      window.__sessionNameRequestWaiting=false;
-      window.__releaseSessionNameRequest=()=>{window.fetch=original;release();};
-      window.fetch=async(input,init)=>{
-        const target=typeof input==="string"?input:input.url;
-        if(new URL(target,location.href).pathname.endsWith("/name")&&init?.method==="POST"){
-          window.__sessionNameRequestWaiting=true;
-          await gate;
-        }
-        return original(input,init);
-      };
-    })()`);
-    await first.click("#save-session-name");
-    await first.until("window.__sessionNameRequestWaiting");
-    const competingName = "Other browser name";
-    assert.equal(
-      record(
-        await request(`/sessions/${namedSessionId}/name`, {
-          displayName: competingName,
-          expectedRevision: 2,
-        }),
-      ).metadataRevision,
-      3,
-    );
-    await first.until(
-      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(competingName)}))`,
-    );
-    await first.click("#close-session-name");
-    await first.until('!document.querySelector("#session-name-dialog").open');
-    await first.evaluate(
-      `document.querySelector('#session-list .name-row[data-session-id="${secondSessionId}"]').click()`,
-    );
-    await first.until(
-      `document.querySelector('#session-list .name-row.active')?.dataset.sessionId===${JSON.stringify(secondSessionId)} && document.querySelector("#composer-directory").textContent===${JSON.stringify(longDirectory)}`,
-    );
-    await first.click("#edit-session-name");
-    await first.until(
-      'document.querySelector("#session-name-dialog").open && document.querySelector("#session-name-input").value===""',
-    );
-    await first.evaluate("window.__releaseSessionNameRequest()");
-    await delay(200);
-    assert.equal(await first.evaluate('document.querySelector("#session-name-dialog").open'), true);
-    assert.equal(await first.evaluate('document.querySelector("#session-name-input").value'), "");
-    assert.equal(
-      await first.evaluate('document.querySelector("#session-name-error").hidden'),
-      true,
-    );
-    await first.click("#close-session-name");
-    console.log(
-      `PASS ${mode} stale name conflicts do not affect a reopened editor for another session`,
-    );
-    const raceBase = record(await request(`/sessions/${namedSessionId}`));
-    const raceRevision = Number(raceBase.metadataRevision);
-    const delayedHttpName = "Delayed HTTP name";
-    const newerSseName = "Newer SSE name";
-    await first.evaluate(
-      `document.querySelector('#session-list .name-row[data-session-id="${namedSessionId}"]').click()`,
-    );
-    await first.until(
-      `document.querySelector('#session-list .name-row.active')?.dataset.sessionId===${JSON.stringify(namedSessionId)}`,
-    );
-    await first.click("#edit-session-name");
-    await first.until('document.querySelector("#session-name-dialog").open');
-    await first.type("#session-name-input", delayedHttpName);
-    await first.evaluate(`(()=>{
-      const original=window.fetch.bind(window);
-      let release=()=>{};
-      const gate=new Promise(resolve=>{release=resolve;});
-      window.__nameResponseWaiting=false;
-      window.__releaseNameResponse=()=>{window.fetch=original;release();};
-      window.fetch=async(input,init)=>{
-        const target=typeof input==="string"?input:input.url;
-        const response=await original(input,init);
-        if(new URL(target,location.href).pathname.endsWith("/name")&&init?.method==="POST"){
-          window.__nameResponseWaiting=true;
-          await gate;
-        }
-        return response;
-      };
-    })()`);
-    await first.click("#save-session-name");
-    await first.until("window.__nameResponseWaiting");
-    const delayedResponseSession = record(await request(`/sessions/${namedSessionId}`));
-    assert.equal(delayedResponseSession.displayName, delayedHttpName);
-    assert.equal(delayedResponseSession.metadataRevision, raceRevision + 1);
-    const newerNameSession = record(
-      await request(`/sessions/${namedSessionId}/name`, {
-        displayName: newerSseName,
-        expectedRevision: raceRevision + 1,
-      }),
-    );
-    assert.equal(newerNameSession.metadataRevision, raceRevision + 2);
-    await first.until(
-      `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(newerSseName)}))`,
-    );
-    assert.equal(
-      await first.evaluate('document.querySelector("#session-name-dialog").open'),
-      true,
-      "the same editor remains open while the newer SSE update arrives",
-    );
-    await first.evaluate("window.__releaseNameResponse()");
-    await first.until('!document.querySelector("#session-name-dialog").open');
-    assert.equal(
-      await first.evaluate(
-        `Array.from(document.querySelectorAll("#session-list .name-row")).some(row=>row.dataset.sessionId===${JSON.stringify(namedSessionId)} && row.textContent.includes(${JSON.stringify(newerSseName)}))`,
-      ),
-      true,
-      "a delayed successful HTTP response cannot replace a newer SSE name",
-    );
-    console.log(`PASS ${mode} delayed rename response preserves the newer SSE name`);
-    await first.evaluate(
-      `document.querySelector('#session-list .name-row[data-session-id="${secondSessionId}"]').click()`,
-    );
-    await first.until(
-      `document.querySelector('#session-list .name-row.active')?.dataset.sessionId===${JSON.stringify(secondSessionId)} && document.querySelector("#composer-directory").textContent===${JSON.stringify(longDirectory)}`,
-    );
     await assertInputGrows(first, "desktop");
     console.log(`PASS ${mode} directory-only browser creation uses the native Pi default model`);
     await first.type("#message", "hello");
@@ -3193,6 +3029,10 @@ for (const mode of modes) {
     );
     assert.equal(
       await second.evaluate('document.querySelector("#composer-directory").textContent.trim()'),
+      longPathParts.at(-1),
+    );
+    assert.equal(
+      await second.evaluate('document.querySelector("#composer-directory").title'),
       longDirectory,
     );
     await first.evaluate(`(()=>{
@@ -3942,7 +3782,7 @@ for (const mode of modes) {
     );
     assert.equal(
       await second.evaluate(
-        'document.querySelector("#conversation").textContent.includes("Start a conversation in this directory.")',
+        'document.querySelector("#conversation").textContent.trim()==="Distill removed the saved history." && !document.querySelector("#message").disabled',
       ),
       true,
     );
@@ -3982,7 +3822,7 @@ for (const mode of modes) {
       await second.evaluate(`(()=>({
         actions:document.querySelector(".composer-actions").getBoundingClientRect().height,
         context:document.querySelector(".composer-context").getBoundingClientRect().height,
-        nameButton:document.querySelector("#edit-session-name").getBoundingClientRect().height
+        modelButton:document.querySelector("#choose-model").getBoundingClientRect().height
       }))()`),
     );
     assert.equal(

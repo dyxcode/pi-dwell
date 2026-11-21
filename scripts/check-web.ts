@@ -233,6 +233,19 @@ function historyTransitionProbeScript(sessionId: string): string {
   })()`;
 }
 
+async function assertLibraryLaunch(page: BrowserPage): Promise<void> {
+  assert.deepEqual(
+    await page.evaluate(`Array.from(document.querySelectorAll('button[aria-haspopup="dialog"]'))
+      .filter(button => button.getAttribute('aria-label') === 'Browse library' || button.textContent.trim() === 'Browse library')
+      .map(button => ({header: !!button.closest('main > header'), width: button.offsetWidth, height: button.offsetHeight}))`),
+    [{ header: true, width: 36, height: 36 }],
+  );
+  await page.click("#library-open");
+  await page.until('document.querySelector("#library-dialog").open');
+  await page.click("#close-library");
+  assert.equal(await page.evaluate("document.activeElement.id"), "library-open");
+}
+
 async function assertComposerLayout(page: BrowserPage, viewport: string): Promise<void> {
   assert.equal(await page.evaluate("innerWidth > 760"), viewport === "desktop");
   assert.equal(
@@ -2807,6 +2820,7 @@ for (const mode of modes) {
     await first.until(
       'document.querySelector("#model-label").textContent.trim()==="dwell-test" && document.querySelector("#attach-image").disabled && document.querySelector("#attach-image").title.includes("Choose a model")',
     );
+    await assertLibraryLaunch(first);
     assert.equal(
       record(await request("/model-capabilities", { provider: "dwell-test", model: "dwell-test" }))
         .supportsImages,
@@ -3431,6 +3445,7 @@ for (const mode of modes) {
       deviceScaleFactor: 1,
       mobile: true,
     });
+    await assertLibraryLaunch(second);
     await assertComposerLayout(second, "mobile");
     await assertStatusCloseGeometry(second, "mobile");
     await assertActionIconGeometry(second, "mobile");

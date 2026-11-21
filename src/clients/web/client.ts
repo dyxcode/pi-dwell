@@ -518,7 +518,7 @@ async function changeLibraryReference(reference: LibraryReference, add: boolean)
 }
 function openLibrary(): void {
   if (!authenticated) return;
-  nav(false);
+  el("library-open", HTMLButtonElement).focus();
   libraryDialogGeneration++;
   libraryDialog.showModal();
   libraryError.textContent = "";
@@ -2827,8 +2827,7 @@ el("memory-reader-close", HTMLButtonElement).onclick = () => {
   memoryQuery.focus();
 };
 memoryRetry.onclick = () => void reloadClientCapabilities();
-for (const id of ["library-open", "library-open-mobile"])
-  el(id, HTMLButtonElement).onclick = openLibrary;
+el("library-open", HTMLButtonElement).onclick = openLibrary;
 el("close-library", HTMLButtonElement).onclick = () => libraryDialog.close();
 el("library-search-form", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();

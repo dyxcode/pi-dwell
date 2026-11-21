@@ -284,12 +284,12 @@ Local dependencies： [shared/discovery.ts](../../../../src/shared/discovery.ts)
 | [`changeModel`](../../../../src/clients/web/client.ts#L2707) | Function | choice, thinkingLevel | [文字解释](implementation/models.md#mechanisms) |
 | [`newSession`](../../../../src/clients/web/client.ts#L2752) | Function |  | [文字解释](implementation/models.md#execution) |
 | [`createSession`](../../../../src/clients/web/client.ts#L2760) | Function |  | [文字解释](implementation/models.md#execution) |
-| [`resetCloseDialog`](../../../../src/clients/web/client.ts#L2882) | Function |  | [文字解释](implementation/session-lifecycle.md#execution) |
-| [`dismissCloseDialog`](../../../../src/clients/web/client.ts#L2895) | Function |  | [文字解释](implementation/session-lifecycle.md#execution) |
-| [`pairingCode`](../../../../src/clients/web/client.ts#L2922) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
-| [`viewport`](../../../../src/clients/web/client.ts#L3019) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
-| [`responsive`](../../../../src/clients/web/client.ts#L3020) | Function |  | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`resume`](../../../../src/clients/web/client.ts#L3042) | Function |  | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`resetCloseDialog`](../../../../src/clients/web/client.ts#L2881) | Function |  | [文字解释](implementation/session-lifecycle.md#execution) |
+| [`dismissCloseDialog`](../../../../src/clients/web/client.ts#L2894) | Function |  | [文字解释](implementation/session-lifecycle.md#execution) |
+| [`pairingCode`](../../../../src/clients/web/client.ts#L2921) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
+| [`viewport`](../../../../src/clients/web/client.ts#L3018) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
+| [`responsive`](../../../../src/clients/web/client.ts#L3019) | Function |  | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`resume`](../../../../src/clients/web/client.ts#L3041) | Function |  | [文字解释](implementation/read-conversation.md#mechanisms) |
 | [`savedHistoryWarning`](../../../../src/clients/web/client.ts#L1029) | Function | | [Feature context](implementation/read-conversation.md#mechanisms) |
 | [`invalidateSessionNameEditor`](../../../../src/clients/web/client.ts#L866) | Function |  | [Feature context](implementation/session-names.md#mechanisms) |
 | [`closeSessionNameEditor`](../../../../src/clients/web/client.ts#L870) | Function |  | [Feature context](implementation/session-names.md#mechanisms) |
@@ -542,7 +542,7 @@ Local dependencies: [shared/memory.ts](../../../../src/shared/memory.ts).
 | Symbol | 类型 | Parameter 或 type | 文字解释 |
 | --- | --- | --- | --- |
 | [`HOST_PAGE`](../../../../src/clients/web/page.ts#L1) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
-| [`STYLE`](../../../../src/clients/web/page.ts#L213) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
+| [`STYLE`](../../../../src/clients/web/page.ts#L212) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
 
 
 ## src/clients/web/script.ts

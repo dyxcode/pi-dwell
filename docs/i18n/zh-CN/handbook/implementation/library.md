@@ -10,7 +10,7 @@
 
 ## 行为
 
-Web 客户端通过一个对话框浏览可选的本地 Current 内容库。最新内容和搜索结果可能包含已保存内容和 discovery candidate。已保存内容会显示有界 excerpt，并可打开精确版本阅读；candidate 会展示 discovery metadata、**Article text has not been saved.** 提示、发现时间和来源链接。没有选中会话也可以浏览；只有选中 Dwell 会话后才能添加或移除引用。
+桌面和手机端均通过顶栏的 **Browse library** 按钮打开本地 Current 内容库对话框。最新内容和搜索结果可能包含已保存内容和 discovery candidate。已保存内容会显示有界 excerpt，并可打开精确版本阅读；candidate 会展示 discovery metadata、**Article text has not been saved.** 提示、发现时间和来源链接。没有选中会话也可以浏览；只有选中 Dwell 会话后才能添加或移除引用。
 
 附加到会话的引用包含内容库绑定、条目身份和准确版本。Current 可以确认 candidate reference，也可以确认已保存版本。添加引用会为所选会话保存这些身份，Pi 上下文保持不变；它不会获取 candidate text，也不会将内容加入 prompt。Current 仍管理 discovery metadata 和已保存 article body。Current 不可用时，Host 仍可显示并移除已保存的引用；浏览内容、打开准确版本和添加新引用则必须连接到可用的内容库。
 

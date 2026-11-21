@@ -282,12 +282,12 @@ Local dependencies: [clients/web/attachments.ts](../../src/clients/web/attachmen
 | [`changeModel`](../../src/clients/web/client.ts#L2707) | Function | choice, thinkingLevel | [Feature context](implementation/models.md#mechanisms) |
 | [`newSession`](../../src/clients/web/client.ts#L2752) | Function |  | [Feature context](implementation/models.md#execution) |
 | [`createSession`](../../src/clients/web/client.ts#L2760) | Function |  | [Feature context](implementation/models.md#execution) |
-| [`resetCloseDialog`](../../src/clients/web/client.ts#L2882) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`dismissCloseDialog`](../../src/clients/web/client.ts#L2895) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`pairingCode`](../../src/clients/web/client.ts#L2922) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`viewport`](../../src/clients/web/client.ts#L3019) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`responsive`](../../src/clients/web/client.ts#L3020) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`resume`](../../src/clients/web/client.ts#L3042) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`resetCloseDialog`](../../src/clients/web/client.ts#L2881) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`dismissCloseDialog`](../../src/clients/web/client.ts#L2894) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`pairingCode`](../../src/clients/web/client.ts#L2921) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`viewport`](../../src/clients/web/client.ts#L3018) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`responsive`](../../src/clients/web/client.ts#L3019) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`resume`](../../src/clients/web/client.ts#L3041) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
 | [`savedHistoryWarning`](../../src/clients/web/client.ts#L1029) | Function | | [Feature context](implementation/read-conversation.md#mechanisms) |
 | [`invalidateSessionNameEditor`](../../src/clients/web/client.ts#L866) | Function |  | [Feature context](implementation/session-names.md#mechanisms) |
 | [`closeSessionNameEditor`](../../src/clients/web/client.ts#L870) | Function |  | [Feature context](implementation/session-names.md#mechanisms) |
@@ -539,7 +539,7 @@ Feature context: [Read and navigate a conversation](implementation/read-conversa
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
 | [`HOST_PAGE`](../../src/clients/web/page.ts#L1) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`STYLE`](../../src/clients/web/page.ts#L213) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`STYLE`](../../src/clients/web/page.ts#L212) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
 
 
 ## src/clients/web/script.ts

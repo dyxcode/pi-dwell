@@ -10,7 +10,7 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/library.md)
 
 ## Behavior
 
-The Web client can browse an optional local Current library from a single dialog. Latest items and search results can include saved content and discovery candidates. A saved item shows a bounded excerpt and opens its exact version for reading. A candidate shows discovery metadata and the message **Article text has not been saved.**, its discovery time, and a link to the source. Browsing is useful without a selected conversation. Attaching or removing a reference requires a selected Dwell session.
+The **Browse library** button in the top bar opens the local Current library dialog on desktop and mobile. Latest items and search results can include saved content and discovery candidates. A saved item shows a bounded excerpt and opens its exact version for reading. A candidate shows discovery metadata and the message **Article text has not been saved.**, its discovery time, and a link to the source. Browsing is useful without a selected conversation. Attaching or removing a reference requires a selected Dwell session.
 
 An attached reference identifies a library binding, item, and exact version. Current can confirm a candidate reference as well as a saved version. Attaching stores that identity for the selected session and leaves Pi context unchanged; it does not fetch candidate text or add content to the prompt. Current remains the owner of discovery metadata and saved article bodies. The host can keep displaying and removing saved references while Current is unavailable, although browsing, exact-version reads, and new attachments require the library to be open.
 

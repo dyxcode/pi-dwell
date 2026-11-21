@@ -3,10 +3,9 @@ import { test } from "node:test";
 import { HOST_PAGE, STYLE } from "../src/clients/web/page.ts";
 import { BROWSER_ASSETS } from "../src/clients/web/script.ts";
 
-test("the browser exposes one library dialog with desktop and mobile entry points", () => {
+test("the browser exposes one library entry in the shared header", () => {
   for (const id of [
     "library-open",
-    "library-open-mobile",
     "library-dialog",
     "library-search-form",
     "library-items",
@@ -15,9 +14,11 @@ test("the browser exposes one library dialog with desktop and mobile entry point
     "library-reference-action",
   ])
     assert.match(HOST_PAGE, new RegExp(`id="${id}"`));
+  assert.match(HOST_PAGE, /<header>[\s\S]*?<button id="library-open"[^>]*>[\s\S]*?<\/header>/);
+  assert.equal((HOST_PAGE.match(/<button id="library-open(?:-[^"]+)?"/g) ?? []).length, 1);
   assert.equal((HOST_PAGE.match(/id="library-dialog"/g) ?? []).length, 1);
   assert.match(HOST_PAGE, /aria-labelledby="library-title"/);
-  assert.match(STYLE, /#library-open-mobile/);
+  assert.match(STYLE, /#library-open\{/);
 });
 
 test("the browser reads exact library references and keeps attach actions out of turn submission", () => {

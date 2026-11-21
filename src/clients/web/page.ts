@@ -61,7 +61,6 @@ export const HOST_PAGE = `<!doctype html>
 <button id="memory-retry" class="text-button memory-more" type="button" hidden>Retry Memory</button>
 </section>
 <div class="rail-foot">
-<button id="library-open" class="text-button library-launch" type="button" aria-haspopup="dialog">Browse library</button>
 <p id="client-capabilities-error" class="footnote" role="status" hidden></p>
 <button id="client-capabilities-retry" class="text-button" type="button" hidden>Retry integration status</button>
 <button id="connection-badge" class="text-button" type="button">Connecting…</button>
@@ -74,7 +73,7 @@ export const HOST_PAGE = `<!doctype html>
 </button>
 <nav id="status-list" aria-label="Session status">
 </nav>
-<button id="library-open-mobile" class="icon" type="button" aria-label="Browse library" aria-haspopup="dialog">▤</button>
+<button id="library-open" class="icon" type="button" aria-label="Browse library" title="Browse library" aria-haspopup="dialog">▤</button>
 <button id="new-mobile" class="icon" type="button" aria-label="New conversation">＋</button>
 </header>
 <div class="notice-area">
@@ -949,7 +948,6 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #save-session-name{border:1px solid var(--dark);background:var(--dark);color:var(--surface);box-shadow:2px 2px var(--lilac)}
 @media(max-width:760px){#session-name-dialog{inset:auto 0 0;margin:0;width:100%;max-width:none;max-height:86dvh;padding:14px 20px max(24px,env(safe-area-inset-bottom));border:0;border-top:1px solid var(--line);box-shadow:0 -3px var(--lilac)}#session-name-dialog .handle{margin-bottom:14px}}
 
-.library-launch{display:block;min-height:38px;padding:7px 0;color:var(--dark);font:11px/1.6 var(--mono);text-align:left}
 #library-dialog{width:min(620px,calc(100vw - 32px));padding:18px;box-shadow:4px 4px var(--lilac)}
 #library-dialog .panel-heading{margin-bottom:12px;gap:12px;align-items:flex-start}
 #library-dialog h2{font:600 18px/1.4 var(--sans);letter-spacing:0;margin:0}
@@ -976,7 +974,7 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #library-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:38dvh;overflow:auto;padding:12px;background:var(--paper);font:12px/1.7 var(--sans)}
 #library-reference-action{min-height:38px;padding:8px 12px;font:11px var(--mono);margin-top:8px}
 #library-reference-action:disabled{opacity:.6}
-#library-open-mobile{display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:36px;height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:17px var(--mono)}
+#library-open{display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:36px;height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:17px var(--mono)}
 @media(max-width:760px){
  #library-dialog{width:100%;max-width:none;padding:12px 16px max(18px,env(safe-area-inset-bottom));box-shadow:0 -3px var(--lilac)}
  #library-dialog .handle{margin-bottom:12px}
@@ -1032,7 +1030,7 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  .section-head,.section-head small,.name-index,.sidebar-slot,.sidebar-state,.selected-directory,#connection-badge,.footnote,.eyebrow,.date,.byline{font-size:var(--type-meta)}
  .section-head{letter-spacing:.5px}
  .name-row{min-height:50px}
- .name-row .session-title,.text-button,.library-launch,.action,.new{font-size:var(--type-ui);line-height:1.5}
+ .name-row .session-title,.text-button,.action,.new{font-size:var(--type-ui);line-height:1.5}
  #status-list .tab-select{font-size:14px}
  #conversation .user .message-body,#conversation .assistant .message-body{font-size:var(--type-reading);line-height:1.75}
  #conversation .message+.message{margin-top:22px}

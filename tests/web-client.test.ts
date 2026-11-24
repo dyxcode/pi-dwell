@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HOST_PAGE, STYLE } from "../src/clients/web/page.ts";
 
-test("the real conversation shell exposes pairing, history, stop, and directory creation", () => {
+test("the real conversation shell exposes connection status, history, stop, and directory creation", () => {
   for (const id of [
-    "pair-form",
+    "retry-button",
     "composer",
     "message",
     "conversation",
@@ -24,7 +24,7 @@ test("the real conversation shell exposes pairing, history, stop, and directory 
   assert.match(STYLE, /#f3eee3/);
 });
 
-test("browser modules are public but directory and model discovery require authentication", async () => {
+test("browser modules are public but directory and model discovery require browser admission or CLI credentials", async () => {
   const { startHost } = await import("../src/server/http.ts");
   const { createPiEnvironment } = await import("./fixtures/pi-environment.ts");
   const { readFile } = await import("node:fs/promises");
@@ -43,7 +43,7 @@ test("browser modules are public but directory and model discovery require authe
       assert.equal(await response.text(), source);
     }
     for (const path of ["/api/v1/models", "/api/v1/directories"]) {
-      assert.equal((await fetch(host.url + path)).status, 401);
+      assert.equal((await fetch(host.url + path)).status, 403);
       assert.equal(
         (await fetch(host.url + path, { headers: { ...headers, Origin: "https://example.com" } }))
           .status,

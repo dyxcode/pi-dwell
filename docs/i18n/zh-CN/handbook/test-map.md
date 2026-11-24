@@ -10,28 +10,33 @@
 
 ## tests/access.test.ts
 
-验证 HTTPS origin 的独立 pairing、Host/Origin 信任边界、配置失败，以及 browser binding 与 SSE revocation。
+验证 HTTPS authority、代理限制、配置错误及浏览器事件流。
 
 [查看源码](../../../../tests/access.test.ts)
 
-- [a configured HTTPS origin pairs independently and preserves auth through restart, logout and revoke](../../../../tests/access.test.ts#L121)
-- [host/origin trust is explicit, forwarding headers cannot enable it, and development stays local](../../../../tests/access.test.ts#L259)
-- [invalid or unsafe access configuration fails startup without rewriting it or holding the port](../../../../tests/access.test.ts#L304)
-- [configured HTTPS-origin SSE requires browser binding and closes immediately on local revoke](../../../../tests/access.test.ts#L357)
+- [HTTPS authority configuration changes take effect only after restart](../../../../tests/access.test.ts#L121)
+- [host/origin trust is explicit, forwarding headers cannot enable it, and development stays local](../../../../tests/access.test.ts#L138)
+- [invalid or unsafe access configuration fails startup without rewriting it or holding the port](../../../../tests/access.test.ts#L183)
+- [configured HTTPS-origin SSE requires the browser request marker and closes on host shutdown](../../../../tests/access.test.ts#L236)
 
 ## tests/auth.test.ts
 
-验证 pairing code、private state、credential 校验、browser session persistence、logout/revoke，以及损坏或不安全文件的拒绝行为。
+验证本地 CLI 凭据、私有目录及旧浏览器数据的隔离。
 
 [查看源码](../../../../tests/auth.test.ts)
 
-- [short pairing codes regenerate pending collisions and preserve exact case](../../../../tests/auth.test.ts#L21)
-- [initialization is private, persistent, and status requires a credential](../../../../tests/auth.test.ts#L53)
-- [pair once, survive restart, forget and revoke browser sessions](../../../../tests/auth.test.ts#L75)
-- [unsafe credentials are rejected without resetting them](../../../../tests/auth.test.ts#L218)
-- [pairing storage failure never issues a browser cookie or resets durable state](../../../../tests/auth.test.ts#L231)
-- [data initialization rejects repository and vault destinations, including aliases](../../../../tests/auth.test.ts#L260)
-- [corrupt and unsupported browser-session records fail startup without overwriting files](../../../../tests/auth.test.ts#L279)
+- [the private local CLI credential survives a restart and invalid bearers cannot fall back](../../../../tests/auth.test.ts#L18)
+- [unsafe credentials are rejected without resetting them](../../../../tests/auth.test.ts#L47)
+- [data initialization rejects repository and vault destinations, including aliases](../../../../tests/auth.test.ts#L60)
+- [startup ignores legacy pairing storage without deleting or rewriting it](../../../../tests/auth.test.ts#L79)
+
+## tests/browser-access.test.ts
+
+验证免凭据浏览器请求、本地管理边界与 public Funnel 拒绝。
+
+[查看源码](../../../../tests/browser-access.test.ts)
+
+- [an unpaired browser can use the local and private proxy lanes without gaining CLI authority](../../../../tests/browser-access.test.ts#L28)
 
 ## tests/catalog.test.ts
 
@@ -58,9 +63,9 @@
 
 - [help is read-only and development data is separate](../../../../tests/cli.test.ts#L23)
 - [removed session commands fail before accessing host state, including help aliases](../../../../tests/cli.test.ts#L34)
-- [CLI status, pair and revoke use authenticated HTTP and do not print the long-lived credential](../../../../tests/cli.test.ts#L61)
-- [CLI reports missing credentials and unreachable hosts without writing state](../../../../tests/cli.test.ts#L78)
-- [public CLI rejects multi-instance options and malformed commands](../../../../tests/cli.test.ts#L102)
+- [CLI status keeps the bearer private and retired commands are rejected](../../../../tests/cli.test.ts#L61)
+- [CLI reports missing credentials and unreachable hosts without writing state](../../../../tests/cli.test.ts#L76)
+- [public CLI rejects multi-instance options and malformed commands](../../../../tests/cli.test.ts#L100)
 
 ## tests/conversation.test.ts
 
@@ -86,15 +91,15 @@
 
 ## tests/events-http.test.ts
 
-通过真实 loopback connection 验证 SSE authentication、event 顺序、cursor、revocation 与 slow-reader backpressure。
+通过真实 loopback 验证事件顺序、游标与慢客户端的隔离。
 
 [查看源码](../../../../tests/events-http.test.ts)
 
-- [events routes authenticate and report an unknown session before starting SSE](../../../../tests/events-http.test.ts#L421)
-- [SSE snapshots and events are ordered for two clients; disconnect detaches observation only](../../../../tests/events-http.test.ts#L437)
-- [browser SSE streams close on revoke, logout, expiry, and auth storage failure](../../../../tests/events-http.test.ts#L534)
-- [Last-Event-ID is unique, session-scoped, and validated before stream headers](../../../../tests/events-http.test.ts#L604)
-- [a slow SSE reader overflows only its real loopback connection](../../../../tests/events-http.test.ts#L654)
+- [events routes authenticate and report an unknown session before starting SSE](../../../../tests/events-http.test.ts#L379)
+- [SSE snapshots and events are ordered for two clients; disconnect detaches observation only](../../../../tests/events-http.test.ts#L395)
+- [browsers receive host-owned session name updates over SSE](../../../../tests/events-http.test.ts#L492)
+- [Last-Event-ID is unique, session-scoped, and validated before stream headers](../../../../tests/events-http.test.ts#L525)
+- [a slow SSE reader overflows only its real loopback connection](../../../../tests/events-http.test.ts#L575)
 
 ## tests/events.test.ts
 
@@ -240,10 +245,10 @@
 
 [查看源码](../../../../tests/history-http.test.ts)
 
-- [history reads an empty closed session without reopening Pi](../../../../tests/history-http.test.ts#L193)
-- [history route retains authentication, query, method, body, and exact-path guards](../../../../tests/history-http.test.ts#L220)
-- [history reads support paired browsers, completed pages, and active-turn metadata without Pi reads](../../../../tests/history-http.test.ts#L307)
-- [history rejects malformed signed cursors through the session error envelope](../../../../tests/history-http.test.ts#L385)
+- [history reads an empty closed session without reopening Pi](../../../../tests/history-http.test.ts#L165)
+- [history route retains authentication, query, method, body, and exact-path guards](../../../../tests/history-http.test.ts#L192)
+- [history reads support browsers, completed pages, and active-turn metadata without Pi reads](../../../../tests/history-http.test.ts#L279)
+- [history rejects malformed signed cursors through the session error envelope](../../../../tests/history-http.test.ts#L348)
 
 ## tests/history-service.test.ts
 
@@ -286,7 +291,7 @@
 - [closing is repeatable and releases the listening port](../../../../tests/host.test.ts#L72)
 - [a losing server cannot initialize state, even with a different data root](../../../../tests/host.test.ts#L82)
 - [status client rejects incompatible HTTP services](../../../../tests/host.test.ts#L93)
-- [Host, Origin, CSRF, media type, body sizes and rate limits are enforced](../../../../tests/host.test.ts#L111)
+- [Host, Origin, CSRF, media type, and body sizes are enforced](../../../../tests/host.test.ts#L111)
 
 ## tests/images-http.test.ts
 
@@ -515,12 +520,13 @@
 
 [查看源码](../../../../tests/sessions-http.test.ts)
 
-- [session routes require authentication and validate configuration/body boundaries](../../../../tests/sessions-http.test.ts#L47)
-- [slow authenticated configuration outlives the ordinary five-second socket timeout](../../../../tests/sessions-http.test.ts#L67)
-- [paired browsers can read sessions but cannot configure executables or bypass mutation guards](../../../../tests/sessions-http.test.ts#L93)
-- [HTTP create/list/open/close/context preserve one session across host restart](../../../../tests/sessions-http.test.ts#L154)
-- [HTTP creation can use the configured Pi default and idle model changes are durable](../../../../tests/sessions-http.test.ts#L188)
-- [disconnecting an admitted creation request does not cancel or duplicate it](../../../../tests/sessions-http.test.ts#L237)
+- [session routes require authentication and validate configuration/body boundaries](../../../../tests/sessions-http.test.ts#L51)
+- [slow authenticated configuration outlives the ordinary five-second socket timeout](../../../../tests/sessions-http.test.ts#L71)
+- [browsers can read sessions but cannot configure executables or bypass mutation guards](../../../../tests/sessions-http.test.ts#L97)
+- [browsers share session names, detect stale revisions and retain them across restart](../../../../tests/sessions-http.test.ts#L148)
+- [HTTP create/list/open/close/context preserve one session across host restart](../../../../tests/sessions-http.test.ts#L260)
+- [HTTP creation can use the configured Pi default and idle model changes are durable](../../../../tests/sessions-http.test.ts#L294)
+- [disconnecting an admitted creation request does not cancel or duplicate it](../../../../tests/sessions-http.test.ts#L343)
 
 ## tests/sessions.test.ts
 
@@ -572,8 +578,8 @@
 
 - [turn routes retain authentication, request limits, and exact path matching](../../../../tests/turns-http.test.ts#L95)
 - [HTTP turn admission is idempotent, session-scoped, and exposes finalized entries](../../../../tests/turns-http.test.ts#L148)
-- [paired browsers must present the binding and mutation headers for turn submission and abort](../../../../tests/turns-http.test.ts#L210)
-- [an admitted turn survives client disconnect, blocks competing work, and can be aborted](../../../../tests/turns-http.test.ts#L343)
+- [browsers must present the request marker and mutation origin for turn submission and abort](../../../../tests/turns-http.test.ts#L210)
+- [an admitted turn survives client disconnect, blocks competing work, and can be aborted](../../../../tests/turns-http.test.ts#L301)
 
 ## tests/turns.test.ts
 
@@ -592,12 +598,12 @@
 
 ## tests/web-client.test.ts
 
-验证实际 browser shell 的 pairing/history/stop/目录创建控件，以及公开 asset 与受保护 discovery 的边界。
+验证连接页、会话操作、公开资源以及受保护的 discovery。
 
 [查看源码](../../../../tests/web-client.test.ts)
 
-- [the real conversation shell exposes pairing, history, stop, and directory creation](../../../../tests/web-client.test.ts#L5)
-- [browser modules are public but directory and model discovery require authentication](../../../../tests/web-client.test.ts#L27)
+- [the real conversation shell exposes connection status, history, stop, and directory creation](../../../../tests/web-client.test.ts#L5)
+- [browser modules are public but directory and model discovery require browser admission or CLI credentials](../../../../tests/web-client.test.ts#L27)
 
 ## tests/web-events.test.ts
 
@@ -634,8 +640,10 @@
 [查看源码](../../../../tests/web.test.ts)
 
 - [the conversation page loads only same-origin external code and styles](../../../../tests/web.test.ts#L6)
-- [native browser compilation exposes a fixed set of credential-safe modules](../../../../tests/web.test.ts#L16)
-- [creation asks only for a directory and model selection sits above the composer](../../../../tests/web.test.ts#L44)
+- [native browser compilation exposes a fixed set of credential-safe modules](../../../../tests/web.test.ts#L15)
+- [creation asks only for a directory and model selection sits above the composer](../../../../tests/web.test.ts#L41)
+- [the Web client has no conversation name editor](../../../../tests/web.test.ts#L53)
+- [the sidebars use one heading and avoid duplicate search instructions](../../../../tests/web.test.ts#L66)
 
 ## tests/integrations.test.ts
 
@@ -719,10 +727,10 @@
 
 [查看源码](../../../../tests/memory-http.test.ts)
 
-- [authenticated memory routes page search and revision-pinned reads](../../../../tests/memory-http.test.ts#L10)
-- [memory routes use browser authentication and validate request and reader results](../../../../tests/memory-http.test.ts#L89)
-- [reader opening failures are nonfatal and capabilities retain configured state](../../../../tests/memory-http.test.ts#L195)
-- [the actual Distill reader preserves partial search pages, NUL text, revisions, and errors](../../../../tests/memory-http.test.ts#L228)
+- [authenticated memory routes page search and revision-pinned reads](../../../../tests/memory-http.test.ts#L9)
+- [memory routes use browser authentication and validate request and reader results](../../../../tests/memory-http.test.ts#L88)
+- [reader opening failures are nonfatal and capabilities retain configured state](../../../../tests/memory-http.test.ts#L178)
+- [the actual Distill reader preserves partial search pages, NUL text, revisions, and errors](../../../../tests/memory-http.test.ts#L211)
 
 ## tests/memory-web.test.ts
 

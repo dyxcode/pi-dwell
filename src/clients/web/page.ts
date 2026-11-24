@@ -13,16 +13,8 @@ export const HOST_PAGE = `<!doctype html>
 <section id="gate" class="gate">
 <div class="gate-card">
 <div class="brand">dwell.</div>
-<h1>Connect this browser.</h1>
+<h1>Connect to Dwell</h1>
 <p id="gate-message" role="status">Checking your connection…</p>
-<p>Create a pairing code on the host:</p>
-<code>npm run dwell -- pair</code>
-<p class="footnote">For a development host, use <code>npm run dwell -- pair --dev</code>.</p>
-<form id="pair-form">
-<label for="pair-code">Pairing code</label>
-<input id="pair-code" pattern="[A-HJ-NP-Za-hj-np-z2-9]{8}" minlength="8" maxlength="64" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
-<button id="pair-button" type="submit" class="action">Connect</button>
-</form>
 <button id="retry-button" type="button" class="text-button">Check connection ↗</button>
 </div>
 </section>
@@ -149,7 +141,6 @@ export const HOST_PAGE = `<!doctype html>
 </div>
 <p id="host-info">
 </p>
-<button id="logout-button" class="action">Forget this browser</button>
 <p class="footnote">Disconnecting leaves your work running on the host.</p>
 </dialog>
 <dialog id="image-dialog" aria-labelledby="image-title"><div class="panel-heading"><h2 id="image-title">Image</h2><button id="close-image" class="icon" type="button" aria-label="Close image preview">×</button></div><img id="preview-image" alt=""></dialog>
@@ -484,10 +475,8 @@ textarea{min-height:28px;height:32px}
 .gate-card{max-width:460px;margin:auto}
 .gate h1{font:600 26px/1.4 var(--mono)}
 .gate p{font-size:14px}
-.gate code{font:12px var(--mono);overflow-wrap:anywhere}
-.gate input,.form select{width:100%;height:44px;border:1px solid var(--line);background:var(--surface);padding:10px;font:13px var(--mono);border-radius:0}
+.form select{width:100%;height:44px;border:1px solid var(--line);background:var(--surface);padding:10px;font:13px var(--mono);border-radius:0}
 .gate label{display:block;margin:24px 0 8px;font:11px var(--mono)}
-.gate .action{margin-top:15px}
 .text-button{font:11px var(--mono);color:var(--dark);min-height:44px;padding:10px 0;text-align:left}
 .notice-area{padding:0 20px;display:flex;gap:10px;align-items:center}
 .notice-area:has(#notice[hidden]){display:none}
@@ -840,8 +829,10 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #conversation .tool-run.error .tool-status{color:var(--close-ink,#904d3c)}
 #conversation .context-source>summary::before{content:'';display:block;width:5px;height:5px;flex:0 0 5px;margin:0 4px 0 2px;border:solid currentColor;border-width:1px 1px 0 0;box-sizing:border-box;transform:rotate(45deg);transform-origin:center}
 #conversation .context-source[open]>summary::before{transform:rotate(135deg)}
-#conversation .activity-action{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#conversation :is(.activity-count,.activity-failures){flex:none;white-space:nowrap;font-size:11px}
+#conversation .activity-group>summary{width:fit-content;max-width:100%;gap:4px;font-family:var(--sans)}
+#conversation .activity-action{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#conversation .activity-action code{font:inherit;font-family:var(--mono);color:inherit;background:none;border:0;border-radius:0;box-shadow:none;padding:0}
+#conversation :is(.activity-count,.activity-failures){flex:none;white-space:nowrap;font-size:11px;opacity:.8}
 #conversation .activity-failures{color:var(--close-ink,#904d3c)}
 #conversation :is(.activity-group,.thinking-run,.tool-run)>summary{position:relative;text-decoration:none}
 #conversation :is(.activity-group,.thinking-run,.tool-run)>summary::before{content:'';position:absolute;left:-11px;top:50%;width:5px;height:5px;margin:0;border:solid currentColor;border-width:1px 1px 0 0;transform:translateY(-50%) rotate(45deg);transform-origin:center;box-sizing:border-box}
@@ -864,6 +855,9 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #conversation .thinking-run>summary{min-height:32px}
 #conversation .thinking-content{padding:2px 0 6px}
 #conversation .message-body :is(.activity-group,.tool-run){margin:4px 0 6px}
+#conversation .message-body .activity-group[open]{margin-bottom:12px}
+#conversation .message-body .activity-group>:is(.thinking-run,.tool-run){padding-left:16px;margin:0 0 2px}
+@media(min-width:761px){#conversation .activity-group>:is(.thinking-run,.tool-run)>summary{min-height:32px}}
 #conversation .tool-run .tool-output{padding-bottom:4px}
 @media(max-width:760px){#rail{width:min(360px,85vw)}#conversation .thinking-run>summary{min-height:36px}}
 
@@ -1021,14 +1015,14 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  #new-dialog h2,#model-dialog h2,#library-dialog h2,#close-session-title{font-size:22px}
  #image-dialog h2{font-size:var(--type-ui)}
  .form label,.gate label,#new-dialog label,#close-session-number{font-size:var(--type-meta);line-height:1.5}
- .form input,.form select,.gate input,#new-dialog #directory,#model-dialog #model-search,.library-search input{font-size:var(--type-ui);height:44px}
+ .form input,.form select,#new-dialog #directory,#model-dialog #model-search,.library-search input{font-size:var(--type-ui);height:44px}
  #new-dialog #browse,#new-dialog .directory-row,#new-dialog #create-button,.directory-choice{font-size:var(--type-ui);min-height:44px}
  #model-dialog .model-option{min-height:56px;padding:10px}
  #model-dialog .model-option strong,#thinking-model{font-size:var(--type-ui)}
  #model-dialog .model-option small,#model-dialog .back-models{font-size:var(--type-meta)}
  .close-actions button{font-size:14px;min-height:40px}
  #close-session-copy{font-size:var(--type-reading)}
- .gate-card{max-width:520px}.gate p,.empty p{font-size:var(--type-reading)}.gate code{font-size:14px}
+ .gate-card{max-width:520px}.gate p,.empty p{font-size:var(--type-reading)}
  .library-search .action,#library-reference-action{font-size:var(--type-ui);min-height:44px}
  .library-section h3,.library-reader h3,.library-result small,.library-reference-row small,.library-reference-row>button:first-child,.library-reference-row .library-remove,#library-source-link{font-size:var(--type-meta)}
  .library-result strong,.library-result span,.library-summary{font-size:var(--type-ui)}

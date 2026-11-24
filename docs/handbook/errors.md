@@ -10,12 +10,10 @@ Error codes are plain strings carried alongside an HTTP status or stream event. 
 
 | What you see | What it usually means | Safe next step |
 | --- | --- | --- |
-| The browser says storage is unavailable (`storage`, status `0`). | The browser could not write and verify its local binding in `localStorage`; no host request was made. | Allow site storage for the Dwell origin, then reload. This is browser-local state, separate from the host catalog. |
-| The host returns `401 unauthenticated` or `403 cli_required`. | Browser pairing expired/revoked, the browser identity is missing, or a CLI-only route was called without the local CLI credential. | Reconnect the browser using the local pairing flow. For CLI-only setup, use the local CLI and confirm it targets the same Dwell mode. Never paste the CLI credential into a browser request. |
-| Pairing returns `invalid_pairing`, `rate_limited`, or `pairing_limit`. | A one-time code is wrong, expired, already used, or the attempt/pending-code limit was reached. | Create a fresh pairing code with the local CLI. Wait for the stated retry window after rate limiting; pairing codes expire after five minutes. |
+| The host returns `401 unauthenticated` or `403 cli_required`. | The CLI bearer is invalid, or a browser called a CLI-only operation. | Use the local CLI and check that it targets the correct mode. Do not put the CLI token in a browser. |
 | `409 request_conflict` appears after a retry. | The same `requestId` was already bound to a different directory/model or message/images. | Reuse that ID only for the identical request. Use a new UUID for a distinct operation. The original operation is retained; do not infer that it was rolled back. |
 | A turn is still active (`409 session_busy` or `turn_pending`). | Dwell is protecting a session with an existing turn or native Pi execution, or the turn has not settled. | Check the turn/session state and let it settle, or explicitly abort the matching run. Do not submit the same work under a new ID just to get around the busy state. |
-| A request gets `429` such as `history_busy`, `subscriber_limit`, or `model_discovery_busy`. | A bounded read, event subscription, or discovery slot is occupied. | Honor `Retry-After` when present, or retry after the active operation ends. The current HTTP handler sets 300 seconds for `pairing_limit` and 60 seconds for other `429` responses. |
+| A request gets `429`. | A bounded read, subscription, or discovery slot is occupied. | Retry after the active operation finishes. |
 | History returns `410 history_unavailable`. | Dwell expected saved Pi history for this session but could not read the recorded file. | Keep the session and its original Pi history intact. Check that the same session file is present and readable before reopening or retrying. Do not create a replacement session and treat it as the old conversation. |
 | History returns `409 history_changed` or `400 invalid_cursor`. | The saved file changed during a bounded read, a history cursor is no longer valid, or an event cursor is malformed or belongs to another session. Stale/ahead/old-epoch event cursors instead receive resync plus a snapshot. | Reload the latest history or reconnect the event stream so the client receives a fresh snapshot. A history-page cursor and an event cursor are different values. |
 | Memory returns `503 memory_unavailable` or `409 memory_changed`. | The configured Distill reader cannot currently serve Memory, or a record's revision changed after search. | Retry the Memory reader. For a revision conflict, refresh the search and open the current result. Conversation work and Distill source coordination remain separate. |
@@ -23,7 +21,7 @@ Error codes are plain strings carried alongside an HTTP status or stream event. 
 | A turn is `interrupted` with `outcome_unknown`, or the UI says it could not confirm a send. | The host durably marked the turn `dispatching` but could not establish the final Pi outcome. The prompt may or may not have reached Pi. Dwell does not automatically replay it. | Inspect the existing turn and saved history first. Retry with the same `requestId` to retrieve the retained turn; use a new ID only if you deliberately intend a new execution after reconciling the old one. |
 | A turn is `failed` with `execution_rejected` or `provider_error`. | Pi explicitly rejected the prompt, or Pi settled the execution as failed. These are terminal turn outcomes, not HTTP error codes. | Read the turn's message and inspect saved history. A retry with the same `requestId` retrieves the same record; a deliberate new attempt needs a new request ID. |
 | Session/model discovery says `runtime_unavailable`, `runtime_mismatch`, or `model_discovery_failed`. | Pi could not start, did not restore the stored session/model as requested, or returned unsupported discovery output. | Check the locally configured Pi executable/version and selected model. Preserve the Dwell session and its native history while diagnosing. |
-| `503 storage_unavailable` or a `stream.error` with that code appears. | Dwell could not persist durable session/turn/auth state. After a turn dispatch, replay is deliberately withheld because execution may already have happened. | Stop issuing new work. Preserve the catalog and session files, inspect storage availability while the host is stopped, then diagnose the specific failing file or database operation. Do not remove the catalog or rotate credentials as a generic fix. |
+| `503 storage_unavailable` or a `stream.error` with that code appears. | Dwell could not persist durable session/turn state. After a turn dispatch, replay is deliberately withheld because execution may already have happened. | Stop issuing new work. Preserve the catalog and session files, inspect storage availability while the host is stopped, then diagnose the specific failing file or database operation. Do not remove the catalog or rotate credentials as a generic fix. |
 | SSE closes, reports a decoder error, or reconnects with a `resync` frame. | The browser saw malformed/oversized stream data, the connection ended, or the server's bounded replay window no longer covers the cursor. | Let the client reconnect and consume its fresh snapshot. `resync` is a recovery frame, not a failed turn. |
 
 ## How an error reaches the caller
@@ -62,7 +60,7 @@ These are literal codes currently emitted through the HTTP JSON error envelope, 
 
 Source: [HTTP handler](../../src/server/http.ts). This code list covers literal JSON-envelope codes from the handler; lower-level startup/configuration exceptions may be ordinary errors before a request can be served.
 
-### Access and pairing
+### Access control
 
 | Code | HTTP status | Meaning |
 | --- | ---: | --- |
@@ -71,14 +69,9 @@ Source: [HTTP handler](../../src/server/http.ts). This code list covers literal 
 | `forbidden_proxy` | 403 | A request with proxy-forwarded headers tried to use the local-listener Host lane. |
 | `local_credential_required` | 403 | A CLI credential was sent through the secure browser-origin lane; CLI credentials belong on the local address. |
 | `cli_required` | 403 | The operation is deliberately restricted to the local CLI credential. |
-| `unauthenticated` | 401 | There is no valid browser session or local CLI credential for this route. |
-| `invalid_pairing` | 401 | The one-time pairing code is invalid, expired, or already redeemed. |
-| `pairing_limit` | 429 | Too many pending pairing codes; the handler's `Retry-After` is 300 seconds. |
-| `rate_limited` | 429 | Too many pairing attempts; the handler's `Retry-After` is 60 seconds. |
-| `session_limit` | 429 in auth | The browser-session limit was reached; this is distinct from the Dwell open-session limit below. |
-| `storage_unavailable` | 503 | Authentication state could not be read or saved. |
+| `unauthenticated` | 401 | The supplied local CLI bearer is invalid. |
 
-Sources: [request access](../../src/server/access.ts), [pairing and browser-session state](../../src/server/auth.ts), [HTTP boundary](../../src/server/http.ts). Pairing codes are one-use credentials, not diagnostic error codes.
+Sources: [request access](../../src/server/access.ts), [CLI credential](../../src/server/auth.ts), [HTTP boundary](../../src/server/http.ts).
 
 ### Session, turn, history, and discovery operations
 
@@ -164,7 +157,7 @@ Turn recovery separates `accepted` from `dispatching`: an `accepted` turn has no
 | SSE startup error | `unauthenticated`, `stream_unavailable`, `stream_overloaded` | These are `SseStartError` codes raised before the stream begins. The HTTP host maps `unauthenticated` to 401 and the other two to 503. |
 | Pi live-event projection | `invalid_pi_event` | The event shape/content could not be projected into the live view. It does not say that saved native history is corrupt or that the Pi execution failed. |
 | Browser SSE decoder | `frame_too_large`, `malformed_sse`, `invalid_json`, `invalid_frame`, `event_mismatch`, `id_mismatch` | The browser rejected the stream framing, JSON, frame schema, event name, or cursor ID. These are local `SseDecodeError` values, not host response codes. Reconnect/resync rather than treating one as a turn result. |
-| Browser API wrapper | `storage`, `http` | `storage` is local browser-binding storage failure with status `0`; `http` is a fallback when the response body did not contain a compatible `{error:{code,message}}` envelope. Normal server codes pass through unchanged. |
+| Browser API wrapper | `http` | Fallback for an incompatible error envelope; valid host codes pass through unchanged. |
 | Resync reason | `cursor_stale`, `cursor_ahead`, `epoch_changed`, `replay_limit` | The server could not continue event replay from the supplied cursor and sent a fresh snapshot. These are control reasons on a `resync` frame, not error codes. |
 
 Sources: [event projection and stream errors](../../src/sessions/events.ts), [server SSE transport](../../src/server/sse.ts), [browser SSE decoder](../../src/clients/web/events.ts), [browser API wrapper](../../src/clients/web/transport.ts).
@@ -175,7 +168,7 @@ Pi RPC transport errors such as `Pi RPC connection closed`, `Pi RPC record excee
 
 | Area | Tests that exercise the current failure boundary |
 | --- | --- |
-| Host routing, access errors, auth and pairing | [access](../../tests/access.test.ts), [auth](../../tests/auth.test.ts), [host](../../tests/host.test.ts) |
+| Host routing, access errors, and CLI credentials | [access](../../tests/access.test.ts), [auth](../../tests/auth.test.ts), [host](../../tests/host.test.ts) |
 | Session and turn HTTP envelopes | [sessions HTTP](../../tests/sessions-http.test.ts), [turns HTTP](../../tests/turns-http.test.ts), [images HTTP](../../tests/images-http.test.ts) |
 | Saved history, cursor and cancellation errors | [history HTTP](../../tests/history-http.test.ts), [history service](../../tests/history-service.test.ts), [Pi history](../../tests/pi-history.test.ts), [history cancellation](../../tests/history-cancellation.test.ts), [history budget](../../tests/pi-history-budget.test.ts) |
 | SSE replay, overload, and browser decoding | [server event HTTP](../../tests/events-http.test.ts), [session events](../../tests/session-events.test.ts), [event hub](../../tests/events.test.ts), [browser SSE](../../tests/web-events.test.ts) |

@@ -6,7 +6,7 @@ Use Dwell, understand its behavior, and follow its implementation from browser c
 
 ## Quick Start
 
-[Install, pair, and send your first message](quick-start.md). Start here if you have not run Dwell before.
+[Install and send your first message](quick-start.md). Start here if you have not run Dwell before.
 
 ## Guide
 

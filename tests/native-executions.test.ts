@@ -727,7 +727,7 @@ test("native execution abort requires its current execution ID and preserves RPC
     `${host.url}/api/v1/sessions/${session.id}/native-executions/${active.id}/abort`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
   );
-  assert.equal(unauthenticated.status, 401);
+  assert.equal(unauthenticated.status, 403);
   const stale = await request(
     `/sessions/${session.id}/native-executions/${randomUUID()}/abort`,
     {},

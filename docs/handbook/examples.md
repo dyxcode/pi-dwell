@@ -14,7 +14,7 @@ With the background service stopped:
 npm start
 ```
 
-Keep that terminal open. Use another terminal in the checkout for `npm run dwell -- pair`. Ctrl-C stops the foreground host through its shutdown path.
+Keep that terminal open and visit `http://127.0.0.1:8787` on the host. Ctrl-C stops the foreground host through its shutdown path.
 
 ## Use isolated development state
 
@@ -29,7 +29,6 @@ In a second terminal:
 
 ```sh
 npm run dwell -- pi configure --executable /absolute/path/to/pi --dev
-npm run dwell -- pair --dev
 npm run dwell -- status --dev
 ```
 
@@ -44,14 +43,9 @@ npm run dwell -- status
 
 The first request returns process health without credentials. The second validates authenticated Dwell status. Neither proves a provider request will succeed.
 
-## Revoke browser access
+## Restrict remote browser access
 
-```sh
-npm run dwell -- auth revoke
-npm run dwell -- pair
-```
-
-Revocation removes all browser sessions and pending codes for the selected mode and closes unauthorized streams. Pair again only in browsers you want to reconnect. Conversation history remains.
+For private Tailscale Serve, restrict the Dwell host’s HTTPS port in your tailnet policy. Keep public Funnel off. The tailnet policy does not control direct loopback access on the host.
 
 ## Inspect service logs
 
@@ -105,4 +99,4 @@ The browser submits a shape like this to `POST /api/v1/sessions/<session-id>/tur
 
 A new request returns 202 and a durable turn record. Retrying the same request ID and payload returns the existing record with 200. Different content under the same identity conflicts. Use a fresh UUID for a genuinely new message.
 
-This JSON shows the request body. The browser transport and local CLI add authentication according to their respective requirements; [HTTP reference](http-auth.md#complete-route-map) lists the routes and admission rules.
+This JSON shows the request body. The browser transport and local CLI use their respective admission requirements; [HTTP reference](http-auth.md#complete-route-map) lists the routes and admission rules.

@@ -7,9 +7,8 @@ test("the conversation page loads only same-origin external code and styles", ()
   assert.match(HOST_PAGE, /href="\/style\.css"/);
   assert.match(HOST_PAGE, /src="\/client\.js" type="module"/);
   assert.doesNotMatch(HOST_PAGE, /<script(?![^>]*\bsrc=)[^>]*>/i);
-  assert.match(HOST_PAGE, /id="pair-form"/);
-  assert.match(HOST_PAGE, /npm run dwell -- pair/);
-  assert.ok(HOST_PAGE.includes('pattern="[A-HJ-NP-Za-hj-np-z2-9]{8}"'));
+  assert.match(HOST_PAGE, /id="retry-button"/);
+  assert.doesNotMatch(HOST_PAGE, /pair-form|logout-button/);
   assert.match(STYLE, /:focus-visible/);
 });
 
@@ -28,11 +27,9 @@ test("native browser compilation exposes a fixed set of credential-safe modules"
   assert.equal(BROWSER_ASSETS.has("/../../server/auth.js"), false);
   const transport = BROWSER_ASSETS.get("/transport.js") ?? "";
   assert.match(transport, /X-Dwell-Request/);
-  assert.match(transport, /X-Dwell-Browser/);
   assert.match(transport, /same-origin/);
-  assert.match(transport, /dwell\.browser-binding\.v1/);
-  assert.match(transport, /new Uint8Array\(32\)/);
-  assert.match(transport, /Browser storage is unavailable/);
+  assert.match(transport, /credentials: "omit"/);
+  assert.doesNotMatch(transport, /localStorage|X-Dwell-Browser/);
   assert.match(BROWSER_SCRIPT, /textContent/);
   assert.doesNotMatch(BROWSER_SCRIPT, /innerHTML|document\.cookie|navigator\.clipboard|cliToken/);
   for (const asset of BROWSER_ASSETS.values()) {

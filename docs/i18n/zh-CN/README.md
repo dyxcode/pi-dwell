@@ -56,13 +56,7 @@ npm run dwell -- pi configure \
   --entry-point "$(npm root -g)/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 ```
 
-生成浏览器配对码：
-
-```sh
-npm run dwell -- pair
-```
-
-在主机上打开 [http://127.0.0.1:8787](http://127.0.0.1:8787)，按原样输入八位配对码，再选择目录开始对话。配对码有效期为五分钟。关闭终端后，Dwell 继续在后台运行。
+在主机上打开 [http://127.0.0.1:8787](http://127.0.0.1:8787)，选择目录即可开始对话。关闭终端后，Dwell 仍在后台运行。
 
 在 Linux 上启用开机启动，并允许退出登录后继续运行：
 

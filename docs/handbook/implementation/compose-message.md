@@ -18,7 +18,7 @@ On a fine-pointer device, Enter submits and Shift+Enter inserts a line break; ac
 
 ## Ownership
 
-Text and image drafts live in browser-page memory. Text is held per session until a confirmed send or the page is discarded. An image draft keeps validated JSON-safe content and a temporary preview URL; selecting or pasting a file does not upload it. Removing an image revokes its URL, and losing authentication clears image drafts.
+Text and image drafts live in browser-page memory. Text is held per session until a confirmed send or the page is discarded. An image draft keeps validated JSON-safe content and a temporary preview URL; selecting or pasting a file does not upload it. Removing an image revokes its URL, and disconnecting the page clears image drafts.
 
 At submission, the browser sends text and the optional image group as one turn request. Dwell records execution identity and status; Pi's native history owns the saved message and image record. Temporary browser previews are separate from saved images.
 
@@ -35,7 +35,7 @@ At submission, the browser sends text and the optional image group as one turn r
 
 ## Mechanisms
 
-Image reading and browser decoding are asynchronous. Each batch captures its session and page generation. If the user switches sessions, loses authentication, or image intake becomes unavailable before decoding finishes, the stale result is discarded and its preview URL revoked. The first invalid file ends the batch; accepted images remain. The file input resets so the same file can be chosen again.
+Image reading and browser decoding are asynchronous. Each batch captures its session and page generation. If the user switches sessions, disconnects the page, or image intake becomes unavailable before decoding finishes, the stale result is discarded and its preview URL revoked. The first invalid file ends the batch; accepted images remain. The file input resets so the same file can be chosen again.
 
 The text input uses browser-native editing for newlines, paste, selection, and IME. Backspace acceleration requires a trusted, unmodified hold, a collapsed caret, and no composition; moving the caret, selecting text, or losing focus cancels it. The browser's native delete operation progressively removes more characters during a sustained hold; normal key repeat remains the fallback.
 

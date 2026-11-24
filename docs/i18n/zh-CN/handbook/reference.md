@@ -19,8 +19,6 @@
 | `--help` | 输出支持的语法 | 无 |
 | `serve` | 启动 foreground host | Production；可选 `--dev` |
 | `status` | 返回通过 authentication 的 HostStatus JSON | Production；可选 `--dev` |
-| `pair` | 创建 single-use pairing code | Production；可选 `--dev` |
-| `auth revoke` | 撤销全部 browser 和 pending pairing code | Production；可选 `--dev` |
 | `pi configure --executable <absolute> [--entry-point <absolute>]` | 验证并保存外部 Pi 配置；要求先关闭已打开的 session | Production；可选 `--dev` |
 | `service install` | 注册 user service | Production |
 | `service start` | 启动并等待通过 authentication 的 readiness 检查 | Production |
@@ -40,7 +38,6 @@
 | Production data | `~/.local/share/pi-dwell` | Dwell 管理的 local state |
 | Development data | `~/.local/share/pi-dwell-dev` | 独立的 credential/catalog/native session |
 | `auth-token` | Data directory | Private local CLI bearer credential |
-| `browser-sessions.json` | Data directory | Browser credential 的 hash 和 expiry |
 | `catalog.sqlite` | Data directory | Runtime configuration、session catalog、durable turn ledger |
 | 可选的 `integrations.json` | Data directory | 显式配置的 Distill module/database，用于 Memory 和 source coordination；另可配置 Current module/root/binding；见 [Distill 配置](guide.md#distill-configuration) 和 [Current Library](guide.md#current-library) |
 | `sessions/<Dwell session ID>/` | Data directory | Pi native JSONL session file |
@@ -66,7 +63,7 @@ Production data directory 创建后，按下面的准确 schema 配置其中的 
 }
 ```
 
-该文件必须是归 service user 所有、权限为 0600 的 regular file。Origin 不带结尾斜杠、path、query 或 fragment。修改后重启 service，将 proxy target 设为 `http://127.0.0.1:8787`，再在 HTTPS 地址下为 browser pairing。Local origin 和 HTTPS origin 各有独立的 browser binding/cookie。CLI bearer authentication 仍只允许使用 local 地址。
+该文件必须是归 service user 所有、权限为 0600 的 regular file。Origin 不带结尾斜杠、path、query 或 fragment。修改后重启 service，将 proxy target 设为 `http://127.0.0.1:8787`，然后通过私有网络打开 HTTPS 地址。访问范围由代理的网络策略决定；不要使用 public Funnel。CLI bearer authentication 仍只允许使用 local 地址。
 
 准确的 application behavior 和 acceptance check 见 [HTTP access internals](http-auth.md#authority-and-https-configuration)。
 

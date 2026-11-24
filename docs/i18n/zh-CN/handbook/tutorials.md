@@ -14,13 +14,13 @@
 
 **目标：**区分 browser connection 与 host 管理的 session。
 
-1. 配对 browser，并在一个你熟悉的目录中创建 session。
+1. 打开 Dwell，并在一个你熟悉的目录中创建 session。
 2. 发送一个简短问题，等待回复。
 3. 关闭 browser tab，保持 Dwell service 运行。
 4. 使用相同 browser profile，再次打开同一个 origin。选择已有 session，不要重新创建。
 5. 阅读已保存的对话，并针对上一次回复继续提问。
 
-Service 管理 runtime；关闭 tab 只会断开 observation。新的 browser profile 或另一个 origin 需要单独 pairing。未发送的 image draft 位于 browser memory，不属于这次 persistence 操作所验证的内容。
+Service 管理 runtime；关闭 tab 只会断开 observation。未发送的 image draft 位于 browser memory，不属于这次 persistence 操作所验证的内容。
 
 **代码路径：**browser transport → HTTP session/history/event routes → SessionService → Pi JSONL。参见[系统流程](system.md#live-output-saved-history-and-reconnect)。
 
@@ -89,4 +89,4 @@ Picker 使用 active session 的 registry，其中可以包含受支持的 exten
 6. 找到 terminal bookkeeping 和 saved-history coverage。注意为什么可以先观察到 live reply，之后才得到完整 saved history。
 7. 阅读 [turns.test.ts](../../../../tests/turns.test.ts)、[turns-http.test.ts](../../../../tests/turns-http.test.ts) 和 [turn-recovery.test.ts](../../../../tests/turn-recovery.test.ts)。修改行为前先运行相关 test file。
 
-通过[源码索引](source-map.md)定位 symbol，通过[测试索引](test-map.md)查找相关 scenario。相同阅读方法也适用于 model switching、cancellation 和 browser pairing。
+通过[源码索引](source-map.md)定位 symbol，通过[测试索引](test-map.md)查找相关 scenario。相同阅读方法也适用于 model switching、cancellation 和 browser access。

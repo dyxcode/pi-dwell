@@ -69,7 +69,7 @@
 
 [`check-pi.ts`](../../../../scripts/check-pi.ts) 要求提供一个绝对 executable path，可选再提供一个绝对 entry point，然后通过 fixture environment overrides 启动 runtime test file。Runner budget 为 60 秒；各 scenario 仍保留自己的 timeout。SIGINT 会转发给 child。Offline fixtures 会验证 installed binary 的 protocol compatibility，不会联系 provider account。
 
-[`check-web.ts`](../../../../scripts/check-web.ts) 通过 DevTools WebSocket protocol 驱动真实 Chrome process。它启动隔离 fixtures，通过真实 HTTP/HTTPS pages 执行 pairing，测试 conversation/model/image/stream/lifecycle behavior，并使用临时 browser profiles。可选 executable positional argument 会覆盖 macOS Chrome 默认位置。`--http` 或 `--https` 选择一种 mode；未指定时两种都会运行。`DWELL_WEB_SCREENSHOT_DIR` 可选用于保存 acceptance screenshots。私有测试产物应保存到 repository 之外的本地位置。
+[`check-web.ts`](../../../../scripts/check-web.ts) 通过 DevTools WebSocket protocol 驱动真实 Chrome process。它启动隔离 fixtures，打开真实 HTTP/HTTPS pages，测试 conversation/model/image/stream/lifecycle behavior，并使用临时 browser profiles。可选 executable positional argument 会覆盖 macOS Chrome 默认位置。`--http` 或 `--https` 选择一种 mode；未指定时两种都会运行。`DWELL_WEB_SCREENSHOT_DIR` 可选用于保存 acceptance screenshots。私有测试产物应保存到 repository 之外的本地位置。
 
 <a id="reading-tests-by-boundary"></a>
 

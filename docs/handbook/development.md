@@ -59,7 +59,7 @@ The default check needs no provider access or credentials. Browser and installed
 
 [`check-pi.ts`](../../scripts/check-pi.ts) requires one absolute executable and an optional absolute entry point, then spawns the runtime test file with fixture environment overrides. The file has a 60-second runner budget, while individual scenarios retain their own timeouts. SIGINT is forwarded to the child. Offline fixtures verify the installed binary's protocol compatibility without contacting a provider account.
 
-[`check-web.ts`](../../scripts/check-web.ts) drives a real Chrome process through the DevTools WebSocket protocol. It starts isolated fixtures, pairs through real HTTP/HTTPS pages, exercises conversation/model/image/stream/lifecycle behavior, and uses temporary browser profiles. An optional executable positional argument overrides the macOS Chrome default. `--http` or `--https` selects one mode; without either, both run. `DWELL_WEB_SCREENSHOT_DIR` optionally saves acceptance screenshots. Use a local destination outside the repository for private test artifacts.
+[`check-web.ts`](../../scripts/check-web.ts) drives a real Chrome process through the DevTools WebSocket protocol. It starts isolated fixtures, opens real HTTP/HTTPS pages, exercises conversation/model/image/stream/lifecycle behavior, and uses temporary browser profiles. An optional executable positional argument overrides the macOS Chrome default. `--http` or `--https` selects one mode; without either, both run. `DWELL_WEB_SCREENSHOT_DIR` optionally saves acceptance screenshots. Use a local destination outside the repository for private test artifacts.
 
 ## Reading tests by boundary
 

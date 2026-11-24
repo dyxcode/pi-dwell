@@ -13,7 +13,7 @@ Each chapter follows a feature through user behavior, module responsibilities, d
 | Feature | Contents |
 | --- | --- |
 | [Run and manage the Host](host-service.md) | Background service, private storage, configuration and shutdown |
-| [Connect a browser](pairing.md) | Pairing, credentials, trusted origins and revocation |
+| [Connect a browser](browser-access.md) | Loopback, private HTTPS, and CLI credentials |
 | [Create and return to a conversation](session-lifecycle.md) | Session identity, Pi processes, project resources and restart recovery |
 | [Session name metadata](session-names.md) | Conversation labels, shared names and revision handling |
 | [Choose a directory, model and thinking level](models.md) | Discovery, capability checks, selection and saved configuration |

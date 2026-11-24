@@ -104,7 +104,7 @@ test("turn routes retain authentication, request limits, and exact path matching
     headers: { "Content-Type": "application/json" },
     body,
   });
-  assert.equal(unauthenticated.status, 401);
+  assert.equal(unauthenticated.status, 403);
 
   const malformed = await fetch(route, {
     method: "POST",
@@ -207,29 +207,11 @@ test("HTTP turn admission is idempotent, session-scoped, and exposes finalized e
   assert.ok(Array.isArray(result.entries) && result.entries.length > 0);
 });
 
-test("paired browsers must present the binding and mutation headers for turn submission and abort", async (t) => {
-  const { host, request, configure, createSession } = await setup(t);
+test("browsers must present the request marker and mutation origin for turn submission and abort", async (t) => {
+  const { host, configure, createSession } = await setup(t);
   await configure();
   const session = await createSession();
-  const pairingResponse = await request("/auth/pairings", {});
-  assert.equal(pairingResponse.status, 201);
-  const pairing = asRecord(await pairingResponse.json());
-  assert.ok(typeof pairing.code === "string");
-
-  const browserKey = "b".repeat(64);
-  const paired = await fetch(`${host.url}/api/v1/auth/pair`, {
-    method: "POST",
-    headers: {
-      Origin: host.url,
-      "X-Dwell-Request": "1",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ code: pairing.code, browserKey }),
-  });
-  assert.equal(paired.status, 200);
-  const cookie = paired.headers.get("set-cookie")?.split(";")[0];
-  assert.ok(cookie);
-  const browserHeaders = { Cookie: cookie, "X-Dwell-Browser": browserKey };
+  const browserHeaders = { "X-Dwell-Request": "1" };
   const browserRequest: HttpRequest = (path, body, signal) =>
     fetch(`${host.url}/api/v1${path}`, {
       method: body === undefined ? "GET" : "POST",
@@ -264,22 +246,10 @@ test("paired browsers must present the binding and mutation headers for turn sub
   assert.equal(missingOrigin.status, 403);
   const missingMutationHeader = await fetch(turnUrl, {
     method: "POST",
-    headers: { ...browserHeaders, Origin: host.url, "Content-Type": "application/json" },
+    headers: { Origin: host.url, "Content-Type": "application/json" },
     body: JSON.stringify(create),
   });
   assert.equal(missingMutationHeader.status, 403);
-  const missingBinding = await fetch(turnUrl, {
-    method: "POST",
-    headers: {
-      Cookie: cookie,
-      Origin: host.url,
-      "X-Dwell-Request": "1",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(create),
-  });
-  assert.equal(missingBinding.status, 401);
-
   const accepted = await browserMutation(turnPath, create);
   assert.equal(accepted.status, 202);
   const turn = asTurnInfo(await accepted.json());
@@ -312,22 +282,10 @@ test("paired browsers must present the binding and mutation headers for turn sub
   assert.equal(abortMissingOrigin.status, 403);
   const abortMissingMutationHeader = await fetch(abortUrl, {
     method: "POST",
-    headers: { ...browserHeaders, Origin: host.url, "Content-Type": "application/json" },
+    headers: { Origin: host.url, "Content-Type": "application/json" },
     body: emptyBody,
   });
   assert.equal(abortMissingMutationHeader.status, 403);
-  const abortMissingBinding = await fetch(abortUrl, {
-    method: "POST",
-    headers: {
-      Cookie: cookie,
-      Origin: host.url,
-      "X-Dwell-Request": "1",
-      "Content-Type": "application/json",
-    },
-    body: emptyBody,
-  });
-  assert.equal(abortMissingBinding.status, 401);
-
   const abortResponse = await browserMutation(abortPath, {});
   assert.equal(abortResponse.status, 200);
   assert.equal(asTurnInfo(await abortResponse.json()).cancellationRequested, true);

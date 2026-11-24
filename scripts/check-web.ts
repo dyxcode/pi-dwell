@@ -854,7 +854,7 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
   const longCommand = `echo ${"x".repeat(320)}`;
   assert.equal(
     await page.evaluate(`(async()=>{
-      const {renderSavedConversation}=await import("/conversation.js");
+      const {groupActivity,renderSavedConversation}=await import("/conversation.js");
       const block=(type,text,callId=null,name=null)=>({type,text,callId,name});
       const entry=(id,role,type,blocks,extra={})=>({
         id,parentId:null,timestamp:"2026-10-27T00:00:00.000Z",type,role,blocks,
@@ -924,7 +924,8 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
         entry("activity-failure","bashExecution","bashExecution",[
           block("tool_call","npm run check",null,"bash"),block("text","Private noisy test output")
         ],{error:true}),
-        entry("activity-answer","assistant","message",[block("text","Visible final answer.")])
+        entry("activity-answer","assistant","message",[block("text","Visible final answer.")]),
+        entry("activity-single","assistant","message",[block("thinking","# One thought\\n\\nStandalone reasoning.")])
       ]));
       const running=document.createElement("div");
       running.id="running-activity-test-fixture";
@@ -934,7 +935,28 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
           block("tool_call",JSON.stringify({command:longCommand}),"running-tool","bash")
         ],{nativeKey:"running-owner"})
       ],[],false,undefined,[{ownerKey:"running-owner",callId:"running-tool",status:"running",output:""}]));
-      fixture.append(focusSource,renderSavedConversation(entries),rhythm,activity,running);
+      const runningTool=document.createElement("div");
+      runningTool.id="running-tool-test-fixture";
+      runningTool.append(renderSavedConversation([
+        entry("running-short","assistant","message",[
+          block("tool_call","{}","running-echo","echo")
+        ],{nativeKey:"running-short-owner"})
+      ],[],false,undefined,[{ownerKey:"running-short-owner",callId:"running-echo",status:"running",output:""}]));
+      const fallbacks=document.createElement("div");
+      fallbacks.id="activity-fallbacks-test-fixture";
+      for(const [type,title] of [["thinking-run","Thinking"],["tool-run error","Failed"]]) {
+        const body=document.createElement("div");
+        const step=document.createElement("details");
+        step.className=type;
+        step.dataset.key=type;
+        const summary=document.createElement("summary");
+        summary.textContent=title;
+        step.append(summary);
+        body.append(step);
+        groupActivity(body,true);
+        fallbacks.append(body);
+      }
+      fixture.append(focusSource,renderSavedConversation(entries),rhythm,activity,running,runningTool,fallbacks);
       document.querySelector("#conversation").append(fixture);
       return true;
     })()`),
@@ -943,15 +965,15 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
   );
 
   try {
-    assert.deepEqual(
+    const activityLayout = record(
       await page.evaluate(`(()=>{
       const root=document.querySelector("#activity-test-fixture");
       const groups=[...root.querySelectorAll(".activity-group")];
       const answer=[...root.querySelectorAll(".markdown p")];
       const visible=item=>item.checkVisibility({contentVisibilityAuto:true});
       const [summary,failureSummary]=groups.map(group=>group.querySelector(":scope>summary"));
-      const count=summary.lastElementChild;
       const toolSummary=root.querySelector(".tool-run>summary");
+      const standalone=root.querySelector(".message-body > .thinking-run > summary");
       const running=document.querySelector("#running-activity-test-fixture .activity-group>summary");
       const action=running.firstElementChild;
       const runningCount=running.lastElementChild;
@@ -960,11 +982,17 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
           const style=getComputedStyle(group);
           return style.backgroundColor==="rgba(0, 0, 0, 0)" && style.borderTopWidth==="0px";
         }),
-        matchesToolFont:getComputedStyle(summary).font===getComputedStyle(toolSummary).font,
-        countAtRight:Math.abs(count.getBoundingClientRect().right-summary.getBoundingClientRect().right)<4,
-        labels:[...summary.children].map(item=>item.textContent),
-        failureLabels:[...failureSummary.children].map(item=>item.textContent),
-        runningLabels:[...running.children].map(item=>item.textContent),
+        editorialFont:getComputedStyle(summary).fontFamily!==getComputedStyle(toolSummary).fontFamily,
+        commandUsesMono:!!action.querySelector("code") && getComputedStyle(action.querySelector("code")).fontFamily===getComputedStyle(toolSummary).fontFamily,
+        fitsContent:summary.getBoundingClientRect().width<summary.closest(".message-body").getBoundingClientRect().width &&
+          failureSummary.getBoundingClientRect().width<summary.getBoundingClientRect().width,
+        labels:summary.textContent.replace(/\\s+/g," ").trim(),
+        failureLabels:failureSummary.textContent.replace(/\\s+/g," ").trim(),
+        runningLabels:running.textContent.replace(/\\s+/g," ").trim(),
+        runningTool:document.querySelector("#running-tool-test-fixture .activity-group > summary").textContent.replace(/\\s+/g," ").trim(),
+        standalone:standalone?.textContent ?? null,
+        liveFallbacks:[...document.querySelectorAll("#activity-fallbacks-test-fixture .activity-group > summary")].map(item=>item.textContent),
+        thoughtOnly:document.querySelector("#quiet-process-test-fixture > .assistant .activity-group > summary").textContent,
         runningFits:action.scrollWidth>action.clientWidth && action.getBoundingClientRect().right<runningCount.getBoundingClientRect().left && getComputedStyle(action).textOverflow==="ellipsis",
         open:groups.map(group=>group.open),
         steps:groups.map(group=>group.querySelectorAll(".thinking-run,.tool-run").length),
@@ -972,13 +1000,21 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
         outputVisible:visible(root.querySelector(".tool-run.error .tool-output"))
       };
     })()`),
+    );
+    assert.deepEqual(
+      activityLayout,
       {
         cleanWrapper: true,
-        matchesToolFont: true,
-        countAtRight: true,
-        labels: ["Activity", "30 steps"],
-        failureLabels: ["Activity", "1 failed", "1 step"],
-        runningLabels: [`Running: $ ${longCommand}`, "2 steps"],
+        editorialFont: true,
+        commandUsesMono: true,
+        fitsContent: true,
+        labels: "15 thoughts · 15 tools",
+        failureLabels: "1 tool · 1 failed",
+        runningLabels: `Running $ ${longCommand} · 2 steps`,
+        runningTool: "Running echo · 1 step",
+        standalone: "One thought",
+        liveFallbacks: ["Thinking · 1 step", "Working · 1 failed · 1 step"],
+        thoughtOnly: "4 thoughts",
         runningFits: true,
         open: [false, false],
         steps: [30, 1],
@@ -1175,18 +1211,22 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
           userToAssistant:answer.top-user.bottom,assistantToUser:followup.top-answer.bottom,
           paragraphGap:secondParagraph.top-firstParagraph.bottom,
           thinkingGap:nextThinking.top-lastThinking.bottom,
-          toolGap:nextTool.top-firstTool.bottom
+          toolGap:nextTool.top-firstTool.bottom,
+          childIndent:tools[0].querySelector(":scope>summary").getBoundingClientRect().left-tools[0].closest(".activity-group").getBoundingClientRect().left,
+          childMinHeight:getComputedStyle(tools[0].querySelector(":scope>summary")).minHeight
         };
       })()`),
     );
     assert.equal(rhythm.messageCount, 4);
     assert.equal(rhythm.paragraphCount, 2);
+    assert.equal(rhythm.childIndent, 16, `${viewport} child steps are indented`);
+    if (viewport === "desktop") assert.equal(rhythm.childMinHeight, "32px");
     for (const [key, label, expected] of [
       ["userToAssistant", "user reply gap", viewport === "desktop" ? 16 : 10],
       ["assistantToUser", "between-turn gap", viewport === "desktop" ? 22 : 16],
       ["paragraphGap", "paragraph gap", viewport === "desktop" ? 12 : 8],
-      ["thinkingGap", "thinking detail gap", 4],
-      ["toolGap", "tool detail gap", 6],
+      ["thinkingGap", "thinking detail gap", 2],
+      ["toolGap", "tool detail gap", 2],
     ] as const) {
       const value = Number(rhythm[key]);
       assert.ok(
@@ -1863,13 +1903,6 @@ async function runCurrentLibraryBrowserAcceptance(
     });
     await page.call("Page.navigate", { url: host.url });
     await page.until(
-      'document.querySelector("#gate-message")?.textContent === "Pair this browser to connect." && !document.querySelector("#pair-button").disabled',
-    );
-    const pairing = record(await request("/auth/pairings", {}));
-    assert.match(String(pairing.code), /^[A-HJ-NP-Za-hj-np-z2-9]{8}$/);
-    await page.type("#pair-code", String(pairing.code));
-    await page.click("#pair-button");
-    await page.until(
       '!document.querySelector("#app").hidden && document.querySelectorAll("#session-list .name-row").length===2',
     );
 
@@ -2421,13 +2454,6 @@ async function runMemoryBrowserAcceptance(
     });
     await page.call("Page.navigate", { url: host.url });
     await page.until(
-      'document.querySelector("#gate-message")?.textContent === "Pair this browser to connect." && !document.querySelector("#pair-button").disabled',
-    );
-    const pairing = record(await request("/auth/pairings", {}));
-    assert.match(String(pairing.code), /^[A-HJ-NP-Za-hj-np-z2-9]{8}$/);
-    await page.type("#pair-code", String(pairing.code));
-    await page.click("#pair-button");
-    await page.until(
       '!document.querySelector("#app").hidden && document.querySelectorAll("#session-list .name-row").length===2 && document.querySelectorAll("#status-list .status-tab").length===2',
     );
     await assertMemoryBrowserMode(page, "standalone");
@@ -2885,34 +2911,6 @@ for (const mode of modes) {
       };
     })()`);
     await first.until(
-      'document.querySelector("#gate-message")?.textContent === "Pair this browser to connect." && !document.querySelector("#pair-button").disabled',
-    );
-    const pairing = record(await request("/auth/pairings", {}));
-    assert.match(String(pairing.code), /^[A-HJ-NP-Za-hj-np-z2-9]{8}$/);
-    for (const [value, valid] of [
-      ["AbCd2345", true],
-      ["abcdefgh", true],
-      ["ABCDEFGH", true],
-      ["AbCd234", false],
-      ["AbCd-2345", false],
-      ["AbCd234O", false],
-      ["AbCd234i", false],
-    ] as const) {
-      assert.equal(
-        await first.evaluate(`(() => {
-          const input = document.querySelector('#pair-code');
-          input.value = ${JSON.stringify(value)};
-          return input.checkValidity();
-        })()`),
-        valid,
-      );
-    }
-    await first.type("#pair-code", "");
-    await first.evaluate("document.querySelector('#pair-code').focus()");
-    await first.call("Input.insertText", { text: ` ${String(pairing.code)} ` });
-    assert.equal(await first.evaluate("document.querySelector('#pair-code').value"), pairing.code);
-    await first.click("#pair-button");
-    await first.until(
       '!document.querySelector("#app").hidden && !document.querySelector("#message").disabled',
     );
     await first.until(
@@ -2929,7 +2927,7 @@ for (const mode of modes) {
       false,
       "the existing default text model is reported as image-incompatible",
     );
-    console.log(`PASS ${mode} real browser pairing and session selection`);
+    console.log(`PASS ${mode} browser opens directly and selects a session`);
     await assertStatusCloseGeometry(first, "desktop");
     await assertSavedRendererCacheAndImageGeneration(first);
     console.log(`PASS ${mode} saved-context cache and image callback generations`);
@@ -2939,9 +2937,9 @@ for (const mode of modes) {
       const localAuthority = new URL(host.url).host;
       const spoofed = await new Promise<number>((resolve, reject) => {
         const request = httpsRequest(
-          `${proxyOrigin}/api/v1/auth/pairings`,
+          `${proxyOrigin}/api/v1/status`,
           {
-            method: "POST",
+            method: "GET",
             ca: certificate,
             headers: {
               Host: localAuthority,
@@ -2956,26 +2954,16 @@ for (const mode of modes) {
           },
         );
         request.on("error", reject);
-        request.end("{}");
+        request.end();
       });
       assert.equal(spoofed, 403, "proxy cannot select the local CLI lane with a forged Host");
       const cookieList = record(await first.call("Network.getAllCookies"));
-      assert.ok(Array.isArray(cookieList.cookies));
-      const browserCookie = cookieList.cookies
-        .map(record)
-        .find((cookie) => cookie.name === "__Host-dwell_browser_production");
-      assert.ok(browserCookie);
-      assert.equal(browserCookie.domain, "127.0.0.1");
-      assert.equal(browserCookie.path, "/");
-      assert.equal(browserCookie.secure, true);
-      assert.equal(browserCookie.httpOnly, true);
-      assert.equal(browserCookie.sameSite, "Strict");
-      assert.equal(await first.evaluate("document.cookie"), "");
+      assert.deepEqual(cookieList.cookies, [], "a new browser never receives an access cookie");
       assert.equal(
         await first.evaluate("fetch('/api/v1/sessions').then(response => response.status)"),
-        401,
+        403,
       );
-      console.log("PASS HTTPS Secure cookie and missing browser binding rejection");
+      console.log("PASS HTTPS access without browser credentials and bare fetch rejection");
     }
     await first.click("#new-mobile");
     await first.until('document.querySelector("#new-dialog").open');
@@ -3596,14 +3584,13 @@ for (const mode of modes) {
       "live thinking starts collapsed",
     );
     assert.deepEqual(
-      await second.evaluate(
-        '[...document.querySelector(".live .activity-group>summary").children].map(item=>item.textContent)',
-      ),
-      ["Thinking: Checking the response", "1 step"],
+      await second.evaluate('document.querySelector(".live .activity-group>summary").textContent'),
+      "Thinking: Checking the response · 1 step",
       "live activity identifies the current thinking step",
     );
     await second.click(".live .activity-group>summary");
     await second.click(".live .thinking-run>summary");
+    await second.evaluate('document.querySelector(".live .activity-group>summary").focus()');
     await second.evaluate('window.dispatchEvent(new Event("online"))');
     await second.until(
       'document.querySelector(".live .activity-group")?.open && document.querySelector(".live .thinking-run")?.open && document.querySelector("#connection-badge").textContent.includes("Connected")',
@@ -3615,16 +3602,14 @@ for (const mode of modes) {
     const thinkingHandoff = record(
       await second.evaluate(`(()=>{
       const thoughts=[...document.querySelectorAll('.thinking-run')].filter(value=>value.textContent.includes('The reasoning is still'));
-      return {count:thoughts.length,open:thoughts[0]?.open,groupOpen:thoughts[0]?.closest('.activity-group')?.open,text:thoughts[0]?.textContent};
+      const group=thoughts[0]?.closest('.activity-group');
+      return {count:thoughts.length,open:thoughts[0]?.open,grouped:!!group,text:thoughts[0]?.textContent,focused:thoughts[0]?.querySelector(':scope>summary')===document.activeElement};
     })()`),
     );
     assert.equal(thinkingHandoff.count, 1, "saved history replaces live thinking once");
     assert.equal(thinkingHandoff.open, true, "thinking stays expanded across reconnect and save");
-    assert.equal(
-      thinkingHandoff.groupOpen,
-      true,
-      "activity stays expanded across reconnect and save",
-    );
+    assert.equal(thinkingHandoff.grouped, false, "one saved thought has no outer disclosure");
+    assert.equal(thinkingHandoff.focused, true, "focus follows the remaining disclosure");
     assert.ok(String(thinkingHandoff.text).includes("in progress, then it finishes."));
     console.log(`PASS ${mode} live thinking reconnect and saved-history handoff`);
     const beforeModel = record(await request(`/sessions/${String(session.id)}`)).model;
@@ -4112,9 +4097,18 @@ for (const mode of modes) {
     })()`);
     await stagePngImages(second, 1, "disconnect-pending");
     await second.until("window.__dwellImageDecodeStarted===true");
-    await second.evaluate(
-      'window.dispatchEvent(new StorageEvent("storage",{key:"dwell.browser-binding.v1"}))',
-    );
+    await second.evaluate(`(()=>{
+      const original=window.fetch.bind(window);
+      window.fetch=async(input,init)=>{
+        const path=new URL(typeof input==="string"?input:input.url,location.href).pathname;
+        if(path.endsWith("/events")){
+          window.fetch=original;
+          return new Response(JSON.stringify({error:{code:"unauthenticated",message:"Access refused."}}),{status:401,headers:{"Content-Type":"application/json"}});
+        }
+        return original(input,init);
+      };
+      window.dispatchEvent(new Event("online"));
+    })()`);
     await second.until('!document.querySelector("#gate").hidden');
     await second.evaluate(`(()=>{
       const original=window.fetch.bind(window);
@@ -4205,9 +4199,6 @@ for (const mode of modes) {
       true,
       "successful reconnection clears the obsolete stream error",
     );
-    await request("/auth/revoke", {});
-    await second.until('!document.querySelector("#gate").hidden');
-    console.log(`PASS ${mode} revocation closes the live browser session`);
     for (const browser of pages) assert.deepEqual(browser.errors, []);
   } finally {
     for (const browser of pages) browser.socket.close();

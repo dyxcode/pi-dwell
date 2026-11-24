@@ -314,7 +314,7 @@ test("authenticated image turns save images natively and retrieve them by scoped
   const imagePath = `/sessions/${firstSession.id}/history/${encodeURIComponent(firstImage.id)}/images/${firstImage.imageIndex}`;
 
   const unauthenticated = await fetch(`${host.url}/api/v1${imagePath}`);
-  assert.equal(unauthenticated.status, 401);
+  assert.equal(unauthenticated.status, 403);
 
   const downloaded = await request(imagePath);
   assert.equal(downloaded.status, 200);

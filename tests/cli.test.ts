@@ -23,7 +23,7 @@ async function directory(t: TestContext): Promise<string> {
 test("help is read-only and development data is separate", async () => {
   const result = await exec(process.execPath, [cli, "--help"]);
   assert.match(result.stdout, /serve/);
-  assert.match(result.stdout, /pair/);
+  assert.doesNotMatch(result.stdout, /pair|auth revoke/);
   assert.match(result.stdout, /service/);
   assert.match(result.stdout, /pi configure/);
   assert.doesNotMatch(result.stdout, /^\s+(?:new|sessions)\b/m);
@@ -58,7 +58,7 @@ test("removed session commands fail before accessing host state, including help 
   await assert.rejects(access(dataDir));
 });
 
-test("CLI status, pair and revoke use authenticated HTTP and do not print the long-lived credential", async (t) => {
+test("CLI status keeps the bearer private and retired commands are rejected", async (t) => {
   const dataDir = await directory(t);
   const host = await startHost({ port: 0, dataDir });
   t.after(() => host.close());
@@ -67,12 +67,10 @@ test("CLI status, pair and revoke use authenticated HTTP and do not print the lo
   const output: unknown = JSON.parse(status.stdout);
   assert.ok(output && typeof output === "object" && "service" in output);
   assert.equal(output.service, "pi-dwell");
-  const pairing = await exec(process.execPath, [...prefix, "pair"]);
-  assert.match(pairing.stdout, /Pairing code: [A-HJ-NP-Za-hj-np-z2-9]{8}\n/);
   const token = (await readFile(join(dataDir, "auth-token"), "utf8")).trim();
-  assert.ok(!`${status.stdout}${status.stderr}${pairing.stdout}${pairing.stderr}`.includes(token));
-  const revoked = await exec(process.execPath, [...prefix, "auth", "revoke"]);
-  assert.match(revoked.stdout, /revoked/);
+  assert.ok(!`${status.stdout}${status.stderr}`.includes(token));
+  await assert.rejects(exec(process.execPath, [...prefix, "pair"]), /Unknown command/);
+  await assert.rejects(exec(process.execPath, [...prefix, "auth", "revoke"]), /Unknown command/);
 });
 
 test("CLI reports missing credentials and unreachable hosts without writing state", async (t) => {

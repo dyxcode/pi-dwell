@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -23,7 +22,7 @@ test("authenticated memory routes page search and revision-pinned reads", async 
   const token = (await readFile(join(dataDir, "auth-token"), "utf8")).trim();
   const cliHeaders = { Authorization: `Bearer ${token}` };
 
-  assert.equal((await fetch(`${host.url}/api/v1/client-capabilities`)).status, 401);
+  assert.equal((await fetch(`${host.url}/api/v1/client-capabilities`)).status, 403);
   assert.deepEqual(
     await (await fetch(`${host.url}/api/v1/client-capabilities`, { headers: cliHeaders })).json(),
     {
@@ -99,23 +98,7 @@ test("memory routes use browser authentication and validate request and reader r
   const { dataDir } = await configureMemory(environment.root);
   const host = await startHost({ port: 0, dataDir });
   closeHost = () => host.close();
-  const token = (await readFile(join(dataDir, "auth-token"), "utf8")).trim();
-  const pairing = await fetch(`${host.url}/api/v1/auth/pairings`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: "{}",
-  });
-  const code = stringValue(objectValue(await pairing.json()).code);
-  const browserKey = randomBytes(32).toString("hex");
-  const paired = await fetch(`${host.url}/api/v1/auth/pair`, {
-    method: "POST",
-    headers: { Origin: host.url, "X-Dwell-Request": "1", "Content-Type": "application/json" },
-    body: JSON.stringify({ code, browserKey }),
-  });
-  assert.equal(paired.status, 200);
-  const cookie = paired.headers.get("set-cookie")?.split(";", 1)[0];
-  assert.ok(cookie);
-  const browserHeaders = { Cookie: cookie, "X-Dwell-Browser": browserKey };
+  const browserHeaders = { "X-Dwell-Request": "1" };
 
   const capabilities = await fetch(`${host.url}/api/v1/client-capabilities`, {
     headers: browserHeaders,

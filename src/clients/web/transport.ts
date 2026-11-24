@@ -1,5 +1,4 @@
 /// <reference lib="dom" />
-export const BINDING_KEY = "dwell.browser-binding.v1";
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -9,32 +8,8 @@ export class ApiError extends Error {
     this.code = code;
   }
 }
-export function binding(create = false): string | null {
-  try {
-    let value = localStorage.getItem(BINDING_KEY);
-    if (value && !/^[a-f0-9]{64}$/.test(value)) value = null;
-    if (!value && create) {
-      value = Array.from(crypto.getRandomValues(new Uint8Array(32)), (n) =>
-        n.toString(16).padStart(2, "0"),
-      ).join("");
-      localStorage.setItem(BINDING_KEY, value);
-      if (localStorage.getItem(BINDING_KEY) !== value)
-        throw new Error("Storage verification failed.");
-    }
-    return value;
-  } catch {
-    throw new ApiError(
-      0,
-      "storage",
-      "Browser storage is unavailable. Enable storage for this site, then retry.",
-    );
-  }
-}
 export function headers(): Headers {
-  const result = new Headers({ Accept: "application/json" });
-  const key = binding();
-  if (key) result.set("X-Dwell-Browser", key);
-  return result;
+  return new Headers({ Accept: "application/json", "X-Dwell-Request": "1" });
 }
 export async function responseError(response: Response): Promise<ApiError> {
   let value: unknown;
@@ -66,13 +41,11 @@ export async function api(
   if (body !== undefined) {
     requestHeaders.set("Content-Type", "application/json");
   }
-  if (method !== "GET") {
-    requestHeaders.set("X-Dwell-Request", "1");
-  }
   const response = await fetch(path, {
     method,
     headers: requestHeaders,
-    credentials: binding() ? "same-origin" : "omit",
+    mode: "same-origin",
+    credentials: "omit",
     cache: "no-store",
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(method === "GET" ? 15_000 : 60_000),

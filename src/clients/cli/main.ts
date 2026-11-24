@@ -3,7 +3,7 @@ import type { HostOptions } from "../../server/http.ts";
 import { runServiceCommand } from "../../service/service.ts";
 import { parseCommand } from "./arguments.ts";
 import { configureRuntime } from "./runtime.ts";
-import { createPairing, readHostStatus, revokeBrowsers } from "./status.ts";
+import { readHostStatus } from "./status.ts";
 
 /** Overrides are an internal subprocess-test seam, never CLI options or environment settings. */
 export async function runCli(
@@ -18,8 +18,6 @@ Usage: npm run dwell -- <command>
 
   serve [--dev]       Start the foreground host at 127.0.0.1:8787
   status [--dev]      Read authenticated host status
-  pair [--dev]        Display a single-use browser pairing code (five minutes)
-  auth revoke [--dev] Revoke all browser sessions and pending pairing codes
   pi configure --executable <absolute> [--entry-point <absolute>] [--dev]
                       Configure the Pi executable for this host
   service install    Register the production user service (no login autostart)
@@ -41,18 +39,6 @@ No project folder or model configuration is required to start.`);
   const options = { dataDir: dataDirectory(command.mode), ...overrides };
   if (command.kind === "status") {
     console.log(JSON.stringify(await readHostStatus(options), null, 2));
-    return;
-  }
-  if (command.kind === "pair") {
-    const pairing = await createPairing(options);
-    console.log(
-      `Pairing code: ${pairing.code}\nExpires: ${new Date(pairing.expiresAt).toISOString()}\nEnter it on the Dwell page. This code works once.`,
-    );
-    return;
-  }
-  if (command.kind === "revoke") {
-    await revokeBrowsers(options);
-    console.log("All browser sessions and pending pairing codes have been revoked.");
     return;
   }
   if (command.kind === "configure") {

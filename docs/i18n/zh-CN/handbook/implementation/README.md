@@ -13,7 +13,7 @@
 | 功能 | 内容 |
 | --- | --- |
 | [运行与管理 Host](host-service.md) | 后台服务、私有存储、配置与关闭 |
-| [连接浏览器](pairing.md) | 配对、凭据、来源校验与撤销访问 |
+| [连接浏览器](browser-access.md) | 回环访问、私有 HTTPS 和 CLI 凭据 |
 | [创建与继续会话](session-lifecycle.md) | 会话身份、Pi 进程、项目资源与重启恢复 |
 | [会话名称元数据](session-names.md) | 会话标签、共享名称和版本同步 |
 | [选择目录、模型与 thinking level](models.md) | 发现、能力检查、选择与配置保存 |

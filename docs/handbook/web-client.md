@@ -25,8 +25,8 @@ The host serves the browser page from this fixed set of source modules:
    `.js`, and serves the pinned `marked` module from a fixed vendor URL.
 3. [client.ts](../../src/clients/web/client.ts) connects the page controls to
    the host API, session state, history renderer, and SSE observer.
-4. [transport.ts](../../src/clients/web/transport.ts) adds the browser binding
-   to API requests and converts failed responses to `ApiError`.
+4. [transport.ts](../../src/clients/web/transport.ts) adds the browser request marker
+   to API calls and converts failed responses to `ApiError`.
 5. [events.ts](../../src/clients/web/events.ts) decodes SSE frames and reduces
    them into browser-side live state.
 6. [conversation.ts](../../src/clients/web/conversation.ts) turns saved and
@@ -43,9 +43,9 @@ modules remain private.
 | File | Responsibility |
 | --- | --- |
 | [client.ts](../../src/clients/web/client.ts) | Main UI coordinator: authentication, session selection, API calls, model and image capability state, SSE/history lifecycle, composer submission, close/reopen flows, and event handlers. |
-| [page.ts](../../src/clients/web/page.ts) | Static HTML shell, pairing gate, navigation, conversation region, composer, dialogs, and CSS. |
+| [page.ts](../../src/clients/web/page.ts) | Static HTML shell, connection screen, navigation, conversation region, composer, dialogs, and CSS. |
 | [script.ts](../../src/clients/web/script.ts) | Fixed TypeScript-module-to-browser-asset map and native type stripping. |
-| [transport.ts](../../src/clients/web/transport.ts) | Browser binding storage, request headers, JSON fetch wrapper, and HTTP error decoding. |
+| [transport.ts](../../src/clients/web/transport.ts) | Request headers, JSON fetch wrapper, and HTTP error decoding. |
 | [events.ts](../../src/clients/web/events.ts) | SSE text framing, event validation, browser conversation state, ordering, bounded live accumulation, resync, history merge, and live/saved de-duplication. |
 | [conversation.ts](../../src/clients/web/conversation.ts) | Saved-message grouping, tool/result pairing, thinking disclosures, tool and context display, saved/live message DOM, and unchanged-group caching. |
 | [dom.ts](../../src/clients/web/dom.ts) | Identity-based DOM reconciliation that preserves compatible elements, open disclosures, handlers, and marked subtrees. |
@@ -57,7 +57,7 @@ modules remain private.
 
 ## Page structure and interaction
 
-The shell contains a pairing gate and a hidden application shell. Once
+The shell contains a connection screen and a hidden application shell. Once
 connected, the application has a conversation sidebar, open-session status
 tabs, a notice region, a scrollable conversation, and a composer. Dialogs cover
 session close, directory-based creation, model selection, host details, and
@@ -93,33 +93,26 @@ The main coordinator keeps separate state for the session catalog, selected
 session, current live stream projection, saved history pages, context preview,
 model capabilities, turn metadata, input drafts, image drafts, pending
 requests, and lifecycle generations. Generation counters invalidate late
-responses after a session switch, reconnect, or authentication change.
+responses after a session switch, reconnect, or connection change.
 
 | State | Storage | Behavior |
 | --- | --- | --- |
-| Browser binding | `localStorage`, key `dwell.browser-binding.v1` | A 32-byte cryptographically random value represented as 64 lowercase hex characters. It is created during pairing and sent as `X-Dwell-Browser`. |
 | Selected session preference | `localStorage`, key `dwell.web.preferences.v1` | The current UI writes the selected ID. A stored ID is a preference; the client selects it only when `runtimeState !== closed`. |
 | Text drafts | JavaScript `Map`, keyed by session ID | Switching sessions saves and restores the current textarea value. A full page reload loses these drafts. |
-| Image drafts | `Attachments` instance, keyed by session ID | Held in memory as image payloads and object URLs; not stored in localStorage. They remain associated with a session while switching within the page, then are cleared on authentication loss/logout or successful send. |
+| Image drafts | `Attachments` instance, keyed by session ID | Held in memory as image payloads and object URLs; not stored in localStorage. They remain associated with a session while switching within the page, then are cleared on disconnect or successful send. |
 | Pi session and transcript | Host-owned catalog and native Pi files | The browser lists and displays them through the host API. They outlive page reloads and browser disconnection. |
 
-`transport.ts` uses JSON requests with `cache: no-store`, same-origin
-credentials only when a browser binding exists, and a 15-second GET or
-60-second POST timeout. POSTs add `Content-Type: application/json` and
-`X-Dwell-Request: 1`. A returned `{ error: { code, message } }` becomes an
-`ApiError` carrying HTTP status and the host code. Other failures receive a
-bounded generic message. If browser storage cannot persist the binding,
-transport reports a pairing failure and does not send an unpersisted token.
-The wrapper returns `unknown` JSON; each caller validates its response with
-the relevant shared guard before using it.
+`transport.ts` uses same-origin fetch with `cache: no-store` and no cookies or
+browser credentials. Every API call carries `X-Dwell-Request: 1`. JSON writes
+set `Content-Type: application/json`; request deadlines are 15 seconds for
+reads and 60 seconds for mutations. The wrapper decodes typed host errors and
+returns `unknown` JSON, which callers validate before use.
 
 ## Connect, select, and refresh
 
-`connect()` reads `/api/v1/status`, validates it with `isHostStatus`, then
-refreshes `/api/v1/sessions`. The pairing form first creates or reuses the
-browser binding and posts the pairing code to `/api/v1/auth/pair`. A 401
-returns the user to the pairing gate. The browser stores no provider API key
-and does not sign in to a provider.
+`connect()` validates `/api/v1/status` and refreshes `/api/v1/sessions` before
+showing the application. The connection screen offers a retry if the host is
+unavailable. The browser does not store provider credentials.
 
 The first selection after refresh prefers the saved selected ID only when that
 session is runtime-open. Otherwise it selects the first open session; if all
@@ -266,7 +259,7 @@ earlier messages” control appears when a next cursor exists.
 
 Transport and ordinary action failures appear in the notice region; model,
 creation, and close failures also use their dialog-specific feedback. A 401
-returns the browser to pairing. Turn/native execution error metadata is shown
+returns the browser to the connection screen. Turn/native execution error metadata is shown
 beside the conversation projection, separate from assistant text.
 
 ## Conversation rendering and safe Markdown
@@ -348,7 +341,7 @@ or visibility restoration, `resume()` invalidates stale capability/model-picker
 work, releases saved-image object URLs, reconnects the selected stream, reloads
 history, and polls the session list. Losing authentication or forgetting the browser
 stops the stream and polling, clears in-memory image drafts, and returns to the
-pairing gate while host work remains host-owned.
+connection screen while host work remains host-owned.
 
 ## Pi extension boundary
 

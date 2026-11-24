@@ -15,8 +15,6 @@ All commands use `npm run dwell -- <command>` from the checkout.
 | `--help` | Print supported grammar | None |
 | `serve` | Foreground host | Production; optional `--dev` |
 | `status` | Authenticated HostStatus JSON | Production; optional `--dev` |
-| `pair` | Create a one-use pairing code | Production; optional `--dev` |
-| `auth revoke` | Revoke all browsers and pending pairing codes | Production; optional `--dev` |
 | `pi configure --executable <absolute> [--entry-point <absolute>]` | Verify and store external Pi configuration; requires open sessions closed | Production; optional `--dev` |
 | `service install` | Register the user service | Production |
 | `service start` | Start and wait for authenticated readiness | Production |
@@ -34,7 +32,6 @@ No command arguments defaults to `serve`. `npm start` runs production foreground
 | Production data | `~/.local/share/pi-dwell` | Dwell-owned local state |
 | Development data | `~/.local/share/pi-dwell-dev` | Separate credentials/catalog/native sessions |
 | `auth-token` | Data directory | Private local CLI bearer credential |
-| `browser-sessions.json` | Data directory | Hashed browser credentials and expiries |
 | `catalog.sqlite` | Data directory | Runtime configuration, session catalog, durable turn ledger |
 | Optional `integrations.json` | Data directory | Explicit Distill module/database for Memory and source coordination, plus Current module/root/binding; see [Distill configuration](guide.md#distill-configuration) and [Current Library](guide.md#current-library) |
 | `sessions/<Dwell session ID>/` | Data directory | Pi native JSONL session files |
@@ -58,7 +55,7 @@ After the production data directory exists, configure its private `access.json` 
 }
 ```
 
-Use a regular file owned by the service user with mode 0600. The origin has no trailing slash, path, query, or fragment. Restart the service after changing it, configure the proxy target as `http://127.0.0.1:8787`, and pair the browser at the HTTPS address. Local and HTTPS origins have separate browser bindings/cookies. CLI bearer authentication remains restricted to the local address.
+Use a regular file owned by the service user with mode 0600. The origin has no trailing slash, path, query, or fragment. Restart the service after changing it, configure the proxy target as `http://127.0.0.1:8787`, and open the HTTPS address over the private network. Restrict access in the proxy’s network policy; do not use public Funnel. CLI bearer authentication remains restricted to the local address.
 
 The exact application behavior and acceptance checks are in [HTTP access internals](http-auth.md#authority-and-https-configuration).
 

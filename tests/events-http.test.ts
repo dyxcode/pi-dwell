@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest, type IncomingMessage } from "node:http";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
@@ -290,48 +290,6 @@ function openEvents(url: string, headers: Record<string, string> = {}): Promise<
   });
 }
 
-async function pairBrowser(
-  hostUrl: string,
-  token: string,
-): Promise<{
-  cookie: string;
-  browserKey: string;
-  headers: Record<string, string>;
-  mutationHeaders: Record<string, string>;
-}> {
-  const pairingResponse = await fetch(`${hostUrl}/api/v1/auth/pairings`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: "{}",
-  });
-  assert.equal(pairingResponse.status, 201);
-  const pairing: unknown = await pairingResponse.json();
-  const pairingRecord = asRecord(pairing);
-  assert.equal(typeof pairingRecord.code, "string");
-  const browserKey = randomBytes(32).toString("hex");
-  const redeem = await fetch(`${hostUrl}/api/v1/auth/pair`, {
-    method: "POST",
-    headers: {
-      Origin: hostUrl,
-      "X-Dwell-Request": "1",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ code: pairingRecord.code, browserKey }),
-  });
-  assert.equal(redeem.status, 200);
-  const setCookie = redeem.headers.get("set-cookie");
-  assert.ok(setCookie);
-  const cookie = setCookie.split(";", 1)[0];
-  if (cookie === undefined) throw new Error("Pairing response did not contain a browser cookie.");
-  const headers = { Cookie: cookie, "X-Dwell-Browser": browserKey };
-  return {
-    cookie,
-    browserKey,
-    headers,
-    mutationHeaders: { ...headers, Origin: hostUrl, "X-Dwell-Request": "1" },
-  };
-}
-
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Expected a JSON object.");
@@ -424,7 +382,7 @@ test("events routes authenticate and report an unknown session before starting S
   const url = `${host.url}/api/v1/sessions/${sessionId}/events`;
 
   const unauthenticated = await fetch(url);
-  assert.equal(unauthenticated.status, 401);
+  assert.equal(unauthenticated.status, 403);
 
   const unknown = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(unknown.status, 404);
@@ -531,14 +489,13 @@ test("SSE snapshots and events are ordered for two clients; disconnect detaches 
   await second.waitForClose();
 });
 
-test("paired browsers receive host-owned session name updates over SSE", async (t) => {
-  const { host, token, createSession } = await setup(t, { withPi: true });
+test("browsers receive host-owned session name updates over SSE", async (t) => {
+  const { host, createSession } = await setup(t, { withPi: true });
   const session = await createSession();
-  const firstBrowser = await pairBrowser(host.url, token);
-  const secondBrowser = await pairBrowser(host.url, token);
+  const headers = { "X-Dwell-Request": "1" };
   const url = `${host.url}/api/v1/sessions/${session.id}/events`;
-  const first = await openEvents(url, firstBrowser.headers);
-  const second = await openEvents(url, secondBrowser.headers);
+  const first = await openEvents(url, headers);
+  const second = await openEvents(url, headers);
   await Promise.all([
     first.waitFor((frame) => frame.event === "snapshot"),
     second.waitFor((frame) => frame.event === "snapshot"),
@@ -546,7 +503,7 @@ test("paired browsers receive host-owned session name updates over SSE", async (
 
   const rename = await fetch(`${host.url}/api/v1/sessions/${session.id}/name`, {
     method: "POST",
-    headers: { ...firstBrowser.mutationHeaders, "Content-Type": "application/json" },
+    headers: { ...{ ...headers, Origin: host.url }, "Content-Type": "application/json" },
     body: JSON.stringify({ displayName: "Shared over SSE", expectedRevision: 0 }),
   });
   assert.equal(rename.status, 200);
@@ -563,76 +520,6 @@ test("paired browsers receive host-owned session name updates over SSE", async (
   first.disconnect();
   second.disconnect();
   await Promise.all([first.waitForClose(), second.waitForClose()]);
-});
-
-test("browser SSE streams close on revoke, logout, expiry, and auth storage failure", async (t) => {
-  let clock = Date.now();
-  const { host, token, request, createSession, dataDir } = await setup(t, {
-    withPi: true,
-    now: () => clock,
-    eventHeartbeatMs: 1000,
-  });
-  const session = await createSession();
-  const eventsUrl = `${host.url}/api/v1/sessions/${session.id}/events`;
-
-  const revoked = await pairBrowser(host.url, token);
-  const revokedStream = await openEvents(eventsUrl, revoked.headers);
-  await revokedStream.waitFor((frame) => frame.event === "snapshot");
-  const revokeResponse = await request("/auth/revoke", {});
-  assert.equal(revokeResponse.status, 200);
-  await revokedStream.waitForClose();
-
-  const loggedOut = await pairBrowser(host.url, token);
-  const logoutStream = await openEvents(eventsUrl, loggedOut.headers);
-  await logoutStream.waitFor((frame) => frame.event === "snapshot");
-  const logoutResponse = await fetch(`${host.url}/api/v1/auth/logout`, {
-    method: "POST",
-    headers: {
-      ...loggedOut.mutationHeaders,
-      "Content-Type": "application/json",
-    },
-    body: "{}",
-  });
-  assert.equal(logoutResponse.status, 200);
-  await logoutStream.waitForClose();
-
-  const expiring = await pairBrowser(host.url, token);
-  const expiryStream = await openEvents(eventsUrl, expiring.headers);
-  await expiryStream.waitFor((frame) => frame.event === "snapshot");
-  clock += 30 * 24 * 60 * 60 * 1000 + 1;
-  await expiryStream.waitForClose(2000);
-
-  const eventExpired = await pairBrowser(host.url, token);
-  const eventStream = await openEvents(eventsUrl, eventExpired.headers);
-  await eventStream.waitFor((frame) => frame.event === "snapshot");
-  clock += 30 * 24 * 60 * 60 * 1000 + 1;
-  const turnResponse = await request(`/sessions/${session.id}/turns`, {
-    requestId: randomUUID(),
-    message: "hello",
-  });
-  assert.equal(turnResponse.status, 202);
-  await eventStream.waitForClose(500);
-  const turn = asTurnInfo(await turnResponse.json());
-  await waitForTurn(request, session.id, turn.runId, (current) => current.status === "completed");
-
-  const brokenSave = await pairBrowser(host.url, token);
-  const brokenStream = await openEvents(eventsUrl, brokenSave.headers);
-  await brokenStream.waitFor((frame) => frame.event === "snapshot");
-  const statePath = join(dataDir, "browser-sessions.json");
-  await rename(statePath, join(dataDir, "browser-sessions.saved"));
-  await mkdir(statePath, { mode: 0o700 });
-  const failedLogout = await fetch(`${host.url}/api/v1/auth/logout`, {
-    method: "POST",
-    headers: {
-      ...brokenSave.mutationHeaders,
-      "Content-Type": "application/json",
-    },
-    body: "{}",
-  });
-  assert.equal(failedLogout.status, 503);
-  const error: unknown = await failedLogout.json();
-  assert.equal(asRecord(asRecord(error).error).code, "storage_unavailable");
-  await brokenStream.waitForClose();
 });
 
 test("Last-Event-ID is unique, session-scoped, and validated before stream headers", async (t) => {

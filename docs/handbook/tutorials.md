@@ -10,13 +10,13 @@ Use these tutorials for end-to-end workflows, [Examples](examples.md) for shorte
 
 **Goal:** distinguish a browser connection from a host-owned session.
 
-1. Pair a browser and create a session in a directory you recognize.
+1. Open Dwell and create a session in a directory you recognize.
 2. Send a short question and wait for a reply.
 3. Close the browser tab, leaving the Dwell service running.
 4. Open the same origin in the same browser profile. Select the existing session rather than creating a new one.
 5. Read the saved conversation and send a follow-up referring to the previous reply.
 
-The service owns the runtime; closing the tab only disconnects observation. A new browser profile or another origin needs its own pairing. Unsaved image drafts are browser memory and should not be treated as part of this persistence exercise.
+The service owns the runtime; closing the tab only disconnects observation. Unsaved image drafts are browser memory and should not be treated as part of this persistence exercise.
 
 **Code trail:** browser transport → HTTP session/history/event routes → SessionService → Pi JSONL. Read [System](system.md#live-output-saved-history-and-reconnect).
 
@@ -77,4 +77,4 @@ Use “submit a message” as the first trace:
 6. Find terminal bookkeeping and saved-history coverage. Notice why a reply can be observed live before it is available as complete saved history.
 7. Read [turns.test.ts](../../tests/turns.test.ts), [turns-http.test.ts](../../tests/turns-http.test.ts), and [turn-recovery.test.ts](../../tests/turn-recovery.test.ts). Run a relevant test file before changing behavior.
 
-Use the [source atlas](source-map.md) to jump to symbols, and the [test atlas](test-map.md) to find related scenarios. The same reading method applies to model switching, cancellation, and browser pairing.
+Use the [source atlas](source-map.md) to jump to symbols, and the [test atlas](test-map.md) to find related scenarios. The same reading method applies to model switching, cancellation, and browser access.

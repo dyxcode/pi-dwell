@@ -10,7 +10,7 @@
 
 ## 快速上手
 
-[安装、配对并发送第一条消息](quick-start.md)。如果还没有运行过 Dwell，从这里开始。
+[安装并发送第一条消息](quick-start.md)。如果还没有运行过 Dwell，从这里开始。
 
 <a id="guide"></a>
 

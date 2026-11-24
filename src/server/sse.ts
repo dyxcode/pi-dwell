@@ -17,7 +17,6 @@ export class SseStartError extends Error {
 export interface SseConnection {
   enqueue(frame: StreamFrame): void;
   start(initial: readonly StreamFrame[], unsubscribe: () => void): void;
-  revalidate(): boolean;
   close(): void;
 }
 
@@ -288,12 +287,6 @@ export function createSseConnection(
         heartbeat.unref();
       }
       pump();
-    },
-    revalidate() {
-      if (closed) return false;
-      if (authorized()) return true;
-      terminate(true);
-      return false;
     },
     close() {
       terminate(false);

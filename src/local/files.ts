@@ -1,7 +1,6 @@
-import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, rename, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { lstat, mkdir, open } from "node:fs/promises";
+import { join } from "node:path";
 import { hasCode, validateDataDirectory } from "./paths.ts";
 
 export async function prepareDataDirectory(path: string): Promise<string> {
@@ -46,24 +45,6 @@ export async function createPrivateFile(path: string, contents: string): Promise
     await handle.sync();
   } finally {
     await handle.close();
-  }
-}
-
-export async function replacePrivateFile(path: string, contents: string): Promise<void> {
-  // Recheck existing state rather than silently replacing unsafe files.
-  await readPrivateFile(path);
-  const temporary = `${path}.${randomUUID()}.tmp`;
-  try {
-    await createPrivateFile(temporary, contents);
-    await rename(temporary, path);
-    const directory = await open(dirname(path), constants.O_RDONLY);
-    try {
-      await directory.sync();
-    } finally {
-      await directory.close();
-    }
-  } finally {
-    await rm(temporary, { force: true });
   }
 }
 

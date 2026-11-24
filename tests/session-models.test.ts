@@ -69,7 +69,7 @@ test("session model discovery uses loaded extensions without switching models or
   assert.ok(isSessionInfo(after));
   assert.equal(after.model, session.model);
   assert.equal(after.thinkingLevel, session.thinkingLevel);
-  assert.equal((await fetch(`${host.url}/api/v1${endpoint}`)).status, 401);
+  assert.equal((await fetch(`${host.url}/api/v1${endpoint}`)).status, 403);
   assert.equal(
     (
       await request(`/sessions/${session.id}/model-capabilities`, {

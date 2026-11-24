@@ -11,9 +11,9 @@ Detailed prose walkthrough: [Implementation](implementation/host-service.md#beha
 | File | Responsibility |
 | --- | --- |
 | [`server/http.ts`](../../src/server/http.ts) | Listener lifecycle, request validation, route dispatch, response headers, errors, shutdown |
-| [`server/access.ts`](../../src/server/access.ts) | Local/HTTPS authority selection, configuration validation, cookie attributes |
-| [`server/auth.ts`](../../src/server/auth.ts) | CLI credential verification, pairing, browser authentication, serialized persistence |
-| [`server/sse.ts`](../../src/server/sse.ts) | Per-response SSE encoding, backpressure, authorization rechecks and cleanup |
+| [`server/access.ts`](../../src/server/access.ts) | Local/HTTPS authority selection, configuration validation and proxy checks |
+| [`server/auth.ts`](../../src/server/auth.ts) | Local CLI credential creation and verification |
+| [`server/sse.ts`](../../src/server/sse.ts) | Per-response SSE encoding, backpressure, shutdown checks and cleanup |
 | [`server/session-discovery.ts`](../../src/server/session-discovery.ts) | Host directory browsing and isolated global model/capability discovery |
 
 ## Request pipeline
@@ -24,7 +24,7 @@ Each response starts with `Cache-Control: no-store`, `X-Content-Type-Options: no
 
 `handle` processes a request in this order:
 
-1. Reject duplicate security-sensitive headers: Host, Origin, Authorization, Cookie, both Dwell headers, and Last-Event-ID.
+1. Reject duplicate security-sensitive headers: Host, Origin, Authorization, the request marker, proxy protocol, fetch-site and Last-Event-ID.
 2. Select the local or configured HTTPS authority, reject cross-origin requests, and reject CLI Authorization on the HTTPS lane.
 3. Reject requests while starting/stopping and request targets longer than 2048 characters.
 4. Parse the path and the narrowly supported query forms. Directory browsing accepts one `path`; history accepts one nonempty `cursor` of at most 1536 characters. Latest library browsing accepts optional `source` and `limit`; other query strings fail.
@@ -37,7 +37,7 @@ Each response starts with `Cache-Control: no-store`, `X-Content-Type-Options: no
 
 ## Complete route map
 
-All API paths below are relative to `/api/v1`. **Either** means local bearer authentication or a browser cookie plus binding key. Browser POST and DELETE operations also require the matching Origin and `X-Dwell-Request: 1`. Empty bodies mean the JSON object `{}`, not a missing Content-Type.
+All API paths below are relative to `/api/v1`. **Either** means a local CLI bearer or an admitted browser request. Browser API requests require `X-Dwell-Request: 1`; POST and DELETE also require the exact Origin. Empty bodies mean the JSON object `{}`.
 
 | Method and route | Authentication | Input and result |
 | --- | --- | --- |
@@ -45,10 +45,6 @@ All API paths below are relative to `/api/v1`. **Either** means local bearer aut
 | `GET /style.css`, browser asset map (outside prefix) | Public, authority checked | Fixed CSS/JS resources |
 | `GET /healthz` (outside prefix) | Public, authority checked | `{status: "ok"}`; process availability, not provider readiness |
 | `GET /status` | Either | HostStatus, including mode, PID, instance and capabilities |
-| `POST /auth/pairings` | CLI | `{}` → 201 pairing code and expiry |
-| `POST /auth/pair` | Browser origin/request marker; no prior login | `{code, browserKey}` → session cookie and `{ok: true}` |
-| `POST /auth/logout` | Browser | `{}` → remove that browser, clear cookie, revalidate streams |
-| `POST /auth/revoke` | CLI | `{}` → remove all browsers and pending codes, revalidate streams |
 | `POST /runtime` | CLI only | Absolute executable and optional entryPoint → verified stored configuration |
 | `GET /directories[?path=…]` | Either | Canonical host directory, parent, child directories, truncation flag |
 | `GET /models` | Either | Global isolated discovery result wrapped in `models` |
@@ -89,21 +85,11 @@ Session creation accepts provider and model together or neither and rejects unkn
 
 `readBrowserOrigin` reads optional production-only `access.json` through the private-file reader. Its exact shape is `{ "version": 1, "browserOrigin": "https://host.example" }`; extra fields, noncanonical origins, paths, query strings, fragments, wildcards, and oversized text fail. Development ignores this file.
 
-`requestAccess` accepts the literal loopback authority or the one configured HTTPS authority. A request to the local authority containing Forwarded or X-Forwarded-* is rejected, preventing a proxy from selecting the local credential lane. Forwarded headers never grant access. A proxy must preserve the configured Host; TLS terminates outside Dwell while the listener remains loopback.
-
-Local cookies are named by mode. HTTPS cookies use the `__Host-` prefix and Secure. Both use Path=/, HttpOnly, SameSite=Strict, and a bounded Max-Age. These checks assume a trusted host account and local executable environment; they do not authenticate a malicious replacement process occupying the exact local origin.
+`requestAccess` accepts only the exact loopback or configured HTTPS authority. A forwarded request cannot choose the local administration lane; the external authority rejects CLI bearers. The private proxy must preserve Host and mark HTTPS forwarding. Dwell rejects requests explicitly marked as public Funnel. Forwarding headers do not establish user identity; private network policy restricts remote clients.
 
 ## LocalAuth internals
 
-`open` prepares private state and exclusively creates missing `auth-token` and `browser-sessions.json` files. Existing files are read and validated; malformed state remains in place and causes startup to fail. The CLI token is 32 random bytes encoded as 64 hex characters. `isCli` checks format before timing-safe comparison.
-
-Browser sessions persist only SHA-256 hashes of the cookie token and browser binding key, plus expiry. `parseSessions` checks version, exact keys, hash formats, positive safe expiry values, unique hashes, and a maximum of 100 records. `isBrowser` validates both supplied secrets and requires an unexpired matching pair.
-
-Pairing uses eight independent cryptographic selections from an alphabet excluding ambiguous `0/O/o` and `1/I/i`. Codes are case-sensitive. The in-memory map stores code hashes and five-minute expiries; collisions regenerate. Creation prunes expired codes and permits at most ten pending codes.
-
-`redeem`, `logout`, and `revoke` run through a promise chain. A rejected action does not poison the queue. Redemption permits at most 20 attempts in a rolling minute after HTTP shape validation, prunes expired browser records, enforces the 100-session limit, writes a new 30-day browser session, then deletes the code. A persistence failure faults browser authentication until repair and restart; new state is not installed in memory before a successful write.
-
-`logout` removes one token and expired sessions. `revoke` saves an empty list and clears pending codes. `drain` lets host shutdown await admitted authentication writes. Pairing codes and rate-limit counters are memory-only and reset on restart.
+`open` creates or reads the owner-only `auth-token`. `isCli` validates its format and compares it in constant time. Browsers do not need a cookie or local credential. When Fetch Metadata is present it must indicate a same-origin request. Loopback access assumes a trusted local environment.
 
 ## SSE writer and backpressure
 
@@ -111,9 +97,9 @@ The event hub owns ordering/replay; `createSseConnection` owns one HTTP response
 
 Each connection has a queue, byte count, blocked/started/closed/ending flags, an unsubscribe callback, heartbeat, and error-flush timer. Its 256 KiB budget counts queued buffers **and** the response's writableLength. An oversized initial snapshot raises `SseStartError` before headers; overflow after streaming starts destroys that slow connection.
 
-`start` prepends initial frames ahead of notifications queued during subscription, checks authorization and the combined budget, sets SSE headers, and pumps. `pump` rechecks authorization before each write and pauses when `response.write` signals backpressure. `drain` resumes it. Heartbeats run every 15 seconds by default and also recheck authentication.
+`start` prepends initial frames ahead of notifications queued during subscription, checks shutdown state and the combined budget, sets SSE headers, and pumps. `pump` checks shutdown state before each write and pauses when `response.write` signals backpressure. `drain` resumes it. Heartbeats run every 15 seconds by default.
 
-A `stream.error` detaches observation, attempts to flush the error, and bounds that flush to one second. `release` clears timers, queue and listeners exactly once, and isolates unsubscribe/onClose exceptions from producers. Revocation and logout explicitly revalidate all active streams; expiry is also detected by heartbeats/writes. A disconnected observer cannot stop the Pi execution it was watching.
+A `stream.error` detaches observation, attempts to flush the error, and bounds that flush to one second. `release` clears timers, queue and listeners exactly once, and isolates unsubscribe/onClose exceptions from producers. A disconnected observer cannot stop the Pi execution it was watching.
 
 ## Directory discovery
 

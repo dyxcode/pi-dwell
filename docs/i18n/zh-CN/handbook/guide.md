@@ -12,8 +12,8 @@ Pi Dwell 为 Dwell host 所拥有的 Pi session 提供浏览器对话界面。�
 
 ## 开始对话
 
-1. 在 host 所在的机器上启动 Dwell host 并创建 pairing code。[快速开始](quick-start.md)介绍 host 的设置步骤。
-2. 打开 host 的浏览器页面并输入 pairing code。Pairing 授权此浏览器访问；它不会让你登录 model provider。
+1. 按照[快速开始](quick-start.md)在主机上启动 Dwell。
+2. 在主机打开 Dwell；手机则通过获准的私有 HTTPS 地址访问。
 3. 选择 **New session**，然后选择 host 上的一个目录。
 4. Dwell 会为该目录打开 Pi session。新 session 使用 Pi 已配置的默认 model 和 thinking 设置。
 5. 如需选择其他 model，请使用消息框上方的 model 控件。按 provider 或 model ID 搜索，选择一个 model，再选择它提供的 thinking level。
@@ -38,7 +38,7 @@ Dwell turn 或 native Pi extension execution 正在运行时，composer 操作�
 
 图片在发送前都只是 draft。你可以预览或移除每个附件。如果切换到不支持图片的 model，已有 draft 仍可移除；要发送它，请改选支持图片的 model。
 
-页面打开期间，浏览器会按 session 在内存中保存文本和图片 draft。在 session 之间切换会保留这些 draft。完整刷新页面会丢失尚未发送的文本和图片 draft。认证失效或选择忘记此浏览器会清除图片 draft；文本只保留在仍打开的页面内存中。host 确认接受消息后，发送的 draft 会被清除。
+页面打开期间，浏览器会按 session 在内存中保存文本和图片 draft。在 session 之间切换会保留这些 draft。完整刷新页面会丢失尚未发送的文本和图片 draft。连接页面重置时会清除图片 draft；文本只保留在仍打开的页面内存中。host 确认接受消息后，发送的 draft 会被清除。
 
 <a id="switch-and-reopen-sessions"></a>
 
@@ -87,7 +87,7 @@ Memory 与 conversation 及 Current Library 相互独立。阅读记录不会将
 
 连接中断后，浏览器会重新连接 live event stream，并定期刷新 session 列表。host 拥有活动中的 Pi 工作，因此关闭标签页或丢失浏览器连接都不会取消 response。页面重新激活时，Dwell 会重新连接并刷新 history。
 
-使用 **Forget this browser** 可撤销此浏览器的 pairing。这会让浏览器与 host 断开连接，但 host 所有的 session 和工作会继续运行。重新 pairing 即可连接回来。
+关闭浏览器标签页只会断开当前页面，Host 上的工作会继续。要阻止设备远程访问，请修改私有网络的访问策略。
 
 <a id="what-the-browser-does-not-provide"></a>
 
@@ -96,7 +96,7 @@ Memory 与 conversation 及 Current Library 相互独立。阅读记录不会将
 - Pi terminal 或 slash-command 界面。
 - Pi 交互式 extension 确认/对话框界面。浏览器可以显示 extension 消息并观察 native extension execution，但需要交互式 Pi client 处理的对话框必须在该 client 中完成。
 - 在创建表单中使用自定义 model 创建 session。请先创建基于目录的 session，再使用 model 控件。
-- 完整刷新页面或关闭浏览器后恢复未发送 draft 的方式。浏览器认证失效或被忘记时，图片 draft 也会清除。
+- 完整刷新页面或关闭浏览器后恢复未发送 draft 的方式。连接页面重置时，图片 draft 也会清除。
 
 当前功能和数值限制请参阅[功能参考](reference.md)。实现行为和测试覆盖请参阅 [Web client 内部说明](web-client.md)、[共享 contracts](contracts.md)和[手册索引](README.md)。
 

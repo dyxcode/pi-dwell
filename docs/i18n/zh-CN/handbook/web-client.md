@@ -19,7 +19,7 @@ Web client 是面向浏览器的对话界面，连接由 host 所拥有的 Pi se
 1. [page.ts](../../../../src/clients/web/page.ts) 定义 HTML shell 和样式。
 2. [script.ts](../../../../src/clients/web/script.ts) 暴露固定的浏览器 asset map。Node 会移除 TypeScript type，把本地 import 的 `.ts` 改写为 `.js`，并通过固定 vendor URL 提供 pinned `marked` module。
 3. [client.ts](../../../../src/clients/web/client.ts) 将页面控件连接到 host API、session state、history renderer 和 SSE observer。
-4. [transport.ts](../../../../src/clients/web/transport.ts) 在 API request 中加入 browser binding，并将失败 response 转换为 `ApiError`。
+4. [transport.ts](../../../../src/clients/web/transport.ts) 在 API request 中加入 request marker，并将失败 response 转换为 `ApiError`。
 5. [events.ts](../../../../src/clients/web/events.ts) 解码 SSE frame，并将其规约为浏览器端 live state。
 6. [conversation.ts](../../../../src/clients/web/conversation.ts) 将 saved 与 live Pi projection 转换为 DOM fragment；[dom.ts](../../../../src/clients/web/dom.ts) 协调这些 fragment，并保留稳定的可见节点。
 
@@ -32,9 +32,9 @@ Web client 是面向浏览器的对话界面，连接由 host 所拥有的 Pi se
 | 文件 | 职责 |
 | --- | --- |
 | [client.ts](../../../../src/clients/web/client.ts) | Main UI coordinator：认证、session 选择、API call、model 和 image capability state、SSE/history 生命周期、composer submission、close/reopen 流程及 event handler。 |
-| [page.ts](../../../../src/clients/web/page.ts) | Static HTML shell、pairing gate、navigation、conversation 区域、composer、dialog 和 CSS。 |
+| [page.ts](../../../../src/clients/web/page.ts) | Static HTML shell、connection screen、navigation、conversation 区域、composer、dialog 和 CSS。 |
 | [script.ts](../../../../src/clients/web/script.ts) | 固定的 TypeScript module 到浏览器 asset 映射，以及 native type stripping。 |
-| [transport.ts](../../../../src/clients/web/transport.ts) | Browser binding storage、request headers、JSON fetch wrapper 和 HTTP error decoding。 |
+| [transport.ts](../../../../src/clients/web/transport.ts) | Request headers、JSON fetch wrapper 和 HTTP error decoding。 |
 | [events.ts](../../../../src/clients/web/events.ts) | SSE text framing、event validation、浏览器 conversation state、排序、有界 live accumulation、resync、history merge 和 live/saved 去重。 |
 | [conversation.ts](../../../../src/clients/web/conversation.ts) | Saved-message 分组、tool/result 配对、thinking disclosure、tool 与 context 显示、saved/live message DOM 及 unchanged-group cache。 |
 | [dom.ts](../../../../src/clients/web/dom.ts) | 基于 identity 的 DOM reconciliation，保留兼容的 element、展开的 disclosure、handler 和标记子树。 |
@@ -48,7 +48,7 @@ Web client 是面向浏览器的对话界面，连接由 host 所拥有的 Pi se
 
 ## 页面结构与交互
 
-Shell 包含 pairing gate 和默认隐藏的 application shell。连接后，application 包含 conversation sidebar、open-session status tab、notice 区域、可滚动 conversation 和 composer。Dialog 用于 session close、按目录创建、model 选择、host 详情和 image 预览。`page.ts` 中的 ID 是 `client.ts` 使用的 DOM contract；`el()` 会检查必需 ID 是否存在以及元素 class 是否符合预期。
+Shell 包含 connection screen 和默认隐藏的 application shell。连接后，application 包含 conversation sidebar、open-session status tab、notice 区域、可滚动 conversation 和 composer。Dialog 用于 session close、按目录创建、model 选择、host 详情和 image 预览。`page.ts` 中的 ID 是 `client.ts` 使用的 DOM contract；`el()` 会检查必需 ID 是否存在以及元素 class 是否符合预期。
 
 Status tab 显示 Ready、Working、Needs attention、Stopped 或 Opening。再次选择某个 tab 后才会显示其 close 操作；Tab slot 分配给当前 runtime-open session，并在关闭后重用。
 
@@ -66,19 +66,18 @@ Main coordinator 将 session catalog、selected session、当前 live stream pro
 
 | State | Storage | 行为 |
 | --- | --- | --- |
-| Browser binding | `localStorage`，key `dwell.browser-binding.v1` | 32 个密码学安全随机 byte，以 64 个小写 hex 字符表示。Pairing 时创建，并通过 `X-Dwell-Browser` 发送。 |
 | Selected session preference | `localStorage`，key `dwell.web.preferences.v1` | 当前 UI 会写入 selected ID。保存的 ID 只是 preference；仅当 session 的 `runtimeState !== closed` 时，client 才会选中它。 |
 | Text draft | JavaScript `Map`，以 session ID 为 key | 在 session 之间切换时保存并恢复当前 textarea 内容。完整页面 reload 会丢失这些 draft。 |
 | Image draft | 按 session ID 管理的 `Attachments` instance | 保存在内存中的 image payload 和 object URL，不写入 localStorage。在当前页面内切换 session 时仍与原 session 关联；authentication 丢失/logout 或成功发送后会清除。 |
 | Pi session 和 transcript | Host-owned catalog 与 Pi native file | 浏览器通过 host API 列出并显示。它们在页面 reload 和浏览器断开后仍保留。 |
 
-`transport.ts` 发送带 JSON 的 request，并设置 `cache: no-store`；只有存在 browser binding 时才发送 same-origin credential；GET timeout 为 15 秒，POST timeout 为 60 秒。POST 会添加 `Content-Type: application/json` 和 `X-Dwell-Request: 1`。收到 `{ error: { code, message } }` 后会转换为包含 HTTP status 和 host code 的 `ApiError`。其他失败会转换为有界的通用 message。若 browser storage 无法保存 binding，transport 会报告 pairing failure，且不会发送未持久化的 token。Wrapper 返回类型为 `unknown` 的 JSON；调用方使用对应的 shared guard 验证 response 后再使用。
+`transport.ts` 只发同源请求，不发送 cookie；所有 API 请求都带 `X-Dwell-Request: 1`。GET 超时 15 秒，写请求超时 60 秒。它将服务端错误转换为 `ApiError`，调用方验证 JSON response。
 
 <a id="connect-select-and-refresh"></a>
 
 ## 连接、选择与刷新
 
-`connect()` 读取 `/api/v1/status`，用 `isHostStatus` 验证，然后刷新 `/api/v1/sessions`。Pairing form 会先创建或复用 browser binding，再将 pairing code POST 到 `/api/v1/auth/pair`。401 会让用户回到 pairing gate。浏览器不会保存 provider API key，也不会登录 provider。
+`connect()` 校验 `/api/v1/status`，然后刷新 `/api/v1/sessions`。连接成功即显示应用；失败时可以重试。浏览器不保存 provider API key。
 
 首次选择 session 时，只有在保存的 selected ID 对应 runtime-open session 时才优先选它。否则选择第一个 open session；如果所有 session 都 closed，就不会自动打开任何已有 session。通过 sidebar 选择 closed 或 failed catalog item 属于显式操作：`openFromSidebar()` 会 POST 到 `/sessions/{id}/open`，验证返回的 session，刷新 navigation，然后选中它。
 
@@ -145,7 +144,7 @@ History request 使用 `/sessions/{id}/history`；读取更早页面时附加 se
 
 浏览器在选择 session、收到 snapshot、resync、terminal turn update 或 native execution settlement 后加载最新 history。若缺少 terminal coverage marker，会进行有界次数的 re-read。History 读取失败时会安排一次 retry；反复失败后，conversation 会显示 retry row。如果存在 next cursor，就会显示 “Load earlier messages” 控件。
 
-Transport 和普通操作失败显示在 notice 区域；model、creation 和 close 失败也会显示在各自 dialog 的反馈区域。401 会让浏览器返回 pairing gate。Turn/native execution 的 error metadata 显示在 conversation projection 旁，与 assistant text 分开。
+Transport 和普通操作失败显示在 notice 区域；model、creation 和 close 失败也会显示在各自 dialog 的反馈区域。401 会让浏览器返回连接页面。Turn/native execution 的 error metadata 显示在 conversation projection 旁，与 assistant text 分开。
 
 <a id="conversation-rendering-and-safe-markdown"></a>
 
@@ -177,7 +176,7 @@ Rendering 前，`renderConversation()` 会记录读者是否靠近底部、可�
 
 已测试的 Pi handoff 是顺序执行的：关闭 Dwell runtime，用另一个 Pi process 操作相同的 native session identity，再通过 Dwell 重新打开以读取新追加的 transcript。该流程由 sessions test 覆盖。
 
-`pagehide` 会停止浏览器的 stream 和 polling，但不会发送 abort 或 close request。页面通过 `pageshow`、`online` 或 visibility restoration 返回时，`resume()` 会让旧的 capability/model-picker 操作失效，释放 saved-image object URL，重新连接 selected stream，重载 history，并 poll session list。认证失效或选择忘记此浏览器时，会停止 stream 和 polling、清除内存中的 image draft，并返回 pairing gate；host-owned 工作会继续运行。
+`pagehide` 会停止浏览器的 stream 和 polling，但不会发送 abort 或 close request。页面通过 `pageshow`、`online` 或 visibility restoration 返回时，`resume()` 会让旧的 capability/model-picker 操作失效，释放 saved-image object URL，重新连接 selected stream，重载 history，并 poll session list。认证失效或选择忘记此浏览器时，会停止 stream 和 polling、清除内存中的 image draft，并返回连接页面；host-owned 工作会继续运行。
 
 <a id="pi-extension-boundary"></a>
 

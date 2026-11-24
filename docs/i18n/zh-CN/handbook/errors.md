@@ -14,19 +14,17 @@
 
 | 你看到的情况 | 通常表示什么 | 安全的下一步 |
 | --- | --- | --- |
-| 浏览器提示 storage 不可用（`storage`，状态 `0`）。 | 浏览器无法在 `localStorage` 中写入并验证本地 binding；尚未向 Host 发出请求。 | 为 Dwell origin 允许站点存储，然后重新加载。这是浏览器本地状态，与 Host catalog 分开。 |
-| Host 返回 `401 unauthenticated` 或 `403 cli_required`。 | 浏览器 pairing 已过期或被撤销、缺少浏览器身份，或者调用了 CLI 专用路由但没有本地 CLI credential。 | 使用本地 pairing 流程重新连接浏览器。CLI 专用设置请使用本地 CLI，并确认目标是相同的 Dwell mode。不要把 CLI credential 粘贴到浏览器请求中。 |
-| Pairing 返回 `invalid_pairing`、`rate_limited` 或 `pairing_limit`。 | 一次性 code 错误、过期、已使用，或已达到尝试次数/待处理 code 上限。 | 使用本地 CLI 创建新的 pairing code。被限速后等待返回的重试时间；pairing code 五分钟后过期。 |
+| 本地 CLI 返回 `401 unauthenticated` 或 `403 cli_required`。 | CLI credential 无效，或浏览器请求了 CLI 专用操作。 | 在主机上运行 CLI 并确认 production/development mode 一致；不要把 CLI credential 放进浏览器。 |
 | 重试后出现 `409 request_conflict`。 | 相同的 `requestId` 已绑定到不同的目录/model 或 message/images。 | 只有请求完全相同时才复用该 ID。不同操作使用新的 UUID。原操作会保留；不要据此推断它已回滚。 |
 | turn 仍处于 active 状态（`409 session_busy` 或 `turn_pending`）。 | Dwell 正在保护已有 turn 或 native Pi execution 的 session，或者 turn 尚未结束。 | 检查 turn/session 状态并等待其结束，或明确 abort 对应的 run。不要只为绕过 busy 状态，就给相同工作换一个 ID 再提交。 |
-| 请求返回 `429`，例如 `history_busy`、`subscriber_limit` 或 `model_discovery_busy`。 | 有界 read、event subscription 或 discovery slot 正被占用。 | 如果响应包含 `Retry-After`，按它等待；否则等当前操作结束后重试。当前 HTTP handler 对 `pairing_limit` 设置 300 秒，对其他 `429` 响应设置 60 秒。 |
+| 请求返回 `429`。 | 有界读取、事件订阅或发现容量已满。 | 等待当前操作结束后再试。 |
 | History 返回 `410 history_unavailable`。 | Dwell 预期此 session 有已保存的 Pi history，但无法读取记录的文件。 | 保留 session 和原有 Pi history。重新打开或重试前，确认相同的 session file 存在且可读。不要创建 replacement session 并把它当作旧对话。 |
 | History 返回 `409 history_changed` 或 `400 invalid_cursor`。 | 有界 read 期间 saved file 发生变化、history cursor 已无效，或者 event cursor 格式错误或属于其他 session。过期、超前或旧 epoch 的 event cursor 会改为返回 resync 和 snapshot。 | 重新加载最新 history，或重连 event stream 以接收新的 snapshot。History page cursor 和 event cursor 是不同的值。 |
 | History 返回 `409 invalid_history` 或 `413 history_limit`。 | 无法安全投影 native JSONL branch/records，或者 saved history 超过 reader 配置的限制。 | 保留 native file 并记下 session ID。使用下面列出的源码和测试诊断其形状/大小；先不要编辑或删除文件。 |
 | turn 状态为 `interrupted` 且错误为 `outcome_unknown`，或 UI 提示无法确认是否已发送。 | Host 已持久化记录 turn 进入 `dispatching`，但无法确定 Pi 的最终结果。Prompt 可能已到达 Pi，也可能没有。Dwell 不会自动重放它。 | 先检查现有 turn 和 saved history。使用相同的 `requestId` 重试以取回保留的 turn；只有在核对旧操作后、并且确实要再执行一次时，才使用新 ID。 |
 | turn 以 `execution_rejected` 或 `provider_error` 进入 `failed`。 | Pi 明确拒绝 prompt，或 Pi 将 execution 结束为失败。这些是 terminal turn outcomes，不是 HTTP error code。 | 阅读 turn 的 message 并检查 saved history。相同 `requestId` 的重试会取回同一条记录；有意发起新尝试时需要新 request ID。 |
 | Session/model discovery 返回 `runtime_unavailable`、`runtime_mismatch` 或 `model_discovery_failed`。 | Pi 无法启动、未按要求恢复存储的 session/model，或返回不受支持的 discovery 输出。 | 检查本地配置的 Pi executable/version 和所选 model。诊断时保留 Dwell session 及其 native history。 |
-| 出现 `503 storage_unavailable` 或带有该 code 的 `stream.error`。 | Dwell 无法持久化 session/turn/auth state。turn dispatch 之后会刻意阻止 replay，因为 execution 可能已经发生。 | 停止提交新工作。保留 catalog 和 session files；停止 Host 后检查 storage 是否可用，再诊断具体出错的文件或数据库操作。不要把删除 catalog 或轮换 credentials 当作通用修复手段。 |
+| 出现 `503 storage_unavailable` 或带有该 code 的 `stream.error`。 | Dwell 无法持久化 session/turn state。turn dispatch 之后会刻意阻止 replay，因为 execution 可能已经发生。 | 停止提交新工作。保留 catalog 和 session files；停止 Host 后检查 storage 是否可用，再诊断具体出错的文件或数据库操作。不要把删除 catalog 或轮换 credentials 当作通用修复手段。 |
 | SSE 关闭、报告 decoder error，或通过 `resync` frame 重连。 | 浏览器收到了格式错误或过大的 stream data、连接已断开，或者服务器的有界 replay window 已不再包含该 cursor。 | 让 client 重连并接收新的 snapshot。`resync` 是恢复控制 frame，不代表 turn 失败。 |
 
 <a id="how-an-error-reaches-the-caller"></a>
@@ -71,9 +69,9 @@ Pi RPC 又有所不同。相关联的 Pi response 若包含 `success: false`，�
 
 来源：[HTTP handler](../../../../src/server/http.ts)。此列表涵盖 handler 中的字面 JSON-envelope code；在请求可被服务之前发生的底层启动/配置异常，可能只是普通 Error。
 
-<a id="access-and-pairing"></a>
+<a id="access-control"></a>
 
-### 访问控制和 pairing
+### 访问控制
 
 | 错误码 | HTTP 状态 | 含义 |
 | --- | ---: | --- |
@@ -82,14 +80,9 @@ Pi RPC 又有所不同。相关联的 Pi response 若包含 `success: false`，�
 | `forbidden_proxy` | 403 | 携带 proxy-forwarded headers 的请求尝试使用本地 listener 的 Host lane。 |
 | `local_credential_required` | 403 | CLI credential 经安全浏览器 origin lane 发送；CLI credential 应用于本地地址。 |
 | `cli_required` | 403 | 此操作明确限定使用本地 CLI credential。 |
-| `unauthenticated` | 401 | 此路由没有有效的 browser session 或本地 CLI credential。 |
-| `invalid_pairing` | 401 | 一次性 pairing code 无效、过期或已兑换。 |
-| `pairing_limit` | 429 | 待处理 pairing code 过多；handler 的 `Retry-After` 为 300 秒。 |
-| `rate_limited` | 429 | pairing 尝试过多；handler 的 `Retry-After` 为 60 秒。 |
-| `session_limit` | auth 中为 429 | 已达到 browser-session 上限；这与下文的 Dwell open-session 上限不同。 |
-| `storage_unavailable` | 503 | 无法读取或保存 authentication state。 |
+| `unauthenticated` | 401 | 提供的本地 CLI bearer 无效。 |
 
-来源：[request access](../../../../src/server/access.ts)、[pairing 和 browser-session state](../../../../src/server/auth.ts)、[HTTP boundary](../../../../src/server/http.ts)。Pairing code 是一次性 credential，不是诊断 error code。
+来源：[request access](../../../../src/server/access.ts)、[CLI credential](../../../../src/server/auth.ts)、[HTTP boundary](../../../../src/server/http.ts)。
 
 <a id="session-turn-history-and-discovery-operations"></a>
 
@@ -183,7 +176,7 @@ Turn recovery 区分 `accepted` 与 `dispatching`：`accepted` turn 尚未进入
 | SSE startup error | `unauthenticated`、`stream_unavailable`、`stream_overloaded` | 这些是 stream 启动前引发的 `SseStartError` code。HTTP Host 将 `unauthenticated` 映射为 401，另外两个映射为 503。 |
 | Pi live-event projection | `invalid_pi_event` | Event 的形状/content 无法投影到 live view。这不表示 saved native history 损坏，也不表示 Pi execution 失败。 |
 | Browser SSE decoder | `frame_too_large`、`malformed_sse`、`invalid_json`、`invalid_frame`、`event_mismatch`、`id_mismatch` | 浏览器拒绝了 stream framing、JSON、frame schema、event name 或 cursor ID。这些是本地 `SseDecodeError` 值，不是 Host response code。应重连/resync，不要把它们当作 turn result。 |
-| Browser API wrapper | `storage`、`http` | `storage` 是本地 browser-binding storage failure，状态为 `0`；若 response body 不含兼容的 `{error:{code,message}}` envelope，则使用 `http` 作为 fallback。普通 server codes 会原样传递。 |
+| Browser API wrapper | `http` | 不兼容错误 envelope 时的 fallback；有效 server code 原样传递。 |
 | Resync reason | `cursor_stale`、`cursor_ahead`、`epoch_changed`、`replay_limit` | Server 无法从提供的 cursor 继续 event replay，于是发送新的 snapshot。这些是 `resync` frame 上的控制原因，不是 error code。 |
 
 来源：[event projection 和 stream errors](../../../../src/sessions/events.ts)、[server SSE transport](../../../../src/server/sse.ts)、[browser SSE decoder](../../../../src/clients/web/events.ts)、[browser API wrapper](../../../../src/clients/web/transport.ts)。
@@ -196,7 +189,7 @@ Pi RPC transport errors，例如 `Pi RPC connection closed`、`Pi RPC record exc
 
 | 范围 | 覆盖当前 failure boundary 的测试 |
 | --- | --- |
-| Host routing、access errors、auth 和 pairing | [access](../../../../tests/access.test.ts)、[auth](../../../../tests/auth.test.ts)、[host](../../../../tests/host.test.ts) |
+| Host routing、access errors、CLI credential | [access](../../../../tests/access.test.ts)、[auth](../../../../tests/auth.test.ts)、[host](../../../../tests/host.test.ts) |
 | Session 和 turn HTTP envelopes | [sessions HTTP](../../../../tests/sessions-http.test.ts)、[turns HTTP](../../../../tests/turns-http.test.ts)、[images HTTP](../../../../tests/images-http.test.ts) |
 | Saved history、cursor 和 cancellation errors | [history HTTP](../../../../tests/history-http.test.ts)、[history service](../../../../tests/history-service.test.ts)、[Pi history](../../../../tests/pi-history.test.ts)、[history cancellation](../../../../tests/history-cancellation.test.ts)、[history budget](../../../../tests/pi-history-budget.test.ts) |
 | SSE replay、overload 和 browser decoding | [server event HTTP](../../../../tests/events-http.test.ts)、[session events](../../../../tests/session-events.test.ts)、[event hub](../../../../tests/events.test.ts)、[browser SSE](../../../../tests/web-events.test.ts) |

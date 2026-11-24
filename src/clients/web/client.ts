@@ -50,8 +50,8 @@ import { actionIcon, labelWithIcon } from "./icons.ts";
 import { setupComposer } from "./input.ts";
 import { MemoryPanel, type MemoryPanelState } from "./memory.ts";
 import { renderMarkdown } from "./markdown.ts";
-import { appendToolCommand, commandPresentation } from "./tool-command.ts";
-import { ApiError, api, binding, headers, message, responseError } from "./transport.ts";
+import { appendToolCommand } from "./tool-command.ts";
+import { ApiError, api, headers, message, responseError } from "./transport.ts";
 
 function el<T extends HTMLElement>(id: string, type: { new (): T }): T {
   const node = document.getElementById(id);
@@ -765,7 +765,8 @@ function historyImage(entryId: string, index: number, mimeType: string): HTMLEle
       if (selected !== session || generation !== epoch) throw new Error("Session changed.");
       const response = await fetch(key, {
         headers: headers(),
-        credentials: "same-origin",
+        mode: "same-origin",
+        credentials: "omit",
         cache: "no-store",
         signal: AbortSignal.timeout(15000),
       });
@@ -835,7 +836,7 @@ try {
     for (const [key, label] of Object.entries(value))
       if (typeof label === "string" && label.length <= 200) localPreferences[key] = label;
 } catch {
-  /* pairing separately explains unavailable storage */
+  /* Preferences are optional when browser storage is unavailable. */
 }
 function savePreference(key: string, value: string): void {
   localPreferences[key] = value;
@@ -1056,7 +1057,7 @@ function closeBlockedReason(): string | null {
 }
 function showError(error: unknown): void {
   if (error instanceof ApiError && error.status === 401) {
-    disconnect("This browser needs pairing again. Your host-owned work continues.");
+    disconnect("The host refused access. Your host-owned work continues.");
     return;
   }
   notice.textContent = message(error);
@@ -1638,6 +1639,16 @@ function renderConversation(): void {
     conversation.querySelectorAll<HTMLDetailsElement>("details[open]"),
   );
   const expanded = new Set(openDetails.map((detail) => detail.dataset.key));
+  const standaloneThinking = new Set(
+    [...openDetails, focused?.closest(".thinking-run")]
+      .filter(
+        (detail): detail is HTMLDetailsElement =>
+          detail instanceof HTMLDetailsElement &&
+          detail.matches(".thinking-run") &&
+          !detail.closest(".activity-group"),
+      )
+      .map((detail) => detail.dataset.key),
+  );
   const trackedGroups = new Set([
     ...openDetails.filter((detail) => detail.matches(".activity-group")),
     anchor?.closest<HTMLDetailsElement>(".activity-group"),
@@ -1739,9 +1750,6 @@ function renderConversation(): void {
             "",
             tool.status === "failed" ? "tool-run error" : "tool-run",
           );
-          if (tool.status === "running")
-            detail.dataset.activityAction =
-              command === null ? tool.name : commandPresentation(command).preview;
           detail.dataset.key =
             tool.callId && tool.ownerKey
               ? `tool-call:${tool.ownerKey}/${tool.callId}`
@@ -1756,6 +1764,8 @@ function renderConversation(): void {
           }
           const fullCommand = command === null ? null : appendToolCommand(summary, command);
           if (command === null) summary.append(node("code", tool.name));
+          if (tool.status === "running")
+            detail.dataset.activityAction = summary.firstElementChild?.textContent ?? tool.name;
           summary.append(status);
           detail.append(summary);
           if (fullCommand) detail.append(fullCommand);
@@ -1793,23 +1803,22 @@ function renderConversation(): void {
       desired.append(recovery);
     }
   }
-  // Pagination and the live-to-saved handoff can change the first step in a group.
-  // Shared step identities let the new group inherit an explicit expansion and anchor.
+  // A shared step can move between groups or become its own disclosure.
   let activityAnchorKey: string | undefined;
   let activityFocusKey: string | undefined;
-  if (trackedActivitySteps.size) {
-    for (const group of Array.from(
-      desired.querySelectorAll<HTMLDetailsElement>(".activity-group"),
+  if (trackedActivitySteps.size || standaloneThinking.size || anchor?.matches(".thinking-run")) {
+    for (const step of Array.from(
+      desired.querySelectorAll<HTMLDetailsElement>(".thinking-run[data-key], .tool-run[data-key]"),
     )) {
-      for (const step of Array.from(
-        group.querySelectorAll<HTMLElement>(":scope > details[data-key]"),
-      )) {
-        const previous = step.dataset.key ? trackedActivitySteps.get(step.dataset.key) : undefined;
-        if (!previous) continue;
-        if (previous.open) group.open = true;
-        if (previous === anchor) activityAnchorKey ??= group.dataset.key;
-        if (previous.dataset.key === focusedDisclosureKey) activityFocusKey ??= group.dataset.key;
-      }
+      const key = step.dataset.key;
+      if (!key) continue;
+      const previous = trackedActivitySteps.get(key);
+      const group = step.closest<HTMLDetailsElement>(".activity-group");
+      if (group && (previous?.open || standaloneThinking.has(key))) group.open = true;
+      if (previous && previous === anchor) activityAnchorKey ??= group?.dataset.key ?? key;
+      if (previous?.dataset.key === focusedDisclosureKey && focusedDisclosureKey)
+        activityFocusKey ??= group?.dataset.key ?? key;
+      if (group && key === anchorKey && !group.open) activityAnchorKey ??= group.dataset.key;
     }
   }
   reconcileChildren(conversation, desired);
@@ -2013,7 +2022,8 @@ async function stream(id: string, epoch: number): Promise<void> {
     if (state.cursor) h.set("Last-Event-ID", state.cursor);
     const response = await fetch(`/api/v1/sessions/${id}/events`, {
       headers: h,
-      credentials: "same-origin",
+      mode: "same-origin",
+      credentials: "omit",
       cache: "no-store",
       signal: abort.signal,
     });
@@ -2356,11 +2366,7 @@ async function connect(): Promise<void> {
     }, 5000);
   } catch (error) {
     if (attempt !== authAttempt) return;
-    disconnect(
-      error instanceof ApiError && error.status === 401
-        ? "Pair this browser to connect."
-        : message(error),
-    );
+    disconnect(message(error));
   } finally {
     button.disabled = false;
   }
@@ -2847,39 +2853,6 @@ el("dismiss-notice", HTMLButtonElement).onclick = clearNotice;
 el("retry-button", HTMLButtonElement).onclick = () => {
   void connect();
 };
-const pairingCode = el("pair-code", HTMLInputElement);
-pairingCode.oninput = () => {
-  const trimmed = pairingCode.value.trim();
-  if (trimmed !== pairingCode.value) pairingCode.value = trimmed;
-};
-el("pair-form", HTMLFormElement).onsubmit = (event) => {
-  event.preventDefault();
-  const code = el("pair-code", HTMLInputElement);
-  const button = el("pair-button", HTMLButtonElement);
-  button.disabled = true;
-  void (async () => {
-    try {
-      const key = binding(true);
-      await api("/api/v1/auth/pair", { code: code.value.trim(), browserKey: key });
-      code.value = "";
-      await connect();
-    } catch (error) {
-      el("gate-message", HTMLElement).textContent = message(error);
-    } finally {
-      button.disabled = false;
-    }
-  })();
-};
-el("logout-button", HTMLButtonElement).onclick = () => {
-  void (async () => {
-    try {
-      await api("/api/v1/auth/logout", {});
-      disconnect("This browser is disconnected.");
-    } catch (error) {
-      showError(error);
-    }
-  })();
-};
 el("connection-badge", HTMLButtonElement).onclick = () => {
   const info = el("host-dialog", HTMLDialogElement);
   el("host-info", HTMLElement).textContent =
@@ -2955,11 +2928,6 @@ function responsive(): void {
 }
 viewport.addEventListener("change", responsive);
 responsive();
-window.addEventListener("storage", (event) => {
-  if (event.key === "dwell.browser-binding.v1" || event.key === null) {
-    disconnect("Browser credentials changed. Reconnect this browser.");
-  }
-});
 window.addEventListener("pagehide", () => {
   suspended = true;
   generation++;

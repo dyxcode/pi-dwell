@@ -47,7 +47,7 @@ const remote = {
   Host: new URL(origin).host,
   Origin: origin,
   "X-Dwell-Request": "1",
-  "X-Dwell-Browser": "a".repeat(64),
+  "X-Forwarded-Proto": "https",
 };
 
 function openEventStream(url: string, headers: Record<string, string> = {}) {
@@ -118,142 +118,21 @@ async function within<T>(promise: Promise<T>, milliseconds: number): Promise<T> 
   }
 }
 
-test("a configured HTTPS origin pairs independently and preserves auth through restart, logout and revoke", async (t) => {
+test("HTTPS authority configuration changes take effect only after restart", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "dwell-access-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await configure(root);
   let host = await startHost({ port: 0, dataDir: root });
   t.after(() => host.close());
-  const token = (await readFile(join(root, "auth-token"), "utf8")).trim();
-  const cli = { Authorization: `Bearer ${token}` };
-  const create = async () => {
-    const result = await send(`${host.url}/api/v1/auth/pairings`, cli, {});
-    assert.equal(result.status, 201);
-    const value: unknown = JSON.parse(result.text);
-    assert.ok(
-      value && typeof value === "object" && "code" in value && typeof value.code === "string",
-    );
-    return value.code;
-  };
-  const redeem = (code: string) =>
-    send(`${host.url}/api/v1/auth/pair`, remote, { code, browserKey: remote["X-Dwell-Browser"] });
-  assert.equal((await send(host.url, { Host: remote.Host })).status, 200);
-  assert.equal((await send(`${host.url}/api/v1/status`, remote)).status, 401);
-  const code = await create();
-  for (const headers of [
-    { ...remote, Origin: "" },
-    { ...remote, "X-Dwell-Request": "" },
-  ])
-    assert.equal(
-      (
-        await send(`${host.url}/api/v1/auth/pair`, headers, {
-          code,
-          browserKey: remote["X-Dwell-Browser"],
-        })
-      ).status,
-      403,
-    );
-  assert.equal(
-    (
-      await send(
-        `${host.url}/api/v1/auth/pair`,
-        { ...remote, Origin: "https://wrong.example" },
-        { code, browserKey: remote["X-Dwell-Browser"] },
-      )
-    ).status,
-    403,
-  );
-  const paired = await redeem(code);
-  assert.equal(paired.status, 200);
-  const setCookie = paired.headers["set-cookie"]?.[0];
-  assert.ok(setCookie);
-  assert.match(setCookie, /^__Host-dwell_browser_production=/);
-  assert.match(setCookie, /; Secure(?:;|$)/);
-  assert.match(setCookie, /; HttpOnly/);
-  assert.match(setCookie, /; SameSite=Strict/);
-  assert.doesNotMatch(setCookie, /Domain=/i);
-  const cookie = setCookie.split(";")[0];
-  assert.ok(cookie);
-  const authenticated = { ...remote, Cookie: cookie };
-  assert.equal((await send(`${host.url}/api/v1/status`, authenticated)).status, 200);
-  assert.equal(
-    (await send(`${host.url}/api/v1/status`, { Host: remote.Host, Cookie: cookie })).status,
-    401,
-  );
-  assert.equal(
-    (
-      await send(`${host.url}/api/v1/status`, {
-        ...authenticated,
-        "X-Dwell-Browser": "b".repeat(64),
-      })
-    ).status,
-    401,
-  );
-  assert.equal(
-    (
-      await send(`${host.url}/api/v1/status`, {
-        Cookie: cookie,
-        "X-Dwell-Browser": remote["X-Dwell-Browser"],
-      })
-    ).status,
-    401,
-    "HTTPS cookie is not selected on the HTTP origin",
-  );
-  assert.equal(
-    (await send(`${host.url}/api/v1/status`, { ...remote, ...cli })).status,
-    403,
-    "CLI bearer stays on the local endpoint",
-  );
-  assert.equal(
-    (await send(`${host.url}/api/v1/runtime`, authenticated, { executable: "/tmp/pi" })).status,
-    403,
-  );
-  assert.equal((await send(`${host.url}/api/v1/auth/pairings`, authenticated, {})).status, 401);
-  assert.equal((await redeem(code)).status, 401);
-  const localPair = await send(
-    `${host.url}/api/v1/auth/pair`,
-    {
-      Origin: host.url,
-      "X-Dwell-Request": "1",
-    },
-    { code: await create(), browserKey: remote["X-Dwell-Browser"] },
-  );
-  assert.equal(localPair.status, 200);
-  const localCookie = localPair.headers["set-cookie"]?.[0];
-  assert.ok(localCookie);
-  assert.match(localCookie, /^dwell_browser_production=/);
-  assert.doesNotMatch(localCookie, /; Secure/);
-  const localToken = localCookie.split(";")[0];
-  assert.ok(localToken);
-  assert.equal(
-    (await send(`${host.url}/api/v1/status`, { ...remote, Cookie: localToken })).status,
-    401,
-  );
+  const next = "https://changed.example.ts.net";
+  const replacement = { ...remote, Host: new URL(next).host, Origin: next };
+  await configure(root, next);
+  assert.equal((await send(host.url, remote)).status, 200);
+  assert.equal((await send(host.url, replacement)).status, 403);
   await host.close();
   host = await startHost({ port: 0, dataDir: root });
-  await configure(root, "https://changed.example.ts.net");
-  assert.equal(
-    (await send(host.url, { Host: remote.Host })).status,
-    200,
-    "configuration changes take effect only on restart",
-  );
-  assert.equal((await send(host.url, { Host: "changed.example.ts.net" })).status, 403);
-  assert.equal((await send(`${host.url}/api/v1/status`, authenticated)).status, 200);
-  const logout = await send(`${host.url}/api/v1/auth/logout`, authenticated, {});
-  assert.equal(logout.status, 200);
-  assert.match(
-    logout.headers["set-cookie"]?.[0] ?? "",
-    /^__Host-dwell_browser_production=;.*Max-Age=0.*Secure/,
-  );
-  assert.equal((await send(`${host.url}/api/v1/status`, authenticated)).status, 401);
-  const again = await redeem(await create());
-  const secondCookie = again.headers["set-cookie"]?.[0]?.split(";")[0];
-  assert.ok(secondCookie);
-  assert.equal((await send(`${host.url}/api/v1/auth/revoke`, cli, {})).status, 200);
-  assert.equal(
-    (await send(`${host.url}/api/v1/status`, { ...remote, Cookie: secondCookie })).status,
-    401,
-  );
+  assert.equal((await send(host.url, replacement)).status, 200);
+  assert.equal((await send(host.url, remote)).status, 403);
 });
 
 test("host/origin trust is explicit, forwarding headers cannot enable it, and development stays local", async (t) => {
@@ -268,7 +147,7 @@ test("host/origin trust is explicit, forwarding headers cannot enable it, and de
   for (const headers of [
     { Host: "wrong.example", "X-Forwarded-Host": remote.Host, "X-Forwarded-Proto": "https" },
     { Host: "wrong.example", Forwarded: `host=${remote.Host};proto=https` },
-    { Host: remote.Host, Origin: host.url },
+    { ...remote, Origin: host.url },
     { Host: new URL(host.url).host, Origin: origin },
     {
       Host: new URL(host.url).host,
@@ -276,8 +155,8 @@ test("host/origin trust is explicit, forwarding headers cannot enable it, and de
       "X-Forwarded-Proto": "https",
     },
     { Host: new URL(host.url).host, Forwarded: `host=${remote.Host};proto=https` },
-    { Host: remote.Host, Origin: "null" },
-    { Host: remote.Host, Origin: `${origin}/` },
+    { ...remote, Origin: "null" },
+    { ...remote, Origin: `${origin}/` },
   ])
     assert.equal((await send(host.url, headers)).status, 403);
   assert.equal(
@@ -285,7 +164,7 @@ test("host/origin trust is explicit, forwarding headers cannot enable it, and de
       await send(host.url, {
         Host: remote.Host,
         "X-Forwarded-Host": "wrong.example",
-        "X-Forwarded-Proto": "http",
+        "X-Forwarded-Proto": "https",
       })
     ).status,
     200,
@@ -354,7 +233,7 @@ test("invalid or unsafe access configuration fails startup without rewriting it 
   await recovered.close();
 });
 
-test("configured HTTPS-origin SSE requires browser binding and closes immediately on local revoke", async (t) => {
+test("configured HTTPS-origin SSE requires the browser request marker and closes on host shutdown", async (t) => {
   const environment = await createPiEnvironment();
   t.after(() => environment.cleanup());
   await configure(environment.root);
@@ -382,39 +261,20 @@ test("configured HTTPS-origin SSE requires browser binding and closes immediatel
   const session: unknown = JSON.parse(created.text);
   assert.ok(isSessionInfo(session));
 
-  const pairing = await send(`${host.url}/api/v1/auth/pairings`, cli, {});
-  assert.equal(pairing.status, 201);
-  const pairingValue: unknown = JSON.parse(pairing.text);
-  assert.ok(
-    pairingValue &&
-      typeof pairingValue === "object" &&
-      "code" in pairingValue &&
-      typeof pairingValue.code === "string",
-  );
-  const paired = await send(`${host.url}/api/v1/auth/pair`, remote, {
-    code: pairingValue.code,
-    browserKey: remote["X-Dwell-Browser"],
-  });
-  assert.equal(paired.status, 200);
-  const setCookie = paired.headers["set-cookie"]?.[0];
-  assert.ok(setCookie);
-  const cookie = setCookie.split(";", 1)[0];
-  assert.ok(cookie);
-
   const eventsUrl = `${host.url}/api/v1/sessions/${session.id}/events`;
   assert.equal(
     (
       await send(eventsUrl, {
         Host: remote.Host,
         Origin: origin,
-        Cookie: cookie,
+        "X-Forwarded-Proto": "https",
         Accept: "text/event-stream",
       })
     ).status,
-    401,
-    "the HTTPS cookie alone does not authorize an event stream",
+    403,
+    "a browser event stream needs the request marker",
   );
-  const stream = await openEventStream(eventsUrl, { ...remote, Cookie: cookie });
+  const stream = await openEventStream(eventsUrl, remote);
   assert.equal(stream.status, 200);
   assert.equal(
     await within(stream.snapshot, 5000),
@@ -422,7 +282,6 @@ test("configured HTTPS-origin SSE requires browser binding and closes immediatel
     "the remote stream receives its snapshot",
   );
 
-  const revoked = await send(`${host.url}/api/v1/auth/revoke`, cli, {});
-  assert.equal(revoked.status, 200);
+  await host.close();
   assert.equal(await within(stream.closed, 1000).then(() => true), true);
 });

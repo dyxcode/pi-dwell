@@ -4,7 +4,7 @@ import type { ServiceAction } from "../../service/service.ts";
 
 export type Command =
   | { kind: "help" }
-  | { kind: "serve" | "status" | "pair" | "revoke"; mode: HostMode }
+  | { kind: "serve" | "status"; mode: HostMode }
   | { kind: "service"; action: ServiceAction }
   | { kind: "configure"; mode: HostMode; executable: string; entryPoint?: string };
 
@@ -63,7 +63,7 @@ export function parseCommand(args: string[]): Command {
   if (
     rest.length === 1 &&
     rest[0] === "--help" &&
-    ["serve", "status", "pair", "auth", "service", "pi"].includes(first)
+    ["serve", "status", "service", "pi"].includes(first)
   )
     return { kind: "help" };
 
@@ -101,16 +101,8 @@ export function parseCommand(args: string[]): Command {
     };
   }
 
-  const options = first === "auth" ? rest.slice(1) : rest;
-  const kind = first === "auth" && rest[0] === "revoke" ? "revoke" : first;
-  if (
-    kind !== "serve" &&
-    kind !== "status" &&
-    kind !== "pair" &&
-    !(first === "auth" && kind === "revoke")
-  )
-    throw new Error("Unknown command. Use --help.");
-  if (options.length > 1 || (options.length === 1 && options[0] !== "--dev"))
+  if (first !== "serve" && first !== "status") throw new Error("Unknown command. Use --help.");
+  if (rest.length > 1 || (rest.length === 1 && rest[0] !== "--dev"))
     throw new Error("Only --dev is supported. Dwell uses one fixed local port. Use --help.");
-  return { kind, mode: options[0] === "--dev" ? "development" : "production" };
+  return { kind: first, mode: rest[0] === "--dev" ? "development" : "production" };
 }

@@ -56,13 +56,7 @@ npm run dwell -- pi configure \
   --entry-point "$(npm root -g)/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 ```
 
-Generate a browser pairing code:
-
-```sh
-npm run dwell -- pair
-```
-
-Open [http://127.0.0.1:8787](http://127.0.0.1:8787) on the host, enter the eight-character code exactly as shown, and select a directory to start a conversation. The code expires after five minutes. Dwell runs in the background after you close the terminal.
+Open [http://127.0.0.1:8787](http://127.0.0.1:8787) on the host and select a directory to start a conversation. Dwell runs in the background after you close the terminal.
 
 On Linux, enable startup at boot and keep the service running after logout:
 

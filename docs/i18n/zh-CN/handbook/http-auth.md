@@ -15,8 +15,8 @@
 | 文件 | 职责 |
 | --- | --- |
 | [`server/http.ts`](../../../../src/server/http.ts) | Listener 生命周期、请求验证、route 分发、response headers、错误处理与 shutdown |
-| [`server/access.ts`](../../../../src/server/access.ts) | 本地/HTTPS authority 选择、配置验证、cookie 属性 |
-| [`server/auth.ts`](../../../../src/server/auth.ts) | CLI credential 验证、pairing、浏览器认证、串行化持久化 |
+| [`server/access.ts`](../../../../src/server/access.ts) | 本地/HTTPS authority 选择、配置验证与代理检查 |
+| [`server/auth.ts`](../../../../src/server/auth.ts) | 本地 CLI credential 创建与验证 |
 | [`server/sse.ts`](../../../../src/server/sse.ts) | 每个 response 的 SSE 编码、backpressure、认证复查与清理 |
 | [`server/session-discovery.ts`](../../../../src/server/session-discovery.ts) | host 目录浏览，以及隔离的全局 model/capability 发现 |
 
@@ -30,7 +30,7 @@
 
 `handle` 按以下顺序处理请求：
 
-1. 拒绝重复的安全敏感 header：Host、Origin、Authorization、Cookie、两个 Dwell header，以及 Last-Event-ID。
+1. 拒绝重复的安全敏感 header：Host、Origin、Authorization、request marker、代理协议、fetch-site 和 Last-Event-ID。
 2. 选择本地或已配置的 HTTPS authority，拒绝 cross-origin 请求，并拒绝 HTTPS lane 上的 CLI Authorization。
 3. 拒绝处于启动/停止阶段的请求，以及长度超过 2048 个字符的 request target。
 4. 解析 path 和有限支持的 query 格式。目录浏览只接受一个 `path`；history 只接受一个非空、最长 1536 个字符的 `cursor`。Library latest 接受可选 `source` 与 `limit`；其他 query 都会失败。
@@ -45,7 +45,7 @@
 
 ## 完整 route 表
 
-下表中的 API path 都相对于 `/api/v1`。**Either** 表示使用本地 bearer authentication，或使用浏览器 cookie 加 binding key。浏览器 POST 和 DELETE 操作还要求匹配的 Origin 和 `X-Dwell-Request: 1`。空 body 表示 JSON object `{}`，并不表示省略 Content-Type。
+下表中的 API path 相对于 `/api/v1`。**Either** 表示本地 CLI bearer 或通过准入检查的浏览器请求。浏览器 API 请求需要 `X-Dwell-Request: 1`，POST 和 DELETE 还需要精确匹配的 Origin。空 body 指 JSON object `{}`。
 
 | 方法和 route | 认证 | 输入和结果 |
 | --- | --- | --- |
@@ -53,10 +53,6 @@
 | `GET /style.css`、浏览器 asset map（prefix 之外） | Public，检查 authority | 固定的 CSS/JS 资源 |
 | `GET /healthz`（prefix 之外） | Public，检查 authority | `{status: "ok"}`；表示进程可用，不表示 provider 已就绪 |
 | `GET /status` | Either | HostStatus，包括 mode、PID、instance 和 capabilities |
-| `POST /auth/pairings` | CLI | `{}` → 201 pairing code 和过期时间 |
-| `POST /auth/pair` | Browser origin/request marker；无需先登录 | `{code, browserKey}` → session cookie 和 `{ok: true}` |
-| `POST /auth/logout` | Browser | `{}` → 移除此浏览器、清除 cookie、重新验证 streams |
-| `POST /auth/revoke` | CLI | `{}` → 移除所有浏览器及待处理 pairing code，并重新验证 streams |
 | `POST /runtime` | 仅 CLI | 绝对路径 executable 和可选 entryPoint → 验证后保存的配置 |
 | `GET /directories[?path=…]` | Either | Canonical host directory、parent、子目录和截断标志 |
 | `GET /models` | Either | 封装在 `models` 中的全局隔离发现结果 |
@@ -99,23 +95,13 @@ Session creation 要求 provider 和 model 成对提供，或都不提供，并�
 
 `readBrowserOrigin` 通过 private-file reader 读取可选的、仅 production 使用的 `access.json`。准确结构为 `{ "version": 1, "browserOrigin": "https://host.example" }`；额外字段、非 canonical origin、path、query string、fragment、wildcard，以及超长文本都会被拒绝。Development mode 忽略此文件。
 
-`requestAccess` 接受字面值 loopback authority 或唯一已配置的 HTTPS authority。如果请求使用本地 authority 且带有 Forwarded 或 X-Forwarded-*，就会被拒绝，避免 proxy 选择本地 credential lane。Forwarded headers 不会授予访问权限。Proxy 必须保留配置的 Host；TLS 在 Dwell 外部终止，listener 仍绑定 loopback。
-
-本地 cookie 按 mode 命名。HTTPS cookie 使用 `__Host-` prefix 和 Secure。两种 cookie 都使用 Path=/、HttpOnly、SameSite=Strict 和有界 Max-Age。这些检查假设 host account 和本地 executable 环境可信；它们无法认证一个占据完全相同本地 origin 的恶意替代进程。
+`requestAccess` 只接受确切的回环或已配置的 HTTPS authority。带转发头的请求不能进入本地管理路径；外部 authority 拒绝 CLI bearer。私有代理必须保留 Host，并标记 HTTPS 转发。Dwell 拒绝明确标记为 public Funnel 的流量。转发头不是用户身份；私有网络策略负责限制远程客户端。
 
 <a id="localauth-internals"></a>
 
 ## LocalAuth 内部机制
 
-`open` 会准备 private state，并以 exclusive create 方式新建缺失的 `auth-token` 和 `browser-sessions.json`。已有文件会被读取并验证；格式错误的 state 会保留在原处，并导致启动失败。CLI token 为 32 个随机字节，编码为 64 个 hex 字符。`isCli` 会在 timing-safe comparison 前先检查格式。
-
-Browser session 只持久化 cookie token 和 browser binding key 的 SHA-256 hash，以及过期时间。`parseSessions` 检查版本、exact keys、hash 格式、正的 safe expiry、重复 hash，以及最多 100 条记录的上限。`isBrowser` 验证提供的两个 secret，并要求它们匹配一对未过期记录。
-
-Pairing 使用八次独立的密码学随机选择，字符表排除易混淆的 `0/O/o` 和 `1/I/i`。Code 区分大小写。内存 map 存储 code hash 和五分钟过期时间；发生碰撞时会重新生成。创建时会清理过期 code，并最多允许十个待处理 code。
-
-`redeem`、`logout` 和 `revoke` 通过 promise chain 串行执行。某次 action 被拒绝不会破坏后续 queue。HTTP shape 验证后，redeem 每滚动一分钟最多允许 20 次尝试；它会清理过期 browser record，检查 100 个 session 的上限，写入有效期 30 天的新 browser session，成功后再删除 pairing code。持久化失败会使 browser authentication 进入故障状态，直到修复并重启；成功写入之前不会把新 state 安装到内存中。
-
-`logout` 移除一个 token 和过期 session。`revoke` 保存空列表并清除待处理 code。`drain` 让 host shutdown 等待已通过 admission 的 authentication write。Pairing code 和 rate-limit counter 仅保存在内存中，重启后会重置。
+`open` 创建或读取 owner-only 的 `auth-token`。`isCli` 验证格式并执行 timing-safe comparison。浏览器不需要 cookie 或本地凭据；如果有 Fetch Metadata，必须表明是同源请求。回环安全依赖可信本机环境。
 
 <a id="sse-writer-and-backpressure"></a>
 
@@ -127,7 +113,7 @@ Event hub 拥有排序和 replay；`createSseConnection` 拥有单个 HTTP respo
 
 `start` 会把初始 frames 放到 subscription 期间排队的通知之前，检查 authorization 和合并预算，设置 SSE headers，然后启动 pump。`pump` 在每次写入前重新检查 authorization；如果 `response.write` 表示 backpressure，就暂停。`drain` 恢复写入。Heartbeat 默认每 15 秒发送一次，也会复查认证。
 
-`stream.error` 会断开 observation，尝试 flush error，并将 flush 时长限制在一秒内。`release` 只执行一次，清理 timer、queue 和 listeners；unsubscribe/onClose 异常不会传播给 producers。Revocation 和 logout 会显式重新验证所有 active streams；heartbeat/write 时也会检测 expiry。Observer 断开不会停止它所观察的 Pi execution。
+`stream.error` 会断开 observation，尝试 flush error，并将 flush 时长限制在一秒内。`release` 只执行一次，清理 timer、queue 和 listeners；unsubscribe/onClose 异常不会传播给 producers。Observer 断开不会停止它所观察的 Pi execution。
 
 <a id="directory-discovery"></a>
 

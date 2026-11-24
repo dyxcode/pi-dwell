@@ -108,7 +108,6 @@ Contracts are in [`shared/events.ts`](../../src/shared/events.ts); the per-sessi
 | **Image support** | Capability metadata indicating whether the selected model can accept image input. Dwell validates this before dispatch and still bounds/validates image data at the request boundary. |
 | **HTTP status** | The numeric response status such as 400 or 503. It describes the HTTP request outcome; it is separate from Dwell session/turn status strings. |
 | **Error code** | A layer-specific diagnostic string in an HTTP error, turn record, or stream event. The same spelling can appear in more than one layer and does not always have an HTTP status. |
-| **Pairing code** | A one-time short credential created by the local CLI for browser pairing. It is security-sensitive input, not an error code or request ID. |
 | **Request/turn idempotency** | The guarantee that the same `requestId` and same payload refers to the original operation. It prevents duplicate creation/execution after retries; it does not cause Dwell to replay an uncertain Pi prompt. |
 
 See [shared contracts](../../src/shared/sessions.ts), [thinking/model capabilities](../../src/shared/thinking.ts), and the [error reference](errors.md) for concrete status/code behavior.

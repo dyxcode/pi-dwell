@@ -39,7 +39,7 @@ test("loopback host serves public health/assets and authenticated status", async
     assert.ok(response.headers.get("content-type")?.includes(type ?? ""));
     assert.match(response.headers.get("content-security-policy") ?? "", /script-src 'self'/);
   }
-  assert.equal((await fetch(`${host.url}/api/v1/sessions`)).status, 401);
+  assert.equal((await fetch(`${host.url}/api/v1/sessions`)).status, 403);
   const write = await fetch(`${host.url}/api/v1/status`, { method: "POST" });
   assert.equal(write.status, 405);
   assert.equal(write.headers.get("allow"), "GET");
@@ -108,19 +108,18 @@ test("status client rejects incompatible HTTP services", async (t) => {
   await assert.rejects(readHostStatus({ port: address.port, dataDir }), /incompatible/i);
 });
 
-test("Host, Origin, CSRF, media type, body sizes and rate limits are enforced", async (t) => {
+test("Host, Origin, CSRF, media type, and body sizes are enforced", async (t) => {
   const dataDir = await directory(t);
   const host = await startHost({ port: 0, dataDir });
   t.after(() => host.close());
-  const token = (await readFile(join(dataDir, "auth-token"), "utf8")).trim();
   for (const origin of ["http://evil.example", "null", "http://127.0.0.1:1"]) {
     assert.equal((await fetch(`${host.url}/healthz`, { headers: { Origin: origin } })).status, 403);
   }
-  const pairUrl = `${host.url}/api/v1/auth/pair`;
+  const sessionUrl = `${host.url}/api/v1/sessions`;
   const browser = { Origin: host.url, "X-Dwell-Request": "1", "Content-Type": "application/json" };
   assert.equal(
     (
-      await fetch(pairUrl, {
+      await fetch(sessionUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",
@@ -130,7 +129,7 @@ test("Host, Origin, CSRF, media type, body sizes and rate limits are enforced", 
   );
   assert.equal(
     (
-      await fetch(pairUrl, {
+      await fetch(sessionUrl, {
         method: "POST",
         headers: { Origin: host.url, "Content-Type": "application/json" },
         body: "{}",
@@ -140,7 +139,7 @@ test("Host, Origin, CSRF, media type, body sizes and rate limits are enforced", 
   );
   assert.equal(
     (
-      await fetch(pairUrl, {
+      await fetch(sessionUrl, {
         method: "POST",
         headers: { ...browser, "Content-Type": "text/plain" },
         body: "{}",
@@ -149,45 +148,17 @@ test("Host, Origin, CSRF, media type, body sizes and rate limits are enforced", 
     415,
   );
   assert.equal(
-    (await fetch(pairUrl, { method: "POST", headers: browser, body: "x".repeat(8193) })).status,
+    (await fetch(sessionUrl, { method: "POST", headers: browser, body: "x".repeat(8193) })).status,
     413,
   );
-  assert.equal((await fetch(pairUrl, { method: "POST", headers: browser, body: "{" })).status, 400);
   assert.equal(
-    (
-      await fetch(`${host.url}/api/v1/auth/pairings`, {
-        method: "POST",
-        headers: browser,
-        body: "{}",
-      })
-    ).status,
-    401,
+    (await fetch(sessionUrl, { method: "POST", headers: browser, body: "{" })).status,
+    400,
   );
-  for (let i = 0; i < 21; i++) {
-    const response = await fetch(pairUrl, {
-      method: "POST",
-      headers: browser,
-      body: JSON.stringify({ code: "AbCd2345", browserKey: "a".repeat(64) }),
-    });
-    assert.equal(response.status, i < 20 ? 401 : 429);
-  }
-  const cli = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-  for (let i = 0; i < 11; i++) {
-    assert.equal(
-      (
-        await fetch(`${host.url}/api/v1/auth/pairings`, {
-          method: "POST",
-          headers: cli,
-          body: "{}",
-        })
-      ).status,
-      i < 10 ? 201 : 429,
-    );
-  }
   const rawRequest = (method: string, headers: Record<string, string>, body: string) =>
     new Promise<number>((resolve, reject) => {
       const outgoing = request(
-        `${host.url}${method === "GET" ? "/healthz" : "/api/v1/auth/pair"}`,
+        `${host.url}${method === "GET" ? "/healthz" : "/api/v1/sessions"}`,
         { method, headers },
         (response) => {
           response.resume();

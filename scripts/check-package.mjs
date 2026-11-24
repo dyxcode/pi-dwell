@@ -9,7 +9,7 @@ const handbookFiles = [
   "docs/handbook/README.md",
   "docs/handbook/implementation/README.md",
   "docs/handbook/implementation/host-service.md",
-  "docs/handbook/implementation/pairing.md",
+  "docs/handbook/implementation/browser-access.md",
   "docs/handbook/implementation/session-lifecycle.md",
   "docs/handbook/implementation/session-names.md",
   "docs/handbook/implementation/models.md",

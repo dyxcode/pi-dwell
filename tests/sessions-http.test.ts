@@ -50,7 +50,7 @@ async function setup(t: TestContext) {
 
 test("session routes require authentication and validate configuration/body boundaries", async (t) => {
   const { host, request, configure, body } = await setup(t);
-  assert.equal((await fetch(`${host.url}/api/v1/sessions`)).status, 401);
+  assert.equal((await fetch(`${host.url}/api/v1/sessions`)).status, 403);
   assert.equal((await request("/sessions", body)).status, 503);
   assert.equal((await configure()).status, 200);
   assert.equal(
@@ -94,20 +94,10 @@ test("slow authenticated configuration outlives the ordinary five-second socket 
   assert.equal(response.status, 200);
 });
 
-test("paired browsers can read sessions but cannot configure executables or bypass mutation guards", async (t) => {
-  const { request, configure, host, body } = await setup(t);
+test("browsers can read sessions but cannot configure executables or bypass mutation guards", async (t) => {
+  const { configure, host, body } = await setup(t);
   await configure();
-  const pairing: unknown = await (await request("/auth/pairings", {})).json();
-  assert.ok(pairing && typeof pairing === "object" && "code" in pairing);
-  const binding = "a".repeat(64);
-  const paired = await fetch(`${host.url}/api/v1/auth/pair`, {
-    method: "POST",
-    headers: { Origin: host.url, "X-Dwell-Request": "1", "Content-Type": "application/json" },
-    body: JSON.stringify({ code: pairing.code, browserKey: binding }),
-  });
-  const cookie = paired.headers.get("set-cookie")?.split(";")[0];
-  assert.ok(cookie);
-  const browser = { Cookie: cookie, "X-Dwell-Browser": binding };
+  const browser = { "X-Dwell-Request": "1" };
   assert.equal((await fetch(`${host.url}/api/v1/sessions`, { headers: browser })).status, 200);
   assert.equal(
     (
@@ -155,7 +145,7 @@ test("paired browsers can read sessions but cannot configure executables or bypa
   assert.equal(turnDenied.status, 403);
 });
 
-test("paired browsers share session names, detect stale revisions and retain them across restart", async (t) => {
+test("browsers share session names, detect stale revisions and retain them across restart", async (t) => {
   const { request, configure, body, host, options } = await setup(t);
   await configure();
   const createdResponse = await request("/sessions", body);
@@ -163,30 +153,12 @@ test("paired browsers share session names, detect stale revisions and retain the
   const created: unknown = await createdResponse.json();
   assert.ok(isSessionInfo(created));
 
-  const pair = async (key: string) => {
-    const pairing: unknown = await (await request("/auth/pairings", {})).json();
-    assert.equal(typeof field(pairing, "code"), "string");
-    const browserKey = key.repeat(64);
-    const redeemed = await fetch(`${host.url}/api/v1/auth/pair`, {
-      method: "POST",
-      headers: {
-        Origin: host.url,
-        "X-Dwell-Request": "1",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ code: field(pairing, "code"), browserKey }),
-    });
-    assert.equal(redeemed.status, 200);
-    const cookie = redeemed.headers.get("set-cookie")?.split(";", 1)[0];
-    assert.ok(cookie);
-    const headers = { Cookie: cookie, "X-Dwell-Browser": browserKey };
-    return {
-      headers,
-      mutationHeaders: { ...headers, Origin: host.url, "X-Dwell-Request": "1" },
-    };
+  const browser = {
+    headers: { "X-Dwell-Request": "1" },
+    mutationHeaders: { Origin: host.url, "X-Dwell-Request": "1" },
   };
-  const first = await pair("a");
-  const second = await pair("b");
+  const first = browser;
+  const second = browser;
   const requestFrom = (url: string, browser: typeof first, name: string, body?: unknown) =>
     fetch(`${url}/api/v1/sessions/${created.id}${name}`, {
       method: body === undefined ? "GET" : "POST",

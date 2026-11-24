@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { request as httpRequest } from "node:http";
 import { join } from "node:path";
@@ -141,34 +141,6 @@ async function rawResponse(
   });
 }
 
-async function pairBrowser(
-  hostUrl: string,
-  token: string,
-): Promise<{ cookie: string; browserKey: string }> {
-  const pairingResponse = await fetch(`${hostUrl}/api/v1/auth/pairings`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: "{}",
-  });
-  assert.equal(pairingResponse.status, 201);
-  const pairing = asRecord(await pairingResponse.json());
-  assert.equal(typeof pairing.code, "string");
-  const browserKey = randomBytes(32).toString("hex");
-  const redeem = await fetch(`${hostUrl}/api/v1/auth/pair`, {
-    method: "POST",
-    headers: {
-      Origin: hostUrl,
-      "X-Dwell-Request": "1",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ code: pairing.code, browserKey }),
-  });
-  assert.equal(redeem.status, 200);
-  const cookie = redeem.headers.get("set-cookie")?.split(";", 1)[0];
-  assert.ok(cookie);
-  return { cookie, browserKey };
-}
-
 function asTurn(value: unknown): Record<string, unknown> {
   return asRecord(value);
 }
@@ -223,7 +195,7 @@ test("history route retains authentication, query, method, body, and exact-path 
   const path = `/api/v1/sessions/${sessionId}/history`;
   const url = `${host.url}${path}`;
 
-  assert.equal((await fetch(url)).status, 401);
+  assert.equal((await fetch(url)).status, 403);
 
   const unknown = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(unknown.status, 404);
@@ -304,24 +276,15 @@ test("history route retains authentication, query, method, body, and exact-path 
   assert.equal(asRecord(asRecord(await eventQuery.json()).error).code, "unexpected_query");
 });
 
-test("history reads support paired browsers, completed pages, and active-turn metadata without Pi reads", async (t) => {
-  const { host, token, request, configure, createSession, startLog, streamStarted } =
-    await setup(t);
+test("history reads support browsers, completed pages, and active-turn metadata without Pi reads", async (t) => {
+  const { host, request, configure, createSession, startLog, streamStarted } = await setup(t);
   await configure();
 
   const emptySession = await createSession();
   assert.equal(await piStarts(startLog), 1);
-  const paired = await pairBrowser(host.url, token);
   const historyUrl = `${host.url}/api/v1/sessions/${emptySession.id}/history`;
-  const cookieOnly = await fetch(historyUrl, { headers: { Cookie: paired.cookie } });
-  assert.equal(cookieOnly.status, 401);
-  const bindingOnly = await fetch(historyUrl, {
-    headers: { "X-Dwell-Browser": paired.browserKey },
-  });
-  assert.equal(bindingOnly.status, 401);
-  const browserHistory = await fetch(historyUrl, {
-    headers: { Cookie: paired.cookie, "X-Dwell-Browser": paired.browserKey },
-  });
+  assert.equal((await fetch(historyUrl)).status, 403);
+  const browserHistory = await fetch(historyUrl, { headers: { "X-Dwell-Request": "1" } });
   assert.equal(browserHistory.status, 200);
   assert.equal(assertHistoryPage(await browserHistory.json(), emptySession.id).status, "empty");
 

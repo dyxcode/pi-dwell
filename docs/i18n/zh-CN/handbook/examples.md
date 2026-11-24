@@ -18,7 +18,7 @@
 npm start
 ```
 
-保持该 terminal 打开。在另一个 terminal 中进入 checkout，运行 `npm run dwell -- pair`。Ctrl-C 会通过 shutdown 路径停止 foreground host。
+保持该 terminal 打开，然后在主机上访问 `http://127.0.0.1:8787`。Ctrl-C 会通过 shutdown 路径停止 foreground host。
 
 <a id="use-isolated-development-state"></a>
 
@@ -35,7 +35,6 @@ npm run dev
 
 ```sh
 npm run dwell -- pi configure --executable /absolute/path/to/pi --dev
-npm run dwell -- pair --dev
 npm run dwell -- status --dev
 ```
 
@@ -52,16 +51,11 @@ npm run dwell -- status
 
 第一个请求无需 credential，返回 process health。第二个请求验证经过 authentication 的 Dwell status。两者都不能证明 provider request 一定成功。
 
-<a id="revoke-browser-access"></a>
+<a id="restrict-browser-access"></a>
 
-## 撤销 browser access
+## 限制远程浏览器访问
 
-```sh
-npm run dwell -- auth revoke
-npm run dwell -- pair
-```
-
-Revocation 会移除所选 mode 下的全部 browser session 和 pending code，并关闭失去 authorization 的 stream。只为希望重新连接的 browser 再次 pairing。Conversation history 会保留。
+如果使用私有 Tailscale Serve，请在 tailnet policy 中限制谁可以访问 Dwell 主机的 HTTPS 端口。不要打开 public Funnel；本机回环访问不受 tailnet policy 控制。
 
 <a id="inspect-service-logs"></a>
 
@@ -121,4 +115,4 @@ Browser 向 `POST /api/v1/sessions/<session-id>/turns` 提交的 payload 类似�
 
 新 request 返回 202 和 durable turn record。以相同 request ID 和 payload 重试时，返回已有 record，状态为 200。同一 identity 下的不同内容会产生 conflict。真正的新消息应使用新的 UUID。
 
-这里展示的是 request body。Browser transport 与 local CLI 根据各自的要求添加 authentication；[HTTP 参考](http-auth.md#complete-route-map)列出了 route 和 admission 规则。
+这里展示的是 request body。Browser transport 与 local CLI 按各自的访问规则发出请求；[HTTP 参考](http-auth.md#complete-route-map)列出了 route 和 admission 规则。

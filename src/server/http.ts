@@ -23,8 +23,8 @@ import {
 } from "../shared/sessions.ts";
 import { isModelCapabilitiesRequest } from "../shared/thinking.ts";
 import { isTurnCreateRequest } from "../shared/turns.ts";
-import { browserCookie, readBrowserOrigin, requestAccess } from "./access.ts";
-import { AccessError, LocalAuth, SESSION_MS } from "./auth.ts";
+import { readBrowserOrigin, requestAccess } from "./access.ts";
+import { AccessError, LocalAuth } from "./auth.ts";
 import { createSseConnection, type SseConnection, SseStartError } from "./sse.ts";
 
 export interface HostOptions {
@@ -45,17 +45,14 @@ export interface RunningHost {
 function fail(status: number, code: string, message: string): never {
   throw new AccessError(status, code, message);
 }
-function cookieToken(request: IncomingMessage, name: string): string | undefined {
-  const values = (request.headers.cookie ?? "")
-    .split(";")
-    .map((part) => part.trim())
-    .filter((part) => part.startsWith(`${name}=`));
-  if (values.length !== 1) return undefined;
-  return values[0]?.slice(name.length + 1);
-}
 function browserRequest(request: IncomingMessage, origin: string): void {
-  if (request.headers.origin !== origin || request.headers["x-dwell-request"] !== "1") {
-    fail(403, "forbidden_origin", "Open Dwell at the address used to connect this browser.");
+  if (
+    request.headers["x-dwell-request"] !== "1" ||
+    (request.method !== "GET" && request.headers.origin !== origin) ||
+    (request.headers["sec-fetch-site"] !== undefined &&
+      request.headers["sec-fetch-site"] !== "same-origin")
+  ) {
+    fail(403, "forbidden_origin", "Use Dwell from its own browser page.");
   }
 }
 async function readJson(request: IncomingMessage, limit = 8192): Promise<Record<string, unknown>> {
@@ -197,27 +194,16 @@ export async function startHost({
   const active = new Set<Promise<void>>();
   const eventStreams = new Set<SseConnection>();
 
-  function revalidateEventStreams(): void {
-    for (const stream of eventStreams) stream.revalidate();
-  }
-
   function openEventStream(
-    request: IncomingMessage,
     response: ServerResponse,
     sessionId: string,
     cursor: string | undefined,
-    cookieName: string,
   ): void {
     if (!auth || !sessions) fail(503, "unavailable", "Session service is starting.");
     let stream: SseConnection | undefined;
     stream = createSseConnection(response, {
       ...(eventHeartbeatMs === undefined ? {} : { heartbeatMs: eventHeartbeatMs }),
-      isAuthorized: () =>
-        Boolean(
-          auth &&
-            (auth.isCli(request.headers.authorization) ||
-              auth.isBrowser(cookieToken(request, cookieName), request.headers["x-dwell-browser"])),
-        ),
+      isAuthorized: () => !stopping,
       onClose: () => {
         if (stream) eventStreams.delete(stream);
       },
@@ -248,9 +234,9 @@ export async function startHost({
         "host",
         "origin",
         "authorization",
-        "cookie",
         "x-dwell-request",
-        "x-dwell-browser",
+        "x-forwarded-proto",
+        "sec-fetch-site",
         "last-event-id",
       ]) {
         if (
@@ -260,11 +246,10 @@ export async function startHost({
         )
           fail(400, "duplicate_header", "Duplicate request header.");
       }
-      const access = requestAccess(request.headers, url, browserOrigin, mode);
-      const { cookieName } = access;
+      const access = requestAccess(request.headers, url, browserOrigin);
       if (request.headers.origin !== undefined && request.headers.origin !== access.origin)
         fail(403, "forbidden_origin", "Cross-origin requests are not allowed.");
-      if (access.secure && request.headers.authorization !== undefined)
+      if (access.proxied && request.headers.authorization !== undefined)
         fail(403, "local_credential_required", "Use the local address for CLI credentials.");
       if (!auth || stopping)
         fail(503, "unavailable", "Dwell is starting or stopping. Try again shortly.");
@@ -306,12 +291,7 @@ export async function startHost({
         }
       }
       const gets = ["/", "/style.css", "/healthz", "/api/v1/status", ...BROWSER_ASSETS.keys()];
-      const posts = [
-        "/api/v1/auth/pairings",
-        "/api/v1/auth/pair",
-        "/api/v1/auth/logout",
-        "/api/v1/auth/revoke",
-      ];
+
       const sessionMatch = /^\/api\/v1\/sessions\/([a-f0-9-]+)(?:\/(open|close|context))?$/.exec(
         path,
       );
@@ -389,22 +369,20 @@ export async function startHost({
         }
       } else if (gets.includes(path)) {
         method = "GET";
-      } else if (posts.includes(path)) {
-        method = "POST";
       }
       if (!method) fail(404, "not_found", "Unknown route.");
       if (request.method !== method) {
         response.setHeader("Allow", method);
         fail(405, "method_not_allowed", `Use ${method} for this route.`);
       }
+      const cli = auth.isCli(request.headers.authorization);
+      if (protectedRoute || path === "/api/v1/status") {
+        if (request.headers.authorization !== undefined && !cli)
+          fail(401, "unauthenticated", "Use a valid local CLI credential.");
+        if (!cli) browserRequest(request, access.origin);
+      }
       if (protectedRoute) {
         if (!sessions) fail(503, "unavailable", "Session service is starting.");
-        const cli = auth.isCli(request.headers.authorization);
-        if (
-          !cli &&
-          !auth.isBrowser(cookieToken(request, cookieName), request.headers["x-dwell-browser"])
-        )
-          fail(401, "unauthenticated", "Connect this browser or use a valid local CLI credential.");
         if (
           method !== "POST" &&
           (request.headers["transfer-encoding"] !== undefined ||
@@ -423,7 +401,6 @@ export async function startHost({
             "cli_required",
             "Pi executable configuration requires the local CLI credential.",
           );
-        if (method !== "GET" && !cli) browserRequest(request, access.origin);
         const body =
           method === "POST"
             ? await readJson(
@@ -622,7 +599,7 @@ export async function startHost({
           const cursorHeader = request.headers["last-event-id"];
           if (cursorHeader !== undefined && typeof cursorHeader !== "string")
             fail(400, "invalid_cursor", "Last-Event-ID must contain one event cursor.");
-          openEventStream(request, response, id, cursorHeader, cookieName);
+          openEventStream(response, id, cursorHeader);
           return;
         } else if (nativeExecutionMatch) {
           const id = nativeExecutionMatch[1];
@@ -698,57 +675,10 @@ export async function startHost({
           );
           return;
         }
-        if (
-          !auth.isCli(request.headers.authorization) &&
-          !auth.isBrowser(cookieToken(request, cookieName), request.headers["x-dwell-browser"])
-        )
-          fail(401, "unauthenticated", "Connect this browser or use a valid local CLI credential.");
         send(response, 200, status);
-        return;
       }
-      if (path === "/api/v1/auth/pairings" || path === "/api/v1/auth/revoke") {
-        if (!auth.isCli(request.headers.authorization))
-          fail(401, "unauthenticated", "This operation requires the local CLI credential.");
-      } else {
-        browserRequest(request, access.origin);
-      }
-      const body = await readJson(request);
-      if (stopping) fail(503, "unavailable", "Dwell is stopping.");
-      if (path === "/api/v1/auth/pair") {
-        if (
-          Object.keys(body).length !== 2 ||
-          typeof body.code !== "string" ||
-          !/^[A-HJ-NP-Za-hj-np-z2-9]{8}$/.test(body.code) ||
-          typeof body.browserKey !== "string" ||
-          !/^[a-f0-9]{64}$/.test(body.browserKey)
-        )
-          fail(400, "invalid_input", "Enter the 8-character pairing code exactly as shown.");
-        const token = await auth.redeem(body.code, body.browserKey);
-        response.setHeader("Set-Cookie", browserCookie(access, token, SESSION_MS / 1000));
-      } else {
-        if (Object.keys(body).length !== 0)
-          fail(400, "invalid_input", "This operation expects an empty JSON object.");
-        if (path === "/api/v1/auth/pairings") {
-          send(response, 201, auth.createPairing());
-          return;
-        }
-        if (path === "/api/v1/auth/revoke") {
-          await auth.revoke();
-          revalidateEventStreams();
-        } else {
-          const token = cookieToken(request, cookieName);
-          if (!token || !auth.isBrowser(token, request.headers["x-dwell-browser"]))
-            fail(401, "unauthenticated", "This browser session has expired or been revoked.");
-          await auth.logout(token);
-          revalidateEventStreams();
-          response.setHeader("Set-Cookie", browserCookie(access, "", 0));
-        }
-      }
-      send(response, 200, { ok: true });
     } catch (error) {
       if (response.destroyed) return;
-      if (error instanceof AccessError && error.code === "storage_unavailable")
-        revalidateEventStreams();
       if (response.headersSent) {
         response.destroy();
         return;
@@ -775,8 +705,6 @@ export async function startHost({
                 : 503;
         send(response, status, { error: { code: error.code, message: error.message } });
       } else if (error instanceof AccessError || error instanceof SessionError) {
-        if (error.status === 429)
-          response.setHeader("Retry-After", error.code === "pairing_limit" ? "300" : "60");
         send(response, error.status, { error: { code: error.code, message: error.message } });
       } else if (error instanceof SseStartError) {
         const status = error.code === "unauthenticated" ? 401 : 503;
@@ -829,7 +757,6 @@ export async function startHost({
               distill?.close();
             } finally {
               try {
-                await auth?.drain();
               } finally {
                 try {
                   await library?.close();
@@ -864,7 +791,7 @@ export async function startHost({
       throw new Error(
         "The HTTPS browserOrigin must use a different authority from the local listener.",
       );
-    auth = await LocalAuth.open(dataDir, now);
+    auth = await LocalAuth.open(dataDir);
     if (integrations.distill) {
       distill = await openDistill(integrations.distill);
       try {

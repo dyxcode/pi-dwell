@@ -122,7 +122,6 @@ Contracts 位于 [`shared/events.ts`](../../../../src/shared/events.ts)；per-se
 | **Image support** | 用来表示所选 model 能否接受 image input 的 capability metadata。Dwell 在 dispatch 前验证此项，并且仍会在 request boundary 验证和限制 image data。 |
 | **HTTP status** | 数值 response status，例如 400 或 503。它描述 HTTP request outcome，与 Dwell session/turn status strings 分开。 |
 | **Error code** | HTTP error、turn record 或 stream event 中按层定义的诊断字符串。相同拼写可能出现在多个层中，且不一定有 HTTP status。 |
-| **Pairing code** | 本地 CLI 创建、用于 browser pairing 的一次性短 credential。它是安全敏感输入，不是 error code 或 request ID。 |
 | **Request/turn idempotency** | 相同 `requestId` 和相同 payload 指向原 operation 的保证。它可避免 retry 时重复创建/执行，但不会让 Dwell replay 结果不确定的 Pi prompt。 |
 
 具体 status/code 行为见 [shared contracts](../../../../src/shared/sessions.ts)、[thinking/model capabilities](../../../../src/shared/thinking.ts) 和[错误参考](errors.md)。

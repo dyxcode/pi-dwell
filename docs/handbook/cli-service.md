@@ -14,13 +14,13 @@ Detailed prose walkthrough: [Implementation](implementation/host-service.md#beha
 
 Service commands accept exactly one of install, uninstall, start, stop, restart, or status. They always target production. `pi configure` accepts only named executable/entry-point options and optional `--dev`. The remaining commands accept only optional `--dev`; there is no public port or data-directory override and no session-management CLI.
 
-[`main.ts`](../../src/clients/cli/main.ts) dispatches the parsed command. Status/configuration results print as JSON; pairing prints the code and expiry; service management prints its status text. Foreground serving dynamically imports the HTTP host and installs SIGINT/SIGTERM handlers. A signal received during startup is remembered and acted on after startup finishes. An occupied port becomes an actionable error explaining the fixed listener and mode collision.
+[`main.ts`](../../src/clients/cli/main.ts) dispatches the parsed command. Status/configuration results print as JSON; service management prints its status text. Foreground serving dynamically imports the HTTP host and installs SIGINT/SIGTERM handlers. A signal received during startup is remembered and acted on after startup finishes. An occupied port becomes an actionable error explaining the fixed listener and mode collision.
 
 ## Local HTTP client
 
 [`status.ts`](../../src/clients/cli/status.ts) implements `localRequest`: read the private credential, construct the loopback URL, serialize POST bodies, use an abort deadline, reject redirects, and return parsed unknown JSON. GET bodies are rejected locally. The default request timeout is three seconds.
 
-A timeout warns that the host may already have completed the operation. Network errors include the address and startup command. A 401 explains development/production credential mismatch. Non-JSON and error responses are handled separately. `errorMessage` extracts only a valid public message; each wrapper validates its expected response: HostStatus, pairing code/expiry, or `{ok:true}`.
+A timeout warns that the host may already have completed the operation. Network errors include the address and startup command. A 401 explains development/production credential mismatch. Non-JSON and error responses are handled separately. `errorMessage` extracts only a valid public message; each wrapper validates its expected response: HostStatus.
 
 [`runtime.ts`](../../src/clients/cli/runtime.ts) raises configuration's deadline to at least 60 seconds because executable verification can take longer than status. It POSTs `/api/v1/runtime` and validates the returned RuntimeConfiguration. The service requires open sessions to be closed before configuration changes.
 

@@ -13,10 +13,8 @@ a transcript to Pi.
 
 ## Start a conversation
 
-1. Start the Dwell host and create a pairing code on the host machine. The
-   [quick start](quick-start.md) covers host setup.
-2. Open the host's browser page and enter the pairing code. Pairing authorizes
-   this browser; it does not sign you in to a model provider.
+1. Start Dwell on the host using [Quick Start](quick-start.md).
+2. Open Dwell on the host or use the approved private HTTPS address.
 3. Choose **New session**, then select a directory on the host machine.
 4. Dwell opens a Pi session for that directory. The session starts with Pi's
    configured default model and thinking setting.
@@ -59,7 +57,7 @@ existing draft remains removable; choose an image-capable model to send it.
 
 The browser keeps text and image drafts in memory per session while the page is
 open. Switching between sessions preserves those drafts. A full page reload
-loses unsent text and image drafts. Losing authentication or forgetting the browser
+loses unsent text and image drafts. Resetting the browser connection
 clears image drafts; text remains only in the still-open page's memory.
 Sending a message clears its draft after the host confirms acceptance.
 
@@ -133,9 +131,7 @@ and refreshes the session list periodically. The host owns active Pi work, so
 closing a tab or losing the browser connection does not cancel a response.
 When the page becomes active again, Dwell reconnects and refreshes history.
 
-Use **Forget this browser** to revoke this browser's pairing. This disconnects
-the browser from the host; it leaves host-owned sessions and work running.
-Pair again to reconnect.
+Closing the tab disconnects only that page; host-owned work continues. To block remote devices, change the private network’s access policy.
 
 ## What the browser does not provide
 

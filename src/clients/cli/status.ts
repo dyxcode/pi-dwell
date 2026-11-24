@@ -103,28 +103,3 @@ export async function readHostStatus(options: ClientOptions = {}): Promise<HostS
   if (!isHostStatus(value)) throw new Error("Incompatible pi-dwell host status.");
   return value;
 }
-
-export async function createPairing(
-  options: ClientOptions = {},
-): Promise<{ code: string; expiresAt: number }> {
-  const value = await localRequest("/api/v1/auth/pairings", options, "POST");
-  if (
-    !value ||
-    typeof value !== "object" ||
-    !("code" in value) ||
-    typeof value.code !== "string" ||
-    !/^[A-HJ-NP-Za-hj-np-z2-9]{8}$/.test(value.code) ||
-    !("expiresAt" in value) ||
-    typeof value.expiresAt !== "number" ||
-    !Number.isSafeInteger(value.expiresAt)
-  ) {
-    throw new Error("Incompatible pairing response.");
-  }
-  return { code: value.code, expiresAt: value.expiresAt };
-}
-
-export async function revokeBrowsers(options: ClientOptions = {}): Promise<void> {
-  const value = await localRequest("/api/v1/auth/revoke", options, "POST");
-  if (!value || typeof value !== "object" || !("ok" in value) || value.ok !== true)
-    throw new Error("Incompatible revocation response.");
-}

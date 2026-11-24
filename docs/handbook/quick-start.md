@@ -4,7 +4,7 @@ English | [简体中文](../i18n/zh-CN/handbook/quick-start.md)
 
 [Documentation index](README.md) · Next: [Guide](guide.md)
 
-Run a host, pair a browser, and send your first message. All terminal commands below run on the machine that will host Pi. A message uses your configured provider and may incur its normal usage costs.
+Run a host and send your first message. All terminal commands below run on the machine that will host Pi. A message uses your configured provider and may incur its normal usage costs.
 
 ## 1. Prepare Pi and Node
 
@@ -49,13 +49,9 @@ npm run dwell -- pi configure \
 
 Configuration validates the executable before storing it. The service reads Pi's saved authentication/configuration from its host user's home. If your setup depends on environment variables, set them in the user service manager and restart Dwell; a background service does not inherit every variable from your current terminal.
 
-## 4. Pair and send
+## 4. Open Dwell and send
 
-```sh
-npm run dwell -- pair
-```
-
-Open `http://127.0.0.1:8787` on the host. Enter the eight-character code exactly as shown; it is case-sensitive, single-use, and expires after five minutes.
+Open `http://127.0.0.1:8787` on the host.
 
 Choose **New session**, select an existing host directory, and create the session. Send a small prompt such as “Reply with one sentence confirming you are ready.” The browser displays live output and then the saved conversation. Choosing a directory gives the Pi session that working directory and its applicable native resources/instructions.
 
@@ -79,6 +75,6 @@ systemctl --user enable pi-dwell.service
 sudo loginctl enable-linger "$(id -un)"
 ```
 
-These commands enable service startup and keep the user manager running after logout. macOS uses a user service during the login session. Read [Reference](reference.md) for foreground/development mode and [Errors](errors.md) if pairing, configuration, or readiness fails.
+These commands enable service startup and keep the user manager running after logout. macOS uses a user service during the login session. Read [Reference](reference.md) for foreground/development mode and [Errors](errors.md) if access, configuration, or readiness fails.
 
 On another device, `127.0.0.1` refers to that device itself. Use an HTTPS proxy origin configured for cross-device access; see [the HTTPS reference](reference.md#optional-https-origin).

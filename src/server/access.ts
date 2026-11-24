@@ -57,16 +57,14 @@ export async function readBrowserOrigin(
 
 export interface RequestAccess {
   origin: string;
-  cookieName: string;
-  secure: boolean;
+  proxied: boolean;
 }
 
-/** Host must be preserved by the proxy. Forwarded headers never grant access. */
+/** The private proxy enforces remote network access; forwarded fields are not identity. */
 export function requestAccess(
   headers: IncomingHttpHeaders,
   localOrigin: string,
   browserOrigin: string | undefined,
-  mode: HostMode,
 ): RequestAccess {
   const host = headers.host;
   if (host === new URL(localOrigin).host) {
@@ -80,17 +78,18 @@ export function requestAccess(
         "forbidden_proxy",
         "Proxy requests must use the configured HTTPS address.",
       );
-    return { origin: localOrigin, cookieName: `dwell_browser_${mode}`, secure: false };
+    return { origin: localOrigin, proxied: false };
   }
-  if (browserOrigin && host === new URL(browserOrigin).host)
-    return { origin: browserOrigin, cookieName: `__Host-dwell_browser_${mode}`, secure: true };
+  if (browserOrigin && host === new URL(browserOrigin).host) {
+    if (headers["tailscale-funnel-request"] !== undefined)
+      throw new AccessError(403, "forbidden_proxy", "Public Funnel is not supported.");
+    if (headers["x-forwarded-proto"] !== "https")
+      throw new AccessError(403, "forbidden_proxy", "Use the configured HTTPS proxy.");
+    return { origin: browserOrigin, proxied: true };
+  }
   throw new AccessError(
     403,
     "forbidden_host",
     "Open Dwell at its local or configured HTTPS address.",
   );
-}
-
-export function browserCookie(access: RequestAccess, token: string, maxAge: number): string {
-  return `${access.cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${access.secure ? "; Secure" : ""}`;
 }

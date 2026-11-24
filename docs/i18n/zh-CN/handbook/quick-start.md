@@ -6,7 +6,7 @@
 
 [文档目录](README.md) · 下一步：[使用指南](guide.md)
 
-启动 host、配对 browser，然后发送第一条消息。下面所有 terminal 命令都在运行 Pi 的机器上执行。发送消息会使用你配置的 provider，并可能产生其正常使用费用。
+启动 host，然后发送第一条消息。下面所有 terminal 命令都在运行 Pi 的机器上执行。发送消息会使用你配置的 provider，并可能产生其正常使用费用。
 
 <a id="1-prepare-pi-and-node"></a>
 
@@ -57,15 +57,11 @@ npm run dwell -- pi configure \
 
 配置会先验证 executable，再保存结果。Service 从 host user 的 home 读取 Pi 已保存的 authentication/configuration。如果配置依赖环境变量，请在 user service manager 中设置，并重启 Dwell；background service 不会继承当前 terminal 中的所有变量。
 
-<a id="4-pair-and-send"></a>
+<a id="4-open-and-send"></a>
 
-## 4. 配对并发送消息
+## 4. 打开 Dwell 并发送消息
 
-```sh
-npm run dwell -- pair
-```
-
-在 host 上打开 `http://127.0.0.1:8787`。按原样输入八位 pairing code；它区分大小写，只能使用一次，五分钟后过期。
+在 host 上打开 `http://127.0.0.1:8787`。
 
 选择 **New session**，选择一个已存在的 host 目录，再创建 session。发送一个简单 prompt，例如 “Reply with one sentence confirming you are ready.”。Browser 会先显示 live output，再显示已保存的对话。选择目录会为 Pi session 设置 working directory，并应用该目录对应的 native resource/instruction。
 
@@ -91,6 +87,6 @@ systemctl --user enable pi-dwell.service
 sudo loginctl enable-linger "$(id -un)"
 ```
 
-这两条命令分别启用 service startup，并让 user manager 在退出登录后继续运行。macOS 在 login session 内使用 user service。Foreground/development mode 见[技术参考](reference.md)；pairing、configuration 或 readiness 失败时，查看[错误参考](errors.md)。
+这两条命令分别启用 service startup，并让 user manager 在退出登录后继续运行。macOS 在 login session 内使用 user service。Foreground/development mode 见[技术参考](reference.md)；访问、configuration 或 readiness 失败时，查看[错误参考](errors.md)。
 
 在另一台设备上，`127.0.0.1` 指向那台设备自身。跨设备访问需配置 HTTPS proxy origin，详见 [HTTPS 参考](reference.md#optional-https-origin)。

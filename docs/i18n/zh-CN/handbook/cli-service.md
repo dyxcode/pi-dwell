@@ -18,7 +18,7 @@
 
 Service commands 必须且只能接受 install、uninstall、start、stop、restart、status 之一。它们始终作用于 production。`pi configure` 只接受具名 executable/entry-point options 和可选的 `--dev`。其余 commands 只接受可选的 `--dev`；没有公开的 port 或 data-directory override，也没有 session-management CLI。
 
-[`main.ts`](../../../../src/clients/cli/main.ts) 分发已解析的 command。Status/configuration 结果以 JSON 打印；pairing 会打印 code 和 expiry；service management 会打印状态文本。前台 serving 会动态导入 HTTP Host 并安装 SIGINT/SIGTERM handlers。启动期间收到的 signal 会被记下，等启动完成后再处理。若 port 已占用，会返回可操作的 error，说明固定 listener 和 mode 冲突。
+[`main.ts`](../../../../src/clients/cli/main.ts) 分发已解析的 command。Status/configuration 结果以 JSON 打印；service management 会打印状态文本。前台 serving 会动态导入 HTTP Host 并安装 SIGINT/SIGTERM handlers。启动期间收到的 signal 会被记下，等启动完成后再处理。若 port 已占用，会返回可操作的 error，说明固定 listener 和 mode 冲突。
 
 <a id="local-http-client"></a>
 
@@ -26,7 +26,7 @@ Service commands 必须且只能接受 install、uninstall、start、stop、rest
 
 [`status.ts`](../../../../src/clients/cli/status.ts) 实现 `localRequest`：读取 private credential、构造 loopback URL、序列化 POST bodies、使用 abort deadline、拒绝 redirects，并返回解析后的 unknown JSON。在本地会拒绝带有 body 的 GET。默认 request timeout 为 3 秒。
 
-Timeout 提示 Host 可能已经完成操作。Network errors 会包含地址和启动 command。401 会说明 development/production credential 不匹配。非 JSON responses 和 error responses 分开处理。`errorMessage` 只提取有效的公开 message；每个 wrapper 都会验证自己的预期 response：HostStatus、pairing code/expiry，或 `{ok:true}`。
+Timeout 提示 Host 可能已经完成操作。Network errors 会包含地址和启动 command。401 会说明 development/production credential 不匹配。非 JSON responses 和 error responses 分开处理。`errorMessage` 只提取有效的公开 message；每个 wrapper 都会验证自己的预期 response：HostStatus。
 
 [`runtime.ts`](../../../../src/clients/cli/runtime.ts) 将 configuration 的 deadline 提高到至少 60 秒，因为验证 executable 可能比 status 耗时更久。它向 `/api/v1/runtime` POST 并验证返回的 RuntimeConfiguration。修改 configuration 前，service 要求关闭所有 open sessions。
 

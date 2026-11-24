@@ -29,7 +29,7 @@ flowchart LR
 
 | State | Owner | Lifetime |
 | --- | --- | --- |
-| Browser pairing and revocation | `LocalAuth` | Hashed browser credentials are persisted; pairing codes are in memory |
+| Browser access | HTTP host and private proxy | The browser stores no Dwell credential; the private network policy controls remote access |
 | Runtime executable configuration | `SessionCatalog` | SQLite |
 | Dwell session ID, Pi session ID, working directory, model and lifecycle | `SessionCatalog`, coordinated by `SessionService` | SQLite plus live runtime state |
 | Request identity and turn outcome | Turn ledger | SQLite; a retry can find its existing request |
@@ -55,13 +55,9 @@ The optional Distill reader and source-access coordination use the explicitly co
 
 Binding first ensures a second host cannot modify state while another owns the port. Development uses a separate data directory but the same public port, so production and development are mutually exclusive on that listener.
 
-## Pairing a browser
+## Opening a browser
 
-The local CLI reads an owner-only bearer credential and requests a short-lived pairing code. The browser creates its own binding key and submits it with that code. `LocalAuth` serializes redemption, stores hashes of a fresh session token and the binding key, and consumes the code only after storage succeeds.
-
-The response places the session token in an HttpOnly cookie. Subsequent browser API requests also carry the binding key. Mutations additionally require the exact origin and `X-Dwell-Request: 1`. This makes possession of the ambient cookie alone insufficient for a browser on a different local origin.
-
-See [HTTP and authentication](http-auth.md) for expiration, limits, origin selection, and revocation behavior.
+Local browsers open Dwell directly. Remote browsers use the trusted private HTTPS proxy, which enforces network policy. Browser API calls send a request marker; mutations also require the matching Origin. CLI administration keeps its separate local bearer credential. See [HTTP and access control](http-auth.md).
 
 ## Creating and reopening a session
 
@@ -119,9 +115,9 @@ The browser uses keyed DOM reconciliation and animation-frame batching. This pre
 | Stop native execution | Cancels only the identified native execution |
 | Close session | Stops/releases its runtime; catalog and native saved conversation remain |
 | Reopen session | Starts a runtime with the stored native session |
-| Stop Dwell host | Closes streams, drains admitted work, shuts down sessions and authentication writes |
+| Stop Dwell host | Closes streams, drains admitted work, shuts down sessions |
 
-The HTTP host keeps its listener through shutdown bookkeeping, rejects new work, closes connections, waits for admitted handlers, shuts down `SessionService`, drains serialized authentication writes, and finally releases the listener. Shutdown calls share one promise.
+The HTTP host keeps its listener through shutdown bookkeeping, rejects new work, closes connections, waits for admitted handlers, shuts down `SessionService`, and finally releases the listener. Shutdown calls share one promise.
 
 After a crash, recovery marks unfinished durable work interrupted and does not replay it automatically. Already executed tools may have effects even when a final reply was not saved. Reopening history can show saved evidence; it cannot roll back those effects.
 

@@ -33,7 +33,7 @@ flowchart LR
 
 | State | Owner | Lifetime |
 | --- | --- | --- |
-| Browser pairing 与 revocation | `LocalAuth` | Hashed browser credentials 会持久化；pairing codes 保存在内存中 |
+| 浏览器访问 | HTTP Host 和私有代理 | 浏览器不保存 Dwell 凭据；远程访问由私有网络策略决定 |
 | Runtime executable configuration | `SessionCatalog` | SQLite |
 | Dwell session ID、Pi session ID、working directory、model 与 lifecycle | `SessionCatalog`，由 `SessionService` 协调 | SQLite 加 live runtime state |
 | Request identity 与 turn outcome | Turn ledger | SQLite；retry 可以找到原 request |
@@ -61,15 +61,11 @@ Dwell 使用 RPC 保留 Pi 的 tools、model 行为和 session 格式。Agent lo
 
 先绑定可确保另一个 host 无法在当前 host 占用 port 时修改 state。Development 使用独立 data directory，但共用 public port，因此 production 和 development 不能同时监听该 port。
 
-<a id="pairing-a-browser"></a>
+<a id="opening-a-browser"></a>
 
-## Pairing browser
+## 打开浏览器
 
-本地 CLI 读取 owner-only bearer credential 并请求短时有效的 pairing code。Browser 创建自己的 binding key，并随该 code 一起提交。`LocalAuth` 会串行处理 redemption，存储新 session token 和 binding key 的 hashes，只有 storage 成功后才消耗该 code。
-
-Response 会把 session token 放进 HttpOnly cookie。后续 browser API requests 也会携带 binding key。Mutation 还要求精确匹配的 origin 和 `X-Dwell-Request: 1`。因此，对来自另一个本地 origin 的 browser 来说，仅持有自动附带的 cookie 并不足以通过验证。
-
-关于 expiration、limits、origin selection 和 revocation behavior，见 [HTTP 与 authentication](http-auth.md)。
+本地浏览器直接打开 Dwell。远程浏览器经受信的私有 HTTPS 代理访问，由网络策略限制设备。浏览器请求发送 request marker；修改操作还需匹配 Origin。CLI 管理保留独立的本地 bearer credential。详见 [HTTP 与访问控制](http-auth.md)。
 
 <a id="creating-and-reopening-a-session"></a>
 
@@ -135,9 +131,9 @@ Browser 使用 keyed DOM reconciliation 和 animation-frame batching。Stream �
 | Stop native execution | 只取消指定的 native execution |
 | Close session | 停止/释放其 runtime；catalog 和 native saved conversation 保留 |
 | Reopen session | 使用已存 native session 启动 runtime |
-| Stop Dwell host | 关闭 streams、drain 已通过 admission 的 work、shutdown sessions 和 authentication writes |
+| Stop Dwell host | 关闭 streams、drain 已通过 admission 的 work、shutdown sessions |
 
-HTTP host 会在 shutdown bookkeeping 期间继续保留 listener，拒绝新 work、关闭 connections、等待已通过 admission 的 handler、shutdown `SessionService`、drain 串行化的 authentication writes，最后释放 listener。所有 shutdown calls 共用一个 promise。
+HTTP host 会在 shutdown bookkeeping 期间继续保留 listener，拒绝新 work、关闭 connections、等待已通过 admission 的 handler、shutdown `SessionService`，最后释放 listener。所有 shutdown calls 共用一个 promise。
 
 Crash 后，recovery 会将未完成的 durable work 标记为 interrupted，且不会自动 replay。已经执行的 tools 即使没有保存 final reply，也可能产生 effects。重新打开 history 可以查看已保存的 evidence，但无法回滚这些 effects。
 

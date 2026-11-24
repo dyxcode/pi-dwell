@@ -32,6 +32,7 @@ import {
 import { isTurnInfo, type TurnInfo } from "../../shared/turns.ts";
 import { Attachments } from "./attachments.ts";
 import {
+  groupActivity,
   renderLiveMessageBlock,
   SavedConversationRenderer,
   thinkingDisclosureKey,
@@ -1607,13 +1608,17 @@ function identifyLiveThinking(message: LiveMessage): void {
     if (detail.dataset.messageId !== message.id) continue;
     const contentIndex = Number(detail.dataset.contentIndex);
     if (!Number.isSafeInteger(contentIndex)) continue;
-    detail.dataset.key = thinkingDisclosureKey(message.nativeKey, contentIndex);
+    const group = detail.closest<HTMLElement>(".activity-group");
+    const previousKey = detail.dataset.key;
+    const key = thinkingDisclosureKey(message.nativeKey, contentIndex);
+    detail.dataset.key = key;
     detail.dataset.nativeKey = message.nativeKey;
+    if (group?.dataset.key === `activity:${previousKey}`) group.dataset.key = `activity:${key}`;
   }
 }
 function renderConversation(): void {
   const focused = document.activeElement;
-  const focusedToolKey =
+  const focusedDisclosureKey =
     focused instanceof HTMLElement && focused.tagName === "SUMMARY"
       ? focused.closest<HTMLElement>("details[data-key]")?.dataset.key
       : undefined;
@@ -1629,11 +1634,24 @@ function renderConversation(): void {
   const anchorId = anchor?.dataset.entryId;
   const anchorKey = anchor?.dataset.key;
   const anchorTop = anchor?.getBoundingClientRect().top;
-  const expanded = new Set(
-    Array.from(conversation.querySelectorAll<HTMLDetailsElement>("details[open]")).map(
-      (d) => d.dataset.key,
-    ),
+  const openDetails = Array.from(
+    conversation.querySelectorAll<HTMLDetailsElement>("details[open]"),
   );
+  const expanded = new Set(openDetails.map((detail) => detail.dataset.key));
+  const trackedGroups = new Set([
+    ...openDetails.filter((detail) => detail.matches(".activity-group")),
+    anchor?.closest<HTMLDetailsElement>(".activity-group"),
+    focused?.closest<HTMLDetailsElement>(".activity-group"),
+  ]);
+  const trackedActivitySteps = new Map<string, HTMLDetailsElement>();
+  for (const group of trackedGroups) {
+    if (!group) continue;
+    for (const step of Array.from(
+      group.querySelectorAll<HTMLElement>(":scope > details[data-key]"),
+    )) {
+      if (step.dataset.key) trackedActivitySteps.set(step.dataset.key, group);
+    }
+  }
   const desired = document.createDocumentFragment();
   if (!selected) {
     const empty = node("div", "", "empty");
@@ -1716,7 +1734,12 @@ function renderConversation(): void {
           } catch {
             /* incomplete live input */
           }
-          const detail = node("details", "", "tool-run");
+          const detail = node(
+            "details",
+            "",
+            tool.status === "failed" ? "tool-run error" : "tool-run",
+          );
+          if (tool.status === "running") detail.dataset.activityAction = tool.name;
           detail.dataset.key =
             tool.callId && tool.ownerKey
               ? `tool-call:${tool.ownerKey}/${tool.callId}`
@@ -1737,10 +1760,14 @@ function renderConversation(): void {
           detail.append(
             node("pre", [input, tool.output].filter(Boolean).join("\n\n"), "tool-output"),
           );
-          detail.open = expanded.has(detail.dataset.key) || tool.status === "failed";
+          detail.open = expanded.has(detail.dataset.key);
           body.append(detail);
         }
       }
+      groupActivity(
+        body,
+        state.activeTurn !== null || state.session?.nativeExecution?.status === "running",
+      );
       if (body.childNodes.length) desired.append(article);
     }
     const native = state.session?.nativeExecution;
@@ -1764,12 +1791,34 @@ function renderConversation(): void {
       desired.append(recovery);
     }
   }
+  // Pagination and the live-to-saved handoff can change the first step in a group.
+  // Shared step identities let the new group inherit an explicit expansion and anchor.
+  let activityAnchorKey: string | undefined;
+  let activityFocusKey: string | undefined;
+  if (trackedActivitySteps.size) {
+    for (const group of Array.from(
+      desired.querySelectorAll<HTMLDetailsElement>(".activity-group"),
+    )) {
+      for (const step of Array.from(
+        group.querySelectorAll<HTMLElement>(":scope > details[data-key]"),
+      )) {
+        const previous = step.dataset.key ? trackedActivitySteps.get(step.dataset.key) : undefined;
+        if (!previous) continue;
+        if (previous.open) group.open = true;
+        if (previous === anchor) activityAnchorKey ??= group.dataset.key;
+        if (previous.dataset.key === focusedDisclosureKey) activityFocusKey ??= group.dataset.key;
+      }
+    }
+  }
   reconcileChildren(conversation, desired);
-  if (focusedToolKey && focused && !focused.isConnected) {
-    Array.from(conversation.querySelectorAll<HTMLDetailsElement>("details[data-key]"))
-      .find((element) => element.dataset.key === focusedToolKey)
-      ?.querySelector<HTMLElement>(":scope > summary")
-      ?.focus({ preventScroll: true });
+  if (focusedDisclosureKey && focused && !focused.isConnected) {
+    const disclosures = Array.from(
+      conversation.querySelectorAll<HTMLDetailsElement>("details[data-key]"),
+    );
+    const replacement =
+      disclosures.find((element) => element.dataset.key === focusedDisclosureKey) ??
+      disclosures.find((element) => element.dataset.key === activityFocusKey);
+    replacement?.querySelector<HTMLElement>(":scope > summary")?.focus({ preventScroll: true });
   }
   older.hidden = !nextCursor;
   if (atBottom) scroll.scrollTop = scroll.scrollHeight;
@@ -1779,10 +1828,12 @@ function renderConversation(): void {
         ? undefined
         : Array.from(
             conversation.querySelectorAll<HTMLElement>("[data-scroll-anchor], [data-key]"),
-          ).find((element) =>
-            anchorKey
-              ? element.dataset.key === anchorKey
-              : anchorId && element.dataset.entryId === anchorId,
+          ).find(
+            (element) =>
+              (anchorKey
+                ? element.dataset.key === (activityAnchorKey ?? anchorKey)
+                : anchorId && element.dataset.entryId === anchorId) &&
+              !element.parentElement?.closest("details:not([open])"),
           );
     scroll.scrollTop =
       replacement && anchorTop !== undefined

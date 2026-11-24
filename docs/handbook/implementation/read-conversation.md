@@ -12,7 +12,7 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/read-conversat
 
 The conversation view combines Pi's saved active branch with temporary live execution. Saved history is authoritative; live messages and tools appear while work is underway, then yield individually to matching saved entries. Project-instruction snapshots appear in a separate Context panel before messages; history context and branch summaries stay with their response group.
 
-The sidebar lists sessions, and open Pi sessions also appear as numbered tabs that keep their slots until close. Each user message begins a turn; its assistant text, thinking, tool calls and results, extension messages, and history context form one response group. Thinking and tool details stay in disclosure panels. Older history loads in bounded pages.
+The sidebar lists sessions, and open Pi sessions also appear as numbered tabs that keep their slots until close. Each user message begins a turn; its assistant text, thinking, tool calls and results, extension messages, and history context form one response group. Consecutive thinking and tool steps share one collapsed activity summary. The summary shows a step count, any running tool, and the count of visible failed steps; opening it reveals individual details without expanding their output. Assistant prose still appears in order outside the summaries. Older history loads in bounded pages.
 
 <a id="ownership"></a>
 
@@ -57,4 +57,4 @@ Keyed reconciliation and cached response groups preserve open details, focus, an
 
 Repeated identical assistant messages should remain separate, and live content should yield only to its matching saved message. Tool results should pair across intervening entries; unmatched results and missing results should remain visible.
 
-Raw HTML should display as text and unsafe links remain inactive. Open thinking and tool panels should survive stream updates and saved-history handoff. New output should retain a bottom-following reader, while updates and older-page prepends preserve the visible message for readers browsing earlier content. A pending history read from another session should never appear in the selected conversation.
+Raw HTML should display as text and unsafe links remain inactive. A long sequence of steps should occupy one summary while collapsed, with prose and failure counts still visible. Opening activity and individual tool or thinking details should survive stream updates and saved-history handoff. New output should retain a bottom-following reader, while updates and older-page prepends preserve the visible message for readers browsing earlier content. A pending history read from another session should never appear in the selected conversation.

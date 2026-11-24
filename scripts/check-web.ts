@@ -911,7 +911,22 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
         entry("rhythm-followup","user","message",[block("text","A follow-up question.")]),
         entry("rhythm-followup-answer","assistant","message",[block("text","A short reply.")])
       ]));
-      fixture.append(focusSource,renderSavedConversation(entries),rhythm);
+      const activity=document.createElement("div");
+      activity.id="activity-test-fixture";
+      const manySteps=Array.from({length:30},(_,index)=>index%2===0
+        ? entry("activity-"+index,"assistant","message",[block("thinking","Step "+index)])
+        : entry("activity-"+index,"bashExecution","bashExecution",[
+          block("tool_call","printf step",null,"bash"),block("text","Tool output "+index)
+        ]));
+      activity.append(renderSavedConversation([
+        ...manySteps,
+        entry("activity-update","assistant","message",[block("text","Visible progress update.")]),
+        entry("activity-failure","bashExecution","bashExecution",[
+          block("tool_call","npm run check",null,"bash"),block("text","Private noisy test output")
+        ],{error:true}),
+        entry("activity-answer","assistant","message",[block("text","Visible final answer.")])
+      ]));
+      fixture.append(focusSource,renderSavedConversation(entries),rhythm,activity);
       document.querySelector("#conversation").append(fixture);
       return true;
     })()`),
@@ -920,12 +935,56 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
   );
 
   try {
+    assert.deepEqual(
+      await page.evaluate(`(()=>{
+      const root=document.querySelector("#activity-test-fixture");
+      const groups=[...root.querySelectorAll(".activity-group")];
+      const answer=[...root.querySelectorAll(".markdown p")];
+      const visible=item=>item.checkVisibility({contentVisibilityAuto:true});
+      return {
+        summaries:groups.map(group=>group.querySelector(":scope>summary").textContent),
+        open:groups.map(group=>group.open),
+        steps:groups.map(group=>group.querySelectorAll(".thinking-run,.tool-run").length),
+        visibleText:answer.filter(visible).map(item=>item.textContent),
+        outputVisible:visible(root.querySelector(".tool-run.error .tool-output"))
+      };
+    })()`),
+      {
+        summaries: ["Activity · 30 steps", "Activity · 1 step · 1 failed"],
+        open: [false, false],
+        steps: [30, 1],
+        visibleText: ["Visible progress update.", "Visible final answer."],
+        outputVisible: false,
+      },
+      `${viewport} long activity stays folded without hiding user-facing text or failure status`,
+    );
+    assert.deepEqual(
+      await page.evaluate(`(async()=>{
+      const step=document.querySelector("#activity-test-fixture .tool-run.error");
+      const group=step.closest(".activity-group");
+      const output=step.querySelector(".tool-output");
+      group.querySelector(":scope>summary").click();
+      const stepWasClosed=!step.open;
+      step.querySelector(":scope>summary").click();
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      return {stepWasClosed,groupOpen:group.open,stepOpen:step.open,visible:output.checkVisibility({contentVisibilityAuto:true}),output:output.textContent};
+    })()`),
+      {
+        stepWasClosed: true,
+        groupOpen: true,
+        stepOpen: true,
+        visible: true,
+        output: "Private noisy test output",
+      },
+    );
     const rendered = await page.evaluate(`(()=>{
       const fixture=document.querySelector("#quiet-process-test-fixture");
-      const thinking=[...fixture.querySelectorAll(".thinking-run")];
+      const detailFixtures=fixture.querySelectorAll(":scope > .assistant .activity-group");
+      for(const group of detailFixtures) group.open=true;
+      const thinking=[...fixture.querySelectorAll(":scope > .assistant .thinking-run")];
       const titles=thinking.map(details=>details.querySelector(":scope>summary").textContent);
       const bodies=thinking.map(details=>details.querySelector(".thinking-content").textContent);
-      const tools=[...fixture.querySelectorAll(".tool-run")];
+      const tools=[...fixture.querySelectorAll(":scope > .assistant .tool-run")];
       const success=tools.find(details=>!details.classList.contains("error"));
       const error=tools.find(details=>details.classList.contains("error"));
       const code=fixture.querySelector(".markdown .code-block");
@@ -969,7 +1028,7 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.equal(presentation.thinkingTitleSize, viewport === "desktop" ? "14px" : "12px");
     assert.equal(presentation.thinkingBodySize, viewport === "desktop" ? "15px" : "13px");
     assert.equal(presentation.successOpen, false);
-    assert.equal(presentation.errorOpen, true);
+    assert.equal(presentation.errorOpen, false);
     assert.equal(presentation.successStatus, "");
     assert.equal(presentation.successStatusAccessible, "Completed");
     assert.equal(presentation.successStatusIcon, true);
@@ -1246,12 +1305,21 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     await page.call("Input.dispatchKeyEvent", { ...tab, type: "keyUp" });
     const focus = record(
       await page.evaluate(`(()=>{
-        const summary=document.querySelector("#quiet-process-test-fixture .thinking-run>summary");
+        const summary=document.querySelector("#quiet-process-test-fixture .activity-group>summary");
         const style=getComputedStyle(summary);
         return {active:document.activeElement===summary,outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth};
       })()`),
     );
-    assert.equal(focus.active, true, "Tab moves keyboard focus to the thinking disclosure");
+    assert.equal(focus.active, true, "Tab moves keyboard focus to the activity disclosure");
+    await page.call("Input.dispatchKeyEvent", space);
+    await page.call("Input.dispatchKeyEvent", { ...space, type: "keyUp" });
+    assert.equal(
+      await page.evaluate(
+        '!document.querySelector("#quiet-process-test-fixture .activity-group").open',
+      ),
+      true,
+      "Space toggles the focused activity disclosure",
+    );
     assert.notEqual(focus.outlineStyle, "none", "keyboard focus has a visible outline");
     assert.notEqual(focus.outlineWidth, "0px", "keyboard focus outline has nonzero width");
 
@@ -1961,7 +2029,7 @@ async function runCurrentLibraryBrowserAcceptance(
     });
     await page.call("Page.reload");
     await page.until(
-      '!document.querySelector("#app").hidden && document.querySelectorAll("#session-list .name-row").length===2',
+      'document.querySelector("#app")?.hidden===false && document.querySelectorAll("#session-list .name-row").length===2',
     );
     await page.evaluate(
       "document.querySelector('#session-list .name-row[data-session-id=\"" +
@@ -3016,12 +3084,12 @@ for (const mode of modes) {
     console.log(`PASS ${mode} sidebar refresh keeps the focused row`);
     await first.call("Page.reload");
     await first.until(
-      'document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
+      'document.querySelector("#conversation")?.textContent.includes("Hello from the offline Pi fixture.")',
     );
     await assertNoPartialOrRecoveryRow(first, `${mode} ordinary reload`);
     const second = await page();
     await second.until(
-      'document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
+      'document.querySelector("#conversation")?.textContent.includes("Hello from the offline Pi fixture.")',
     );
     await assertNoPartialOrRecoveryRow(second, `${mode} ordinary browser snapshot`);
     await second.until(
@@ -3111,7 +3179,7 @@ for (const mode of modes) {
     assert.equal(changedSession.model, ALTERNATE_MODEL);
     await first.call("Page.reload");
     await first.until(
-      `document.querySelector("#model-label").textContent.trim()===${JSON.stringify(ALTERNATE_MODEL)}`,
+      `document.querySelector("#model-label")?.textContent.trim()===${JSON.stringify(ALTERNATE_MODEL)}`,
     );
     const alternateThinking = String(
       await first.evaluate('document.querySelector("#thinking-label").textContent'),
@@ -3137,7 +3205,7 @@ for (const mode of modes) {
     assert.match(slowRunId, /^[0-9a-f-]{36}$/i);
     await second.call("Page.reload");
     await second.until(
-      'document.querySelector("#conversation").textContent.includes("dwell-slow-start") && document.querySelector("#send").getAttribute("aria-label")==="Stop response"',
+      'document.querySelector("#conversation")?.textContent.includes("dwell-slow-start") && document.querySelector("#send")?.getAttribute("aria-label")==="Stop response"',
     );
     await assertNoPartialOrRecoveryRow(second, `${mode} active-turn snapshot`);
     await second.evaluate(
@@ -3498,10 +3566,19 @@ for (const mode of modes) {
       false,
       "live thinking starts collapsed",
     );
+    assert.match(
+      String(
+        await second.evaluate(
+          'document.querySelector(".live .activity-group>summary").textContent',
+        ),
+      ),
+      /^Working · 1 step/u,
+    );
+    await second.click(".live .activity-group>summary");
     await second.click(".live .thinking-run>summary");
     await second.evaluate('window.dispatchEvent(new Event("online"))');
     await second.until(
-      'document.querySelector(".live .thinking-run")?.open && document.querySelector("#connection-badge").textContent.includes("Connected")',
+      'document.querySelector(".live .activity-group")?.open && document.querySelector(".live .thinking-run")?.open && document.querySelector("#connection-badge").textContent.includes("Connected")',
     );
     await writeFile(thinkingRelease, "release", { mode: 0o600 });
     await second.until(
@@ -3510,11 +3587,16 @@ for (const mode of modes) {
     const thinkingHandoff = record(
       await second.evaluate(`(()=>{
       const thoughts=[...document.querySelectorAll('.thinking-run')].filter(value=>value.textContent.includes('The reasoning is still'));
-      return {count:thoughts.length,open:thoughts[0]?.open,text:thoughts[0]?.textContent};
+      return {count:thoughts.length,open:thoughts[0]?.open,groupOpen:thoughts[0]?.closest('.activity-group')?.open,text:thoughts[0]?.textContent};
     })()`),
     );
     assert.equal(thinkingHandoff.count, 1, "saved history replaces live thinking once");
     assert.equal(thinkingHandoff.open, true, "thinking stays expanded across reconnect and save");
+    assert.equal(
+      thinkingHandoff.groupOpen,
+      true,
+      "activity stays expanded across reconnect and save",
+    );
     assert.ok(String(thinkingHandoff.text).includes("in progress, then it finishes."));
     console.log(`PASS ${mode} live thinking reconnect and saved-history handoff`);
     const beforeModel = record(await request(`/sessions/${String(session.id)}`)).model;
@@ -3905,7 +3987,7 @@ for (const mode of modes) {
     );
     await second.call("Page.reload");
     await second.until(
-      '!document.querySelector("#app").hidden && document.querySelectorAll("#session-list .name-row").length === 2',
+      'document.querySelector("#app")?.hidden===false && document.querySelectorAll("#session-list .name-row").length === 2',
     );
     assert.equal(
       await second.evaluate('document.querySelectorAll(".status-tab").length'),

@@ -190,6 +190,55 @@ export function renderLiveMessageBlock(
   return output;
 }
 
+/** Fold contiguous process steps without moving assistant prose or visible notices. */
+export function groupActivity(body: HTMLElement, working = false): void {
+  let group: HTMLDetailsElement | undefined;
+  let summary: HTMLElement | undefined;
+  let pendingAnchors: Element[] = [];
+  let steps = 0;
+  let failures = 0;
+  let action: string | undefined;
+  const finish = (tail = false): void => {
+    if (!summary) return;
+    const running = action !== undefined || (working && tail);
+    const count = `${steps} ${steps === 1 ? "step" : "steps"}`;
+    summary.append(node("span", `${running ? "Working" : "Activity"} · ${count}`));
+    if (action) summary.append(node("span", ` · Running: ${action}`, "activity-action"));
+    if (failures) summary.append(node("span", ` · ${failures} failed`, "activity-failures"));
+    group = summary = undefined;
+    pendingAnchors = [];
+    steps = failures = 0;
+    action = undefined;
+  };
+
+  for (const child of Array.from(body.children)) {
+    if (child.classList.contains("history-entry-anchor")) {
+      if (group) pendingAnchors.push(child);
+      continue;
+    }
+    if (
+      !(child instanceof HTMLDetailsElement) ||
+      !child.matches(".thinking-run, .tool-run") ||
+      !child.dataset.key
+    ) {
+      finish();
+      continue;
+    }
+    if (!group) {
+      group = keyed(node("details", "", "activity-group"), `activity:${child.dataset.key}`);
+      summary = node("summary");
+      group.append(summary);
+      body.insertBefore(group, child);
+    }
+    steps += 1;
+    if (child.classList.contains("error")) failures += 1;
+    if (child.dataset.activityAction) action = child.dataset.activityAction;
+    group.append(...pendingAnchors, child);
+    pendingAnchors = [];
+  }
+  finish(true);
+}
+
 function thinkingDetails(
   entry: HistoryEntry,
   block: HistoryBlock,
@@ -253,7 +302,6 @@ function toolRun(
   const isError = owner.error === true || result?.error === true || live?.status === "failed";
   const details = keyed(node("details"), key, owner.id);
   details.className = `tool-run${isError ? " error" : ""}`;
-  details.open = isError;
   const summary = node("summary");
   const shell = options.shell === true || call?.name === "bash";
   const command = options.shell ? (call?.text ?? "bash") : bashCommand(call);
@@ -273,6 +321,7 @@ function toolRun(
             ? "Orphan result"
             : "No result saved";
   const indicator = node("span", status === "✓" ? "" : status, "tool-status");
+  if (status === "Running") details.dataset.activityAction = label;
   if (status === "✓") {
     indicator.append(actionIcon("check"));
     indicator.setAttribute("aria-label", "Completed");
@@ -403,6 +452,7 @@ function renderAssistant(
     appendTruncated(body, entry);
   }
 
+  groupActivity(body);
   article.append(body);
   return article;
 }

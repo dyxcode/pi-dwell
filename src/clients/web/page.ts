@@ -840,10 +840,15 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #conversation .tool-run.error .tool-status{color:var(--close-ink,#904d3c)}
 #conversation .context-source>summary::before{content:'';display:block;width:5px;height:5px;flex:0 0 5px;margin:0 4px 0 2px;border:solid currentColor;border-width:1px 1px 0 0;box-sizing:border-box;transform:rotate(45deg);transform-origin:center}
 #conversation .context-source[open]>summary::before{transform:rotate(135deg)}
-#conversation :is(.thinking-run,.tool-run)>summary{position:relative;text-decoration:none}
-#conversation :is(.thinking-run,.tool-run)>summary::before{content:'';position:absolute;left:-11px;top:50%;width:5px;height:5px;margin:0;border:solid currentColor;border-width:1px 1px 0 0;transform:translateY(-50%) rotate(45deg);transform-origin:center;box-sizing:border-box}
-#conversation :is(.thinking-run,.tool-run)[open]>summary::before{transform:translateY(-50%) rotate(135deg)}
-#conversation :is(.thinking-run,.tool-run)>summary:focus-visible{outline:1px dotted #797267;outline-offset:2px;text-decoration:none}
+#conversation .activity-group{margin:0 0 4px;color:#797267}
+#conversation .activity-group>summary{display:flex;align-items:center;gap:8px;width:fit-content;max-width:100%;min-height:36px;list-style:none;cursor:pointer;font:13px/1.5 var(--sans)}
+#conversation .activity-group>summary::-webkit-details-marker{display:none}
+#conversation .activity-action{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#conversation .activity-failures{color:var(--close-ink,#904d3c);white-space:nowrap}
+#conversation :is(.activity-group,.thinking-run,.tool-run)>summary{position:relative;text-decoration:none}
+#conversation :is(.activity-group,.thinking-run,.tool-run)>summary::before{content:'';position:absolute;left:-11px;top:50%;width:5px;height:5px;margin:0;border:solid currentColor;border-width:1px 1px 0 0;transform:translateY(-50%) rotate(45deg);transform-origin:center;box-sizing:border-box}
+#conversation :is(.activity-group,.thinking-run,.tool-run)[open]>summary::before{transform:translateY(-50%) rotate(135deg)}
+#conversation :is(.activity-group,.thinking-run,.tool-run)>summary:focus-visible{outline:1px dotted #797267;outline-offset:2px;text-decoration:none}
 @media(max-width:760px){#conversation .thinking-run>summary{min-height:40px}}
 
 #conversation .tool-run .tool-caption{padding:0 0 4px;font:11px/1.6 var(--mono);color:#797267}

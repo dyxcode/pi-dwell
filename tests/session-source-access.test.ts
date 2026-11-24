@@ -30,13 +30,21 @@ test("source reads hold only a short gate and release it on success and error", 
   };
   const ref = { sessionId: source.piSessionId, sessionFile: source.piSessionFile, cwd: root };
   let finish!: () => void;
+  let readEntered!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    readEntered = resolve;
+  });
   const pending = access.read(source, source.piSessionFile, async () => {
-    assert.equal(storage.acquireSourceRead(ref), undefined);
+    const concurrent = storage.acquireSourceRead(ref);
+    assert.ok(concurrent, "concurrent reads on the same session share access");
+    concurrent.release();
+    readEntered();
     await new Promise<void>((resolve) => {
       finish = resolve;
     });
     return "read";
   });
+  await entered;
   finish();
   assert.equal((await pending).value, "read");
   await assert.rejects(
@@ -63,7 +71,7 @@ test("fresh session use is reserved before spawn and released only after child c
   });
   const access = new SessionSourceAccess(storage);
   const source = { piSessionId: randomUUID(), directory: root, piSessionFile: null };
-  const opening = access.begin(source);
+  const opening = await access.begin(source);
   assert.ok(opening);
   const reserved = storage.listPendingHostUses();
   assert.equal(reserved.length, 1);
@@ -104,11 +112,11 @@ test("only a known unspawned opening is abandoned automatically", { skip: !modul
   });
   const source = { piSessionId: randomUUID(), directory: root, piSessionFile: null };
   const access = new SessionSourceAccess(storage);
-  const uncertain = access.begin(source);
+  const uncertain = await access.begin(source);
   assert.ok(uncertain);
   const restored = new SessionSourceAccess(storage);
   assert.equal(storage.listPendingHostUses().length, 1);
-  const opening = restored.begin({ ...source, piSessionId: randomUUID() });
+  const opening = await restored.begin({ ...source, piSessionId: randomUUID() });
   assert.ok(opening);
   opening.abandon();
   assert.equal(storage.listPendingHostUses().length, 1);
@@ -127,7 +135,7 @@ test("a refused child release remains available for shutdown retry", {
   const storage = await openDistill({ module, database: databasePath });
   const access = new SessionSourceAccess(storage);
   const source = { piSessionId: randomUUID(), directory: root, piSessionFile: null };
-  const opening = access.begin(source);
+  const opening = await access.begin(source);
   assert.ok(opening);
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
   const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
@@ -178,7 +186,7 @@ test("drain attempts pending host-use releases after a SQLite read-release failu
   const storage = await openDistill({ module, database: databasePath });
   const access = new SessionSourceAccess(storage);
   const source = { piSessionId: randomUUID(), directory: root, piSessionFile: null };
-  const opening = access.begin(source);
+  const opening = await access.begin(source);
   assert.ok(opening);
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
   const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
@@ -237,4 +245,36 @@ test("drain attempts pending host-use releases after a SQLite read-release failu
 
   database.exec(`DROP TRIGGER ${readReleaseTrigger}`);
   await access.drain();
+});
+
+test("same-file delete contention waits briefly and succeeds once the delete lock releases", {
+  skip: !module,
+}, async (t) => {
+  assert.ok(module);
+  const root = await mkdtemp(join(tmpdir(), "dwell-source-wait-"));
+  const databasePath = join(root, "memory.sqlite");
+  const storage = await openDistill({ module, database: databasePath });
+  const database = new DatabaseSync(databasePath);
+  const access = new SessionSourceAccess(storage);
+  t.after(async () => {
+    await access.drain();
+    database.close();
+    storage.close();
+    await rm(root, { recursive: true, force: true });
+  });
+  const source = {
+    piSessionId: randomUUID(),
+    directory: root,
+    piSessionFile: join(root, "historical.jsonl"),
+  };
+  const deleteToken = randomUUID();
+  database
+    .prepare("INSERT INTO source_access (token, session_file, mode, owner_pid) VALUES (?, ?, ?, ?)")
+    .run(deleteToken, source.piSessionFile, "delete", process.pid);
+  setTimeout(() => {
+    database.prepare("DELETE FROM source_access WHERE token = ?").run(deleteToken);
+  }, 30);
+
+  const result = await access.read(source, source.piSessionFile, async () => "after-delete");
+  assert.equal(result.value, "after-delete");
 });

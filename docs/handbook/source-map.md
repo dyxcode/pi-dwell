@@ -1719,32 +1719,34 @@ Local dependencies: [src/runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts).
 
 Feature context: [Coordinate history cleanup](implementation/history-retirement.md)
 
-[Open source](../../src/sessions/source-access.ts) · 233 lines
+[Open source](../../src/sessions/source-access.ts) · 282 lines
 
 Local dependencies: [src/integrations/distill.ts](../../src/integrations/distill.ts), [src/storage/catalog.ts](../../src/storage/catalog.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`SourceSession`](../../src/sessions/source-access.ts#L9) | Type alias | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`OpeningSource`](../../src/sessions/source-access.ts#L36) | Interface | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SourceAccessError`](../../src/sessions/source-access.ts#L41) | Class | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SourceAccessError.constructor`](../../src/sessions/source-access.ts#L42) | Constructor | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess`](../../src/sessions/source-access.ts#L51) | Class | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.#storage`](../../src/sessions/source-access.ts#L52) | Property | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.#reads`](../../src/sessions/source-access.ts#L53) | Property | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.#children`](../../src/sessions/source-access.ts#L54) | Property | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.#releases`](../../src/sessions/source-access.ts#L55) | Property | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.constructor`](../../src/sessions/source-access.ts#L57) | Constructor | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.read`](../../src/sessions/source-access.ts#L65) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.#releaseRead`](../../src/sessions/source-access.ts#L224) | Method | lease | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.begin`](../../src/sessions/source-access.ts#L130) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.drain`](../../src/sessions/source-access.ts#L173) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.#release`](../../src/sessions/source-access.ts#L199) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`matchingDeletion`](../../src/sessions/source-access.ts#L22) | Function | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.missing`](../../src/sessions/source-access.ts#L99) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionSourceAccess.#withReadLease`](../../src/sessions/source-access.ts#L208) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SourceReadObservation`](../../src/sessions/source-access.ts#L11) | Interface | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`MissingSourceObservation`](../../src/sessions/source-access.ts#L17) | Interface | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SourceSession`](../../src/sessions/source-access.ts#L16) | Type alias | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`OpeningSource`](../../src/sessions/source-access.ts#L43) | Interface | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SourceAccessError`](../../src/sessions/source-access.ts#L48) | Class | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SourceAccessError.constructor`](../../src/sessions/source-access.ts#L49) | Constructor | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess`](../../src/sessions/source-access.ts#L58) | Class | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.#storage`](../../src/sessions/source-access.ts#L59) | Property | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.#reads`](../../src/sessions/source-access.ts#L60) | Property | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.#children`](../../src/sessions/source-access.ts#L61) | Property | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.#releases`](../../src/sessions/source-access.ts#L62) | Property | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.constructor`](../../src/sessions/source-access.ts#L64) | Constructor | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.read`](../../src/sessions/source-access.ts#L72) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.#releaseRead`](../../src/sessions/source-access.ts#L272) | Method | lease | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.begin`](../../src/sessions/source-access.ts#L145) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.drain`](../../src/sessions/source-access.ts#L191) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.#acquireRead`](../../src/sessions/source-access.ts#L217) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.#acquireBegin`](../../src/sessions/source-access.ts#L232) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.#release`](../../src/sessions/source-access.ts#L247) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`matchingDeletion`](../../src/sessions/source-access.ts#L29) | Function | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.missing`](../../src/sessions/source-access.ts#L110) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionSourceAccess.#withReadLease`](../../src/sessions/source-access.ts#L256) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SourceReadObservation`](../../src/sessions/source-access.ts#L18) | Interface | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`MissingSourceObservation`](../../src/sessions/source-access.ts#L24) | Interface | | [Feature context](implementation/history-retirement.md#mechanisms) |
 
 
 ## src/integrations/current.ts

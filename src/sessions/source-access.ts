@@ -1,9 +1,16 @@
+import { setTimeout as delay } from "node:timers/promises";
 import type {
   DistillChild,
   DistillDeletionReceipt,
   DistillRead,
+  DistillSource,
   DistillStorage,
+  DistillUse,
+  DistillUseSource,
 } from "../integrations/distill.ts";
+
+const SOURCE_ACCESS_WAIT_MS = 1_000;
+const SOURCE_ACCESS_RETRY_MS = 10;
 import type { StoredSession } from "../storage/catalog.ts";
 
 type SourceSession = Pick<StoredSession, "piSessionId" | "piSessionFile" | "directory">;
@@ -67,15 +74,19 @@ export class SessionSourceAccess {
     file: string,
     read: () => Promise<T>,
     knownGeneration?: string | null,
+    signal?: AbortSignal,
   ): Promise<SourceReadObservation<T>> {
     const storage = this.#storage;
     if (!storage) return { value: await read(), sourceGeneration: null };
-    const lease = storage.acquireSourceRead({
-      sessionId: source.piSessionId,
-      sessionFile: file,
-      cwd: source.directory,
-    });
-    if (!lease) throw new SourceAccessError();
+    const lease = await this.#acquireRead(
+      storage,
+      {
+        sessionId: source.piSessionId,
+        sessionFile: file,
+        cwd: source.directory,
+      },
+      signal,
+    );
     return this.#withReadLease(lease, async () => {
       const value = await read();
       const lookupGeneration = lease.sourceGeneration ?? knownGeneration ?? undefined;
@@ -100,15 +111,19 @@ export class SessionSourceAccess {
     source: SourceSession,
     file: string,
     knownGeneration?: string | null,
+    signal?: AbortSignal,
   ): Promise<MissingSourceObservation> {
     const storage = this.#storage;
     if (!storage) return { sourceGeneration: null };
-    const lease = storage.acquireSourceRead({
-      sessionId: source.piSessionId,
-      sessionFile: file,
-      cwd: source.directory,
-    });
-    if (!lease) throw new SourceAccessError();
+    const lease = await this.#acquireRead(
+      storage,
+      {
+        sessionId: source.piSessionId,
+        sessionFile: file,
+        cwd: source.directory,
+      },
+      signal,
+    );
     return this.#withReadLease(lease, async () => {
       const lookupGeneration = lease.sourceGeneration ?? knownGeneration ?? undefined;
       const candidate = lookupGeneration
@@ -127,15 +142,18 @@ export class SessionSourceAccess {
     });
   }
 
-  begin(source: SourceSession): OpeningSource | undefined {
+  async begin(source: SourceSession, signal?: AbortSignal): Promise<OpeningSource | undefined> {
     const storage = this.#storage;
     if (!storage) return undefined;
-    const use = storage.beginHostUse({
-      sessionId: source.piSessionId,
-      cwd: source.directory,
-      ...(source.piSessionFile === null ? {} : { sessionFile: source.piSessionFile }),
-    });
-    if (!use) throw new SourceAccessError();
+    const use = await this.#acquireBegin(
+      storage,
+      {
+        sessionId: source.piSessionId,
+        cwd: source.directory,
+        ...(source.piSessionFile === null ? {} : { sessionFile: source.piSessionFile }),
+      },
+      signal,
+    );
     let spawned = false;
     return {
       onSpawn: (pid, closed) => {
@@ -194,6 +212,36 @@ export class SessionSourceAccess {
       );
     if (errors.length > 0)
       throw new AggregateError(errors, "Distill source access could not be drained.");
+  }
+
+  async #acquireRead(
+    storage: DistillStorage,
+    source: DistillSource,
+    signal?: AbortSignal,
+  ): Promise<DistillRead> {
+    const deadline = Date.now() + SOURCE_ACCESS_WAIT_MS;
+    while (true) {
+      signal?.throwIfAborted();
+      const lease = storage.acquireSourceRead(source);
+      if (lease) return lease;
+      if (Date.now() >= deadline) throw new SourceAccessError();
+      await delay(SOURCE_ACCESS_RETRY_MS, undefined, signal ? { signal } : undefined);
+    }
+  }
+
+  async #acquireBegin(
+    storage: DistillStorage,
+    source: DistillUseSource,
+    signal?: AbortSignal,
+  ): Promise<DistillUse> {
+    const deadline = Date.now() + SOURCE_ACCESS_WAIT_MS;
+    while (true) {
+      signal?.throwIfAborted();
+      const use = storage.beginHostUse(source);
+      if (use) return use;
+      if (Date.now() >= deadline) throw new SourceAccessError();
+      await delay(SOURCE_ACCESS_RETRY_MS, undefined, signal ? { signal } : undefined);
+    }
   }
 
   #release(id: string): void {

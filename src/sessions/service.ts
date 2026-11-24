@@ -2267,7 +2267,7 @@ export class SessionService {
       );
     let opening: OpeningSource | undefined;
     try {
-      opening = this.#sourceAccess.begin(stored);
+      opening = await this.#sourceAccess.begin(stored, options.signal);
     } catch (error) {
       if (error instanceof SourceAccessError)
         throw new SessionError(503, "source_busy", error.message);

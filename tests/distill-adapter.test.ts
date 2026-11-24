@@ -42,7 +42,9 @@ test("the built Distill API coordinates Dwell reads and durable child use", asyn
   const read = storage.acquireSourceRead(source);
   assert.ok(read);
   assert.equal(read.sourceGeneration, null);
-  assert.equal(storage.beginHostUse(source), undefined);
+  const sharedUse = storage.beginHostUse(source);
+  assert.ok(sharedUse, "read leases share access with non-delete host reservations");
+  assert.equal(storage.recoverHostUse(sharedUse.id, { kind: "opening-abandoned" }), true);
   assert.throws(() => storage.close(), /Release source-read leases/);
   read.release();
   read.release();

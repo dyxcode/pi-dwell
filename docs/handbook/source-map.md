@@ -722,7 +722,7 @@ Local dependencies: [shared/discovery.ts](../../src/shared/discovery.ts), [share
 
 Feature context: [Create and return to a conversation](implementation/session-lifecycle.md)
 
-[Open source](../../src/runtime/pi-process.ts) · 936 lines
+[Open source](../../src/runtime/pi-process.ts) · 941 lines
 
 Local dependencies: [local/paths.ts](../../src/local/paths.ts), [shared/discovery.ts](../../src/shared/discovery.ts), [shared/images.ts](../../src/shared/images.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [runtime/pi-models.ts](../../src/runtime/pi-models.ts), [runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts).
 
@@ -765,46 +765,47 @@ Local dependencies: [local/paths.ts](../../src/local/paths.ts), [shared/discover
 | [`PiProcess.#run`](../../src/runtime/pi-process.ts#L229) | Property |  | [Feature context](implementation/session-lifecycle.md#behavior) |
 | [`PiProcess.#lastNativeExecution`](../../src/runtime/pi-process.ts#L230) | Property |  | [Feature context](implementation/session-lifecycle.md#behavior) |
 | [`PiProcess.#stopping`](../../src/runtime/pi-process.ts#L231) | Property |  | [Feature context](implementation/session-lifecycle.md#behavior) |
-| [`PiProcess.#error`](../../src/runtime/pi-process.ts#L232) | Property |  | [Feature context](implementation/session-lifecycle.md#behavior) |
-| [`PiProcess.constructor`](../../src/runtime/pi-process.ts#L234) | Constructor | child, requestMs, shutdownMs | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`PiProcess.start`](../../src/runtime/pi-process.ts#L276) | Method | options | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`PiProcess.state`](../../src/runtime/pi-process.ts#L400) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.pid`](../../src/runtime/pi-process.ts#L403) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.stderrTail`](../../src/runtime/pi-process.ts#L406) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.activeExecution`](../../src/runtime/pi-process.ts#L410) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.subscribe`](../../src/runtime/pi-process.ts#L418) | Method | listener, options | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.subscribeState`](../../src/runtime/pi-process.ts#L427) | Method | listener | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.subscribeNativeExecution`](../../src/runtime/pi-process.ts#L433) | Method | listener | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.getState`](../../src/runtime/pi-process.ts#L446) | Method |  | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.getAvailableModels`](../../src/runtime/pi-process.ts#L456) | Method |  | [Feature context](implementation/models.md#mechanisms) |
-| [`PiProcess.getAvailableThinkingLevels`](../../src/runtime/pi-process.ts#L462) | Method |  | [Feature context](implementation/models.md#mechanisms) |
-| [`PiProcess.setThinkingLevel`](../../src/runtime/pi-process.ts#L485) | Method | level | [Feature context](implementation/models.md#mechanisms) |
-| [`PiProcess.setModel`](../../src/runtime/pi-process.ts#L494) | Method | provider, model | [Feature context](implementation/models.md#mechanisms) |
-| [`PiProcess.getMessages`](../../src/runtime/pi-process.ts#L523) | Method |  | [Feature context](implementation/models.md#mechanisms) |
-| [`PiProcess.getEntries`](../../src/runtime/pi-process.ts#L539) | Method |  | [Feature context](implementation/models.md#mechanisms) |
-| [`PiProcess.supportsImages`](../../src/runtime/pi-process.ts#L549) | Method |  | [Feature context](implementation/models.md#mechanisms) |
-| [`PiProcess.startRun`](../../src/runtime/pi-process.ts#L585) | Method | message, images | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.run`](../../src/runtime/pi-process.ts#L655) | Method | message | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.abort`](../../src/runtime/pi-process.ts#L661) | Method |  | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.respondToUi`](../../src/runtime/pi-process.ts#L666) | Method | response | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`PiProcess.stop`](../../src/runtime/pi-process.ts#L689) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`PiProcess.#stop`](../../src/runtime/pi-process.ts#L694) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`PiProcess.#finish`](../../src/runtime/pi-process.ts#L712) | Method | run, result | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.#rejectRun`](../../src/runtime/pi-process.ts#L720) | Method | run, error | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.#fail`](../../src/runtime/pi-process.ts#L728) | Method | error | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.#onRecord`](../../src/runtime/pi-process.ts#L737) | Method | record | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.#setState`](../../src/runtime/pi-process.ts#L791) | Method | state | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.#beginNativeRun`](../../src/runtime/pi-process.ts#L799) | Method |  | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.#finishNativeRun`](../../src/runtime/pi-process.ts#L807) | Method | run, result | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.#transferHandledRun`](../../src/runtime/pi-process.ts#L815) | Method | run | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.#interruptRun`](../../src/runtime/pi-process.ts#L842) | Method | error | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.#publishNativeExecution`](../../src/runtime/pi-process.ts#L858) | Method | event | [Feature context](implementation/send-message.md#mechanisms) |
-| [`PiProcess.#notifyNativeExecutionListener`](../../src/runtime/pi-process.ts#L864) | Method | listener, event | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.#notifyStateListener`](../../src/runtime/pi-process.ts#L876) | Method | listener, state | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`PiProcess.#hasInteractiveObservers`](../../src/runtime/pi-process.ts#L885) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`PiProcess.#cancelDialogs`](../../src/runtime/pi-process.ts#L889) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`PiProcess.#uiRequest`](../../src/runtime/pi-process.ts#L894) | Method | record | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`PiProcess.#clearDialogs`](../../src/runtime/pi-process.ts#L932) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`PiProcess.#expectedExit`](../../src/runtime/pi-process.ts#L232) | Property |  | [Feature context](implementation/host-service.md#mechanisms) |
+| [`PiProcess.#error`](../../src/runtime/pi-process.ts#L233) | Property |  | [Feature context](implementation/session-lifecycle.md#behavior) |
+| [`PiProcess.constructor`](../../src/runtime/pi-process.ts#L235) | Constructor | child, requestMs, shutdownMs | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`PiProcess.start`](../../src/runtime/pi-process.ts#L280) | Method | options | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`PiProcess.state`](../../src/runtime/pi-process.ts#L404) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.pid`](../../src/runtime/pi-process.ts#L407) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.stderrTail`](../../src/runtime/pi-process.ts#L410) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.activeExecution`](../../src/runtime/pi-process.ts#L414) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.subscribe`](../../src/runtime/pi-process.ts#L422) | Method | listener, options | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.subscribeState`](../../src/runtime/pi-process.ts#L431) | Method | listener | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.subscribeNativeExecution`](../../src/runtime/pi-process.ts#L437) | Method | listener | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.getState`](../../src/runtime/pi-process.ts#L450) | Method |  | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.getAvailableModels`](../../src/runtime/pi-process.ts#L460) | Method |  | [Feature context](implementation/models.md#mechanisms) |
+| [`PiProcess.getAvailableThinkingLevels`](../../src/runtime/pi-process.ts#L466) | Method |  | [Feature context](implementation/models.md#mechanisms) |
+| [`PiProcess.setThinkingLevel`](../../src/runtime/pi-process.ts#L489) | Method | level | [Feature context](implementation/models.md#mechanisms) |
+| [`PiProcess.setModel`](../../src/runtime/pi-process.ts#L498) | Method | provider, model | [Feature context](implementation/models.md#mechanisms) |
+| [`PiProcess.getMessages`](../../src/runtime/pi-process.ts#L527) | Method |  | [Feature context](implementation/models.md#mechanisms) |
+| [`PiProcess.getEntries`](../../src/runtime/pi-process.ts#L543) | Method |  | [Feature context](implementation/models.md#mechanisms) |
+| [`PiProcess.supportsImages`](../../src/runtime/pi-process.ts#L553) | Method |  | [Feature context](implementation/models.md#mechanisms) |
+| [`PiProcess.startRun`](../../src/runtime/pi-process.ts#L589) | Method | message, images | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.run`](../../src/runtime/pi-process.ts#L659) | Method | message | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.abort`](../../src/runtime/pi-process.ts#L665) | Method |  | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.respondToUi`](../../src/runtime/pi-process.ts#L670) | Method | response | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`PiProcess.stop`](../../src/runtime/pi-process.ts#L693) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`PiProcess.#stop`](../../src/runtime/pi-process.ts#L698) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`PiProcess.#finish`](../../src/runtime/pi-process.ts#L717) | Method | run, result | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.#rejectRun`](../../src/runtime/pi-process.ts#L725) | Method | run, error | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.#fail`](../../src/runtime/pi-process.ts#L733) | Method | error | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.#onRecord`](../../src/runtime/pi-process.ts#L742) | Method | record | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.#setState`](../../src/runtime/pi-process.ts#L796) | Method | state | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.#beginNativeRun`](../../src/runtime/pi-process.ts#L804) | Method |  | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.#finishNativeRun`](../../src/runtime/pi-process.ts#L812) | Method | run, result | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.#transferHandledRun`](../../src/runtime/pi-process.ts#L820) | Method | run | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.#interruptRun`](../../src/runtime/pi-process.ts#L847) | Method | error | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.#publishNativeExecution`](../../src/runtime/pi-process.ts#L863) | Method | event | [Feature context](implementation/send-message.md#mechanisms) |
+| [`PiProcess.#notifyNativeExecutionListener`](../../src/runtime/pi-process.ts#L869) | Method | listener, event | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.#notifyStateListener`](../../src/runtime/pi-process.ts#L881) | Method | listener, state | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`PiProcess.#hasInteractiveObservers`](../../src/runtime/pi-process.ts#L890) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`PiProcess.#cancelDialogs`](../../src/runtime/pi-process.ts#L894) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`PiProcess.#uiRequest`](../../src/runtime/pi-process.ts#L899) | Method | record | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`PiProcess.#clearDialogs`](../../src/runtime/pi-process.ts#L937) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
 
 
 ## src/runtime/pi-rpc.ts
@@ -907,7 +908,7 @@ Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts]
 
 Feature context: [Run and manage the Host](implementation/host-service.md)
 
-[Open source](../../src/server/http.ts) · 854 lines
+[Open source](../../src/server/http.ts) · 888 lines
 
 Local dependencies: [clients/web/page.ts](../../src/clients/web/page.ts), [clients/web/script.ts](../../src/clients/web/script.ts), [integrations/configuration.ts](../../src/integrations/configuration.ts), [integrations/current.ts](../../src/integrations/current.ts), [integrations/distill.ts](../../src/integrations/distill.ts), [integrations/memory.ts](../../src/integrations/memory.ts), [local/files.ts](../../src/local/files.ts), [local/paths.ts](../../src/local/paths.ts), [server/access.ts](../../src/server/access.ts), [server/auth.ts](../../src/server/auth.ts), [server/sse.ts](../../src/server/sse.ts), [sessions/service.ts](../../src/sessions/service.ts), [shared/library.ts](../../src/shared/library.ts), [shared/memory.ts](../../src/shared/memory.ts), [shared/protocol.ts](../../src/shared/protocol.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/turns.ts](../../src/shared/turns.ts).
 
@@ -919,13 +920,14 @@ Local dependencies: [clients/web/page.ts](../../src/clients/web/page.ts), [clien
 | [`cookieToken`](../../src/server/http.ts#L48) | Function | request, name | [Feature context](implementation/pairing.md#mechanisms) |
 | [`browserRequest`](../../src/server/http.ts#L56) | Function | request, origin | [Feature context](implementation/pairing.md#mechanisms) |
 | [`readJson`](../../src/server/http.ts#L61) | Function | request, limit | [Feature context](implementation/pairing.md#mechanisms) |
-| [`send`](../../src/server/http.ts#L98) | Function | response, status, body | [Feature context](implementation/pairing.md#mechanisms) |
-| [`parseHistoryCursor`](../../src/server/http.ts#L102) | Function | query | [Feature context](implementation/pairing.md#mechanisms) |
-| [`startHost`](../../src/server/http.ts#L133) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [Feature context](implementation/host-service.md#mechanisms) |
-| [`startHost.revalidateEventStreams`](../../src/server/http.ts#L166) | Nested function |  | [Feature context](implementation/host-service.md#mechanisms) |
-| [`startHost.openEventStream`](../../src/server/http.ts#L170) | Nested function | request, response, sessionId, cursor, cookieName | [Feature context](implementation/host-service.md#mechanisms) |
-| [`startHost.handle`](../../src/server/http.ts#L203) | Nested function | request, response | [Feature context](implementation/host-service.md#execution) |
-| [`parseLibraryLatestQuery`](../../src/server/http.ts#L116) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`HTTP_DIAGNOSTIC_CODES`](../../src/server/http.ts#L98) | Module value | Inferred from initializer | [Feature context](implementation/host-service.md#mechanisms) |
+| [`send`](../../src/server/http.ts#L121) | Function | response, status, body | [Feature context](implementation/pairing.md#mechanisms) |
+| [`parseHistoryCursor`](../../src/server/http.ts#L136) | Function | query | [Feature context](implementation/pairing.md#mechanisms) |
+| [`startHost`](../../src/server/http.ts#L167) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [Feature context](implementation/host-service.md#mechanisms) |
+| [`startHost.revalidateEventStreams`](../../src/server/http.ts#L200) | Nested function |  | [Feature context](implementation/host-service.md#mechanisms) |
+| [`startHost.openEventStream`](../../src/server/http.ts#L204) | Nested function | request, response, sessionId, cursor, cookieName | [Feature context](implementation/host-service.md#mechanisms) |
+| [`startHost.handle`](../../src/server/http.ts#L237) | Nested function | request, response | [Feature context](implementation/host-service.md#execution) |
+| [`parseLibraryLatestQuery`](../../src/server/http.ts#L150) | Function | | [Feature context](implementation/library.md#mechanisms) |
   port = DEFAULT_PORT,
   mode = "production",
   dataDir = dataDirectory(mode),
@@ -1256,7 +1258,7 @@ Local dependencies: [runtime/message-identity.ts](../../src/runtime/message-iden
 
 Feature context: [Create and return to a conversation](implementation/session-lifecycle.md)
 
-[Open source](../../src/sessions/service.ts) · 2423 lines
+[Open source](../../src/sessions/service.ts) · 2470 lines
 
 Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts](../../src/local/paths.ts), [runtime/message-identity.ts](../../src/runtime/message-identity.ts), [runtime/pi-history.ts](../../src/runtime/pi-history.ts), [runtime/pi-process.ts](../../src/runtime/pi-process.ts), [runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts), [server/session-discovery.ts](../../src/server/session-discovery.ts), [shared/discovery.ts](../../src/shared/discovery.ts), [shared/events.ts](../../src/shared/events.ts), [shared/history.ts](../../src/shared/history.ts), [shared/images.ts](../../src/shared/images.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/turns.ts](../../src/shared/turns.ts), [storage/catalog.ts](../../src/storage/catalog.ts), [sessions/events.ts](../../src/sessions/events.ts), [sessions/history.ts](../../src/sessions/history.ts).
 
@@ -1309,66 +1311,66 @@ Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts]
 | [`SessionService.#shutdown`](../../src/sessions/service.ts#L254) | Property |  | [Feature context](implementation/session-lifecycle.md#behavior) |
 | [`SessionService.constructor`](../../src/sessions/service.ts#L257) | Constructor | catalog, dataDir, options | [Feature context](implementation/session-lifecycle.md#ownership) |
 | [`SessionService.create`](../../src/sessions/service.ts#L270) | Method | options | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`SessionService.runtimeCount`](../../src/sessions/service.ts#L288) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`SessionService.configure`](../../src/sessions/service.ts#L292) | Method | configuration | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`SessionService.listSessions`](../../src/sessions/service.ts#L315) | Method |  | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.getSession`](../../src/sessions/service.ts#L320) | Method | id | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.listDirectories`](../../src/sessions/service.ts#L396) | Method | path | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.listAvailableModels`](../../src/sessions/service.ts#L419) | Method |  | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.listSessionModels`](../../src/sessions/service.ts#L444) | Method | id | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.getSessionModelCapabilities`](../../src/sessions/service.ts#L487) | Method | id, request | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.getModelCapabilities`](../../src/sessions/service.ts#L507) | Method | request | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.subscribeEvents`](../../src/sessions/service.ts#L546) | Method | id, cursor, listener | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.#publishState`](../../src/sessions/service.ts#L577) | Method | id, withTurn | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.#storageFault`](../../src/sessions/service.ts#L600) | Method | id | [Feature context](implementation/models.md#mechanisms) |
-| [`SessionService.createSession`](../../src/sessions/service.ts#L610) | Method | request | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.setSessionModel`](../../src/sessions/service.ts#L694) | Method | id, request | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.openSession`](../../src/sessions/service.ts#L801) | Method | id | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.closeSession`](../../src/sessions/service.ts#L805) | Method | id | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.getContext`](../../src/sessions/service.ts#L847) | Method | id | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.getHistory`](../../src/sessions/service.ts#L859) | Method | id, cursor | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`SessionService.getHistoryImage`](../../src/sessions/service.ts#L977) | Method | id, entryId, imageIndex | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`SessionService.submitTurn`](../../src/sessions/service.ts#L1005) | Method | id, request | [Feature context](implementation/send-message.md#ownership) |
-| [`SessionService.getTurn`](../../src/sessions/service.ts#L1081) | Method | id, runId | [Feature context](implementation/send-message.md#ownership) |
-| [`SessionService.getTurnResult`](../../src/sessions/service.ts#L1087) | Method | id, runId | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`SessionService.abortTurn`](../../src/sessions/service.ts#L1139) | Method | id, runId | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.abortNativeExecution`](../../src/sessions/service.ts#L1174) | Method | id, executionId | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#storedTurn`](../../src/sessions/service.ts#L1218) | Method | id, runId | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.#checkStorage`](../../src/sessions/service.ts#L1226) | Method | id | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#writeTurn`](../../src/sessions/service.ts#L1235) | Method | turn | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#abortRuntime`](../../src/sessions/service.ts#L1249) | Method | slot | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#executeTurn`](../../src/sessions/service.ts#L1264) | Method | slot, message, images | [Feature context](implementation/send-message.md#ownership) |
-| [`SessionService.#completeHandledTurn`](../../src/sessions/service.ts#L1447) | Method | sessionId, runId, runtime, before, historyWasExpected | [Feature context](implementation/send-message.md#ownership) |
-| [`SessionService.shutdown`](../../src/sessions/service.ts#L1510) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#configuration`](../../src/sessions/service.ts#L1583) | Method |  | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`SessionService.#admit`](../../src/sessions/service.ts#L1594) | Method |  | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`SessionService.#mutate`](../../src/sessions/service.ts#L1599) | Method | operation | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`SessionService.#read`](../../src/sessions/service.ts#L1613) | Method | operation | [Feature context](implementation/session-lifecycle.md#ownership) |
-| [`SessionService.#stored`](../../src/sessions/service.ts#L1643) | Method | id | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.#view`](../../src/sessions/service.ts#L1651) | Method | stored | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.#directory`](../../src/sessions/service.ts#L1701) | Method | path | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.#prune`](../../src/sessions/service.ts#L1717) | Method |  | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.#checkHistory`](../../src/sessions/service.ts#L1728) | Method | stored | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`SessionService.#savedHistory`](../../src/sessions/service.ts#L1986) | Method | stored, options | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`SessionService.#identityForEntries`](../../src/sessions/service.ts#L2004) | Method | entries | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`SessionService.#identityForHistory`](../../src/sessions/service.ts#L2009) | Method | history | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`SessionService.#observeRuntime`](../../src/sessions/service.ts#L2015) | Method | sessionId, runtime | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#nativeExecutionEvent`](../../src/sessions/service.ts#L2049) | Method | sessionId, event, startedLate | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#refreshNativeHistory`](../../src/sessions/service.ts#L2135) | Method | sessionId, executionId | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#scheduleNativeStateRefresh`](../../src/sessions/service.ts#L2166) | Method | sessionId, executionId, runtime | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#refreshNativeSessionState`](../../src/sessions/service.ts#L2196) | Method | sessionId, executionId, runtime | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`SessionService.#open`](../../src/sessions/service.ts#L2247) | Method | stored, options | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.#rememberHistory`](../../src/sessions/service.ts#L2398) | Method | stored, runtime | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`SessionService.#recordHistoryCheck`](../../src/sessions/service.ts#L1847) | Method | | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`SessionService.#historyCheckState`](../../src/sessions/service.ts#L1975) | Method | | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`SessionService.renameSession`](../../src/sessions/service.ts#L325) | Method |  | [Feature context](implementation/session-names.md#mechanisms) |
-| [`SessionService.listLibraryReferences`](../../src/sessions/service.ts#L366) | Method | | [Feature context](implementation/library.md#mechanisms) |
-| [`SessionService.addLibraryReference`](../../src/sessions/service.ts#L372) | Method | | [Feature context](implementation/library.md#mechanisms) |
-| [`SessionService.removeLibraryReference`](../../src/sessions/service.ts#L387) | Method | | [Feature context](implementation/library.md#mechanisms) |
-| [`SessionService.#recordMissingHistory`](../../src/sessions/service.ts#L1882) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionService.#retiredHistoryError`](../../src/sessions/service.ts#L1963) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionService.#invalidateRetiredHistory`](../../src/sessions/service.ts#L1967) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`SessionService.#staleMissingHistory`](../../src/sessions/service.ts#L1943) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionService.runtimeCount`](../../src/sessions/service.ts#L293) | GetAccessor |  | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`SessionService.configure`](../../src/sessions/service.ts#L297) | Method | configuration | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`SessionService.listSessions`](../../src/sessions/service.ts#L320) | Method |  | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.getSession`](../../src/sessions/service.ts#L325) | Method | id | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.listDirectories`](../../src/sessions/service.ts#L401) | Method | path | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.listAvailableModels`](../../src/sessions/service.ts#L424) | Method |  | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.listSessionModels`](../../src/sessions/service.ts#L449) | Method | id | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.getSessionModelCapabilities`](../../src/sessions/service.ts#L492) | Method | id, request | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.getModelCapabilities`](../../src/sessions/service.ts#L512) | Method | request | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.subscribeEvents`](../../src/sessions/service.ts#L551) | Method | id, cursor, listener | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.#publishState`](../../src/sessions/service.ts#L582) | Method | id, withTurn | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.#storageFault`](../../src/sessions/service.ts#L605) | Method | id | [Feature context](implementation/models.md#mechanisms) |
+| [`SessionService.createSession`](../../src/sessions/service.ts#L622) | Method | request | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.setSessionModel`](../../src/sessions/service.ts#L706) | Method | id, request | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.openSession`](../../src/sessions/service.ts#L813) | Method | id | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.closeSession`](../../src/sessions/service.ts#L817) | Method | id | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.getContext`](../../src/sessions/service.ts#L859) | Method | id | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.getHistory`](../../src/sessions/service.ts#L871) | Method | id, cursor | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`SessionService.getHistoryImage`](../../src/sessions/service.ts#L989) | Method | id, entryId, imageIndex | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`SessionService.submitTurn`](../../src/sessions/service.ts#L1017) | Method | id, request | [Feature context](implementation/send-message.md#ownership) |
+| [`SessionService.getTurn`](../../src/sessions/service.ts#L1093) | Method | id, runId | [Feature context](implementation/send-message.md#ownership) |
+| [`SessionService.getTurnResult`](../../src/sessions/service.ts#L1099) | Method | id, runId | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`SessionService.abortTurn`](../../src/sessions/service.ts#L1151) | Method | id, runId | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.abortNativeExecution`](../../src/sessions/service.ts#L1186) | Method | id, executionId | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#storedTurn`](../../src/sessions/service.ts#L1230) | Method | id, runId | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.#checkStorage`](../../src/sessions/service.ts#L1238) | Method | id | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#writeTurn`](../../src/sessions/service.ts#L1247) | Method | turn | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#abortRuntime`](../../src/sessions/service.ts#L1286) | Method | slot | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#executeTurn`](../../src/sessions/service.ts#L1301) | Method | slot, message, images | [Feature context](implementation/send-message.md#ownership) |
+| [`SessionService.#completeHandledTurn`](../../src/sessions/service.ts#L1494) | Method | sessionId, runId, runtime, before, historyWasExpected | [Feature context](implementation/send-message.md#ownership) |
+| [`SessionService.shutdown`](../../src/sessions/service.ts#L1557) | Method |  | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#configuration`](../../src/sessions/service.ts#L1630) | Method |  | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`SessionService.#admit`](../../src/sessions/service.ts#L1641) | Method |  | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`SessionService.#mutate`](../../src/sessions/service.ts#L1646) | Method | operation | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`SessionService.#read`](../../src/sessions/service.ts#L1660) | Method | operation | [Feature context](implementation/session-lifecycle.md#ownership) |
+| [`SessionService.#stored`](../../src/sessions/service.ts#L1690) | Method | id | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.#view`](../../src/sessions/service.ts#L1698) | Method | stored | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.#directory`](../../src/sessions/service.ts#L1748) | Method | path | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.#prune`](../../src/sessions/service.ts#L1764) | Method |  | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.#checkHistory`](../../src/sessions/service.ts#L1775) | Method | stored | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`SessionService.#savedHistory`](../../src/sessions/service.ts#L2033) | Method | stored, options | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`SessionService.#identityForEntries`](../../src/sessions/service.ts#L2051) | Method | entries | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`SessionService.#identityForHistory`](../../src/sessions/service.ts#L2056) | Method | history | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`SessionService.#observeRuntime`](../../src/sessions/service.ts#L2062) | Method | sessionId, runtime | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#nativeExecutionEvent`](../../src/sessions/service.ts#L2096) | Method | sessionId, event, startedLate | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#refreshNativeHistory`](../../src/sessions/service.ts#L2182) | Method | sessionId, executionId | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#scheduleNativeStateRefresh`](../../src/sessions/service.ts#L2213) | Method | sessionId, executionId, runtime | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#refreshNativeSessionState`](../../src/sessions/service.ts#L2243) | Method | sessionId, executionId, runtime | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`SessionService.#open`](../../src/sessions/service.ts#L2294) | Method | stored, options | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.#rememberHistory`](../../src/sessions/service.ts#L2445) | Method | stored, runtime | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`SessionService.#recordHistoryCheck`](../../src/sessions/service.ts#L1894) | Method | | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`SessionService.#historyCheckState`](../../src/sessions/service.ts#L2022) | Method | | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`SessionService.renameSession`](../../src/sessions/service.ts#L330) | Method |  | [Feature context](implementation/session-names.md#mechanisms) |
+| [`SessionService.listLibraryReferences`](../../src/sessions/service.ts#L371) | Method | | [Feature context](implementation/library.md#mechanisms) |
+| [`SessionService.addLibraryReference`](../../src/sessions/service.ts#L377) | Method | | [Feature context](implementation/library.md#mechanisms) |
+| [`SessionService.removeLibraryReference`](../../src/sessions/service.ts#L392) | Method | | [Feature context](implementation/library.md#mechanisms) |
+| [`SessionService.#recordMissingHistory`](../../src/sessions/service.ts#L1929) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionService.#retiredHistoryError`](../../src/sessions/service.ts#L2010) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionService.#invalidateRetiredHistory`](../../src/sessions/service.ts#L2014) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`SessionService.#staleMissingHistory`](../../src/sessions/service.ts#L1990) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |
 
 
 ## src/shared/discovery.ts
@@ -1579,7 +1581,7 @@ Local dependencies: [shared/images.ts](../../src/shared/images.ts).
 
 Feature context: [Create and return to a conversation](implementation/session-lifecycle.md)
 
-[Open source](../../src/storage/catalog.ts) · 1237 lines
+[Open source](../../src/storage/catalog.ts) · 1238 lines
 
 Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts](../../src/local/paths.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/turns.ts](../../src/shared/turns.ts).
 
@@ -1654,7 +1656,7 @@ Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts]
 | [`SessionCatalog.listTurns`](../../src/storage/catalog.ts#L1182) | Method |  | [Feature context](implementation/send-message.md#mechanisms) |
 | [`SessionCatalog.markTurnDispatching`](../../src/storage/catalog.ts#L1189) | Method | record, session | [Feature context](implementation/send-message.md#mechanisms) |
 | [`SessionCatalog.interruptTurns`](../../src/storage/catalog.ts#L1212) | Method | now | [Feature context](implementation/send-message.md#mechanisms) |
-| [`SessionCatalog.close`](../../src/storage/catalog.ts#L1234) | Method |  | [Feature context](implementation/send-message.md#mechanisms) |
+| [`SessionCatalog.close`](../../src/storage/catalog.ts#L1235) | Method |  | [Feature context](implementation/send-message.md#mechanisms) |
 | [`isHistoryCheckState`](../../src/storage/catalog.ts#L157) | Function | | [Feature context](implementation/session-lifecycle.md#ownership) |
 | [`nullableHistoryCheckFromDatabase`](../../src/storage/catalog.ts#L399) | Function | | [Feature context](implementation/session-lifecycle.md#ownership) |
 | [`migrateV4ToV5`](../../src/storage/catalog.ts#L602) | Function | | [Feature context](implementation/session-lifecycle.md#mechanisms) |
@@ -1668,7 +1670,7 @@ Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts]
 | [`SessionCatalog.listLibraryReferences`](../../src/storage/catalog.ts#L863) | Method | | [Feature context](implementation/library.md#mechanisms) |
 | [`SessionCatalog.addLibraryReference`](../../src/storage/catalog.ts#L873) | Method | | [Feature context](implementation/library.md#mechanisms) |
 | [`SessionCatalog.removeLibraryReference`](../../src/storage/catalog.ts#L883) | Method | | [Feature context](implementation/library.md#mechanisms) |
-| [`SessionCatalog.#validateLibraryRows`](../../src/storage/catalog.ts#L1222) | Method | | [Feature context](implementation/library.md#mechanisms) |
+| [`SessionCatalog.#validateLibraryRows`](../../src/storage/catalog.ts#L1223) | Method | | [Feature context](implementation/library.md#mechanisms) |
 | [`isStoredSourceObservation`](../../src/storage/catalog.ts#L164) | Function | | [Feature context](implementation/history-retirement.md#mechanisms) |
 | [`migrateV7ToV8`](../../src/storage/catalog.ts#L636) | Function | | [Feature context](implementation/history-retirement.md#mechanisms) |
 | [`SessionCatalog.sourceObservation`](../../src/storage/catalog.ts#L1019) | Method | | [Feature context](implementation/history-retirement.md#mechanisms) |

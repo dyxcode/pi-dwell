@@ -165,6 +165,66 @@ test("a shutdown-cancelled public read uses a free permit but never joins the wa
   }
 });
 
+test("post-settlement history overload leaves the same Pi child available without replay", {
+  timeout: 20_000,
+}, async (t) => {
+  const settled = deferred<void>();
+  const releaseSettlement = deferred<void>();
+  let holdNextTurn = false;
+  const { service, session, startLog, turnLog } = await serviceWithHistory(t, async (point) => {
+    if (point !== "settled" || !holdNextTurn) return;
+    holdNextTurn = false;
+    settled.resolve(undefined);
+    await releaseSettlement.promise;
+  });
+  const request = { requestId: randomUUID(), message: "settle once" };
+  const startsBefore = await readFile(startLog, "utf8");
+  const logged = t.mock.method(console, "error", () => {});
+  holdNextTurn = true;
+  const { turn } = await service.submitTurn(session.id, request);
+  await settled.promise;
+
+  const blockers = Array.from({ length: 10 }, holdHistoryRead);
+  try {
+    await Promise.all(blockers.slice(0, 2).map((blocker) => blocker.entered));
+    releaseSettlement.resolve(undefined);
+    const terminal = await waitForTurn(service, session.id, turn.runId, (value) =>
+      ["completed", "failed", "interrupted", "aborted"].includes(value.status),
+    );
+    assert.equal(terminal.status, "interrupted");
+    assert.equal(terminal.error?.code, "history_busy");
+    assert.deepEqual(terminal.entryIds, []);
+    assert.equal(service.getSession(session.id).runtimeState, "ready");
+    assert.ok(
+      logged.mock.calls.some(
+        ({ arguments: args }) =>
+          args[0] ===
+          JSON.stringify({
+            event: "turn_error",
+            status: "interrupted",
+            code: "history_busy",
+            sessionId: session.id,
+            runId: turn.runId,
+          }),
+      ),
+    );
+  } finally {
+    for (const blocker of blockers) blocker.release();
+    await Promise.all(blockers.map((blocker) => blocker.promise));
+  }
+
+  const history = await service.getHistory(session.id);
+  assert.equal(history.coveredTurnId, null);
+  assert.match(JSON.stringify(history.entries), /settle once/u);
+  const duplicate = await service.submitTurn(session.id, request);
+  assert.equal(duplicate.created, false);
+  assert.equal(duplicate.turn.runId, turn.runId);
+  const next = await service.submitTurn(session.id, { requestId: randomUUID(), message: "next" });
+  await waitForTurn(service, session.id, next.turn.runId, (value) => value.status === "completed");
+  assert.equal(await readFile(startLog, "utf8"), startsBefore);
+  assert.equal((await readFile(turnLog, "utf8")).trim().split("\n").length, 3);
+});
+
 test("aborting a turn cancels its queued baseline scan without replaying the request", {
   timeout: 20_000,
 }, async (t) => {

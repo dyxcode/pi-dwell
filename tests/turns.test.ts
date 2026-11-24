@@ -141,6 +141,7 @@ test("accepted work can be cancelled before dispatch and provider failures remai
     (value) => value.activeTurnId === null,
   );
   assert.deepEqual(await service.getContext(session.id), { messages: [] });
+  const logged = t.mock.method(console, "error", () => {});
   const failure = await service.submitTurn(session.id, {
     requestId: randomUUID(),
     message: "fail",
@@ -149,7 +150,21 @@ test("accepted work can be cancelled before dispatch and provider failures remai
     () => service.getTurn(session.id, failure.turn.runId),
     (value) => value.status === "failed",
   );
-  assert.ok(failed.error);
+  assert.equal(failed.error?.code, "provider_error");
+  assert.deepEqual(
+    logged.mock.calls.map((call) => call.arguments),
+    [
+      [
+        JSON.stringify({
+          event: "turn_error",
+          status: "failed",
+          code: "provider_error",
+          sessionId: session.id,
+          runId: failure.turn.runId,
+        }),
+      ],
+    ],
+  );
   assert.equal((await service.abortTurn(session.id, failure.turn.runId)).status, "failed");
 });
 

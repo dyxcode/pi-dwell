@@ -1209,14 +1209,15 @@ export class SessionCatalog {
     }
   }
 
-  interruptTurns(now: number): void {
+  interruptTurns(now: number): number {
     if (!Number.isSafeInteger(now))
       throw new TypeError("Turn interruption time must be a safe integer.");
-    this.database
+    const { changes } = this.database
       .prepare(
         "UPDATE turns SET status = 'interrupted', updated_at = CASE WHEN updated_at > ? THEN updated_at ELSE ? END, error_code = CASE WHEN status = 'accepted' THEN 'not_dispatched' ELSE 'outcome_unknown' END, error_message = CASE WHEN status = 'accepted' THEN 'Host stopped before dispatch; the prompt was not sent.' ELSE 'Turn execution was interrupted by host restart; the outcome is unknown.' END WHERE status IN ('accepted', 'dispatching', 'running')",
       )
       .run(now, now);
+    return Number(changes);
   }
 
   #validateLibraryRows(): void {

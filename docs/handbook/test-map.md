@@ -173,9 +173,10 @@ Fixture/helper module; inspect its exported setup or subprocess behavior in the 
 
 - [aborting an admitted history scan lets it finish and releases its permit](../../tests/history-cancellation.test.ts#L113)
 - [a shutdown-cancelled public read uses a free permit but never joins the wait queue](../../tests/history-cancellation.test.ts#L137)
-- [aborting a turn cancels its queued baseline scan without replaying the request](../../tests/history-cancellation.test.ts#L168)
-- [aborting a turn cancels queued history identity capture while opening a closed session](../../tests/history-cancellation.test.ts#L223)
-- [shutdown cancels queued public history reads without waiting for unrelated active scans](../../tests/history-cancellation.test.ts#L280)
+- [post-settlement history overload leaves the same Pi child available without replay](../../tests/history-cancellation.test.ts#L168)
+- [aborting a turn cancels its queued baseline scan without replaying the request](../../tests/history-cancellation.test.ts#L228)
+- [aborting a turn cancels queued history identity capture while opening a closed session](../../tests/history-cancellation.test.ts#L283)
+- [shutdown cancels queued public history reads without waiting for unrelated active scans](../../tests/history-cancellation.test.ts#L340)
 
 ## tests/history-context.test.ts
 
@@ -236,11 +237,12 @@ Fixture/helper module; inspect its exported setup or subprocess behavior in the 
 
 [Open source](../../tests/host.test.ts)
 
-- [loopback host serves public health/assets and authenticated status](../../tests/host.test.ts#L16)
-- [closing is repeatable and releases the listening port](../../tests/host.test.ts#L48)
-- [a losing server cannot initialize state, even with a different data root](../../tests/host.test.ts#L58)
-- [status client rejects incompatible HTTP services](../../tests/host.test.ts#L69)
-- [Host, Origin, CSRF, media type, body sizes and rate limits are enforced](../../tests/host.test.ts#L87)
+- [loopback host serves public health/assets and authenticated status](../../tests/host.test.ts#L17)
+- [HTTP 5xx diagnostics omit request credentials and bodies](../../tests/host.test.ts#L49)
+- [closing is repeatable and releases the listening port](../../tests/host.test.ts#L72)
+- [a losing server cannot initialize state, even with a different data root](../../tests/host.test.ts#L82)
+- [status client rejects incompatible HTTP services](../../tests/host.test.ts#L93)
+- [Host, Origin, CSRF, media type, body sizes and rate limits are enforced](../../tests/host.test.ts#L111)
 
 ## tests/images-http.test.ts
 
@@ -324,11 +326,12 @@ Fixture/helper module; inspect its exported setup or subprocess behavior in the 
 - [malformed get_entries data fails the runtime](../../tests/runtime-failure.test.ts#L84)
 - [startRun reports transport timeout as uncertain, not a command rejection](../../tests/runtime-failure.test.ts#L102)
 - [shutdown escalates for an unresponsive Pi and observes its actual exit](../../tests/runtime-failure.test.ts#L116)
-- [private stderr diagnostics are bounded and excluded from ordinary errors](../../tests/runtime-failure.test.ts#L124)
-- [missing executable and directory errors do not launch a runtime](../../tests/runtime-failure.test.ts#L135)
-- [a recovered provider attempt is completed only after final settlement](../../tests/runtime-failure.test.ts#L144)
-- [oversized prompts reject before dispatch and leave the session usable](../../tests/runtime-failure.test.ts#L150)
-- [pending RPC requests are bounded without disrupting admitted queries](../../tests/runtime-failure.test.ts#L158)
+- [unexpected Pi exit logs only process metadata, not stderr or prompt content](../../tests/runtime-failure.test.ts#L124)
+- [private stderr diagnostics are bounded and excluded from ordinary errors](../../tests/runtime-failure.test.ts#L137)
+- [missing executable and directory errors do not launch a runtime](../../tests/runtime-failure.test.ts#L150)
+- [a recovered provider attempt is completed only after final settlement](../../tests/runtime-failure.test.ts#L159)
+- [oversized prompts reject before dispatch and leave the session usable](../../tests/runtime-failure.test.ts#L165)
+- [pending RPC requests are bounded without disrupting admitted queries](../../tests/runtime-failure.test.ts#L173)
 
 ## tests/runtime.test.ts
 
@@ -480,8 +483,8 @@ Fixture/helper module; inspect its exported setup or subprocess behavior in the 
 
 [Open source](../../tests/turn-recovery.test.ts)
 
-- [a final ledger write failure blocks new execution until restart without losing Pi history](../../tests/turn-recovery.test.ts#L111)
-- [failed cancellation persistence stops the runtime and blocks new work](../../tests/turn-recovery.test.ts#L181)
+- [a final ledger write failure blocks new execution until restart without losing Pi history](../../tests/turn-recovery.test.ts#L116)
+- [failed cancellation persistence stops the runtime and blocks new work](../../tests/turn-recovery.test.ts#L199)
 
 ## tests/turns-http.test.ts
 
@@ -499,11 +502,11 @@ Fixture/helper module; inspect its exported setup or subprocess behavior in the 
 - [turn admission deduplicates before busy and saved results survive host restart](../../tests/turns.test.ts#L57)
 - [slow turns do not block other sessions and abort is scoped to its run](../../tests/turns.test.ts#L93)
 - [accepted work can be cancelled before dispatch and provider failures remain explicit](../../tests/turns.test.ts#L132)
-- [database admission failure never sends a prompt and removed history is unavailable](../../tests/turns.test.ts#L154)
-- [shutdown bounds active work and restarting never replays it](../../tests/turns.test.ts#L196)
-- [cancel during dispatch preparation preserves an empty session; completion can win an abort race](../../tests/turns.test.ts#L215)
-- [extension-handled input completes without model work and leaves an empty session reopenable](../../tests/turns.test.ts#L278)
-- [extension-handled custom messages are saved without a fabricated assistant](../../tests/turns.test.ts#L326)
+- [database admission failure never sends a prompt and removed history is unavailable](../../tests/turns.test.ts#L169)
+- [shutdown bounds active work and restarting never replays it](../../tests/turns.test.ts#L211)
+- [cancel during dispatch preparation preserves an empty session; completion can win an abort race](../../tests/turns.test.ts#L230)
+- [extension-handled input completes without model work and leaves an empty session reopenable](../../tests/turns.test.ts#L293)
+- [extension-handled custom messages are saved without a fabricated assistant](../../tests/turns.test.ts#L341)
 
 ## tests/web-client.test.ts
 

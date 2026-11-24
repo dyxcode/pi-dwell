@@ -277,7 +277,12 @@ export class SessionService {
         throw new CurrentLibraryError("library_binding_mismatch");
       }
       catalog.interruptCreating((options.now ?? Date.now)());
-      catalog.interruptTurns((options.now ?? Date.now)());
+      const interrupted = catalog.interruptTurns((options.now ?? Date.now)());
+      if (interrupted > 0) {
+        console.error(
+          JSON.stringify({ event: "turn_recovery", status: "interrupted", count: interrupted }),
+        );
+      }
       return new SessionService(catalog, dataDir, options);
     } catch (error) {
       catalog.close();
@@ -600,6 +605,13 @@ export class SessionService {
   #storageFault(id: string): void {
     if (this.#storageFaults.has(id)) return;
     this.#storageFaults.add(id);
+    console.error(
+      JSON.stringify({
+        event: "session_storage_error",
+        code: "storage_unavailable",
+        sessionId: id,
+      }),
+    );
     this.#events.fail(
       id,
       "storage_unavailable",
@@ -1235,6 +1247,31 @@ export class SessionService {
   #writeTurn(turn: StoredTurn): void {
     try {
       this.#catalog.updateTurn(turn);
+      if (turn.status === "failed" || turn.status === "interrupted") {
+        const code = turn.error?.code ?? "unknown";
+        console.error(
+          JSON.stringify({
+            event: "turn_error",
+            status: turn.status,
+            code: [
+              "execution_rejected",
+              "outcome_unknown",
+              "provider_error",
+              "history_busy",
+              "source_busy",
+              "history_unavailable",
+              "invalid_history",
+              "storage_unavailable",
+              "runtime_unavailable",
+              "runtime_mismatch",
+            ].includes(code)
+              ? code
+              : "unclassified",
+            sessionId: turn.sessionId,
+            runId: turn.runId,
+          }),
+        );
+      }
       this.#publishState(turn.sessionId, true);
     } catch {
       this.#storageFault(turn.sessionId);
@@ -1269,6 +1306,7 @@ export class SessionService {
     const id = slot.sessionId;
     let markedHistory = false;
     let historyWasExpected = false;
+    let checkingSettledHistory = false;
     let unobserve: (() => void) | undefined;
     try {
       await this.#checkpoint?.("accepted", turnView(this.#storedTurn(id, slot.runId)));
@@ -1361,7 +1399,9 @@ export class SessionService {
         await this.#completeHandledTurn(id, slot.runId, runtime, before, historyWasExpected);
         return;
       }
+      checkingSettledHistory = true;
       const historyAfter = await this.#rememberHistory(this.#stored(id), runtime);
+      checkingSettledHistory = false;
       if (historyAfter.state !== "readable")
         throw new SessionError(410, "history_unavailable", HISTORY_UNAVAILABLE);
       const savedAfter = historyAfter.value.entries;
@@ -1379,6 +1419,11 @@ export class SessionService {
       });
     } catch (error) {
       const rejectedPrompt = error instanceof RpcCommandError && error.command === "prompt";
+      const historyBusy =
+        checkingSettledHistory &&
+        error instanceof SessionError &&
+        (error.code === "history_busy" || error.code === "source_busy");
+      if (historyBusy) this.#historyIdentity.delete(id); // The pre-turn baseline is no longer current.
       try {
         const turn = this.#storedTurn(id, slot.runId);
         const shutdownBeforeDispatch = this.#stopping && !slot.dispatched;
@@ -1401,8 +1446,9 @@ export class SessionService {
                       : slot.dispatched && !rejectedPrompt
                         ? "outcome_unknown"
                         : "execution_rejected",
-                  message:
-                    error instanceof SessionError
+                  message: historyBusy
+                    ? "Pi finished, but saved turn entries could not be verified. The prompt was not replayed."
+                    : error instanceof SessionError
                       ? error.message
                       : "Execution did not complete reliably. No automatic retry was performed.",
                 },
@@ -1410,7 +1456,8 @@ export class SessionService {
       } catch {
         this.#storageFault(id);
       }
-      if (slot.dispatched || this.#storageFaults.has(id)) {
+      // The ledger still reports unverified settlement, but read contention cannot damage Pi.
+      if ((slot.dispatched && !historyBusy) || this.#storageFaults.has(id)) {
         try {
           await slot.runtime?.stop();
         } catch {

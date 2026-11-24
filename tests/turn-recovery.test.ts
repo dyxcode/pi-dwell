@@ -68,6 +68,7 @@ for (const point of ["accepted", "dispatching", "running", "settled"]) {
     child.kill("SIGKILL");
     await closed;
     clearTimeout(timer);
+    const logged = t.mock.method(console, "error", () => {});
     const restored = await SessionService.create({
       dataDir,
       env: childEnv,
@@ -77,6 +78,10 @@ for (const point of ["accepted", "dispatching", "running", "settled"]) {
     const turn = restored.getTurn(original.sessionId, original.runId);
     assert.equal(turn.status, "interrupted");
     assert.equal(turn.error?.code, point === "accepted" ? "not_dispatched" : "outcome_unknown");
+    assert.deepEqual(
+      logged.mock.calls.map((call) => call.arguments),
+      [[JSON.stringify({ event: "turn_recovery", status: "interrupted", count: 1 })]],
+    );
     const retry = await restored.submitTurn(turn.sessionId, {
       requestId,
       message: point === "running" ? "slow" : "hello",
@@ -149,6 +154,7 @@ test("a final ledger write failure blocks new execution until restart without lo
   await atSettlement;
   const lock = new DatabaseSync(join(dataDir, "catalog.sqlite"));
   lock.exec("BEGIN EXCLUSIVE");
+  const logged = t.mock.method(console, "error", () => {});
   release();
   // Keep the lock until runtime cleanup proves that final persistence failed.
   const deadline = Date.now() + 5000;
@@ -164,6 +170,18 @@ test("a final ledger write failure blocks new execution until restart without lo
   lock.exec("ROLLBACK");
   lock.close();
   assert.throws(() => service.getTurn(session.id, turn.runId), /could not be saved/);
+  assert.deepEqual(
+    logged.mock.calls.map((call) => call.arguments),
+    [
+      [
+        JSON.stringify({
+          event: "session_storage_error",
+          code: "storage_unavailable",
+          sessionId: session.id,
+        }),
+      ],
+    ],
+  );
   await assert.rejects(
     service.submitTurn(session.id, { requestId: randomUUID(), message: "hello" }),
     /could not be saved/,

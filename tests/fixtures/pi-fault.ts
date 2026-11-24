@@ -76,6 +76,7 @@ process.stdin.on("data", (chunk: Buffer) => {
       output(response);
     } else if (value.type === "prompt") {
       if (mode === "crash") {
+        process.stderr.write("private-diagnostic");
         process.exit(23);
       }
       if (mode === "timeout") continue;

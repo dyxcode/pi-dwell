@@ -30,7 +30,7 @@ Admission validates the request again inside the global mutation queue. It looks
 
 The worker opens or resumes the same Pi session and checks image support against the active model. Before dispatch, Dwell reads saved history and records a baseline of native entry IDs and assistant-message identities. A SQLite transaction records dispatch intent and that Pi history is expected. The worker checks cancellation and shutdown again, then installs the Pi event observer before sending the prompt.
 
-Pi's prompt response classifies input as an ordinary agent run or extension-handled input. Ordinary runs move through accepted, dispatching, and running before settlement. Dwell then reads saved history, identifies entries added since the baseline, and commits the terminal result with their references. Later result reads resolve those references against Pi's saved file.
+Pi's prompt response classifies input as an ordinary agent run or extension-handled input. Ordinary runs move through accepted, dispatching, and running before settlement. Dwell then reads saved history, identifies entries added since the baseline, and commits the terminal result with their references. Later result reads resolve those references against Pi's saved file. If the post-run history read is temporarily busy, Dwell records the turn as interrupted without claiming saved-entry coverage. The reply can still appear in saved history, and the healthy Pi child remains available for the next turn.
 
 <a id="mechanisms"></a>
 

@@ -38,6 +38,8 @@ Private directories and registration files are checked for current-user ownershi
 
 Starting an already-running service checks readiness without restarting it. If a service started by the current request never becomes ready, Dwell attempts to stop that service; a previously running instance remains untouched. Stop waits for the manager to report completion and never kills an arbitrary process. Status combines manager state with authenticated host readiness. Linux reports boot autostart and lingering separately; unavailable queries are shown as unknown. Linux also restarts a failed process with backoff.
 
+Dwell writes structured diagnostics to standard error for server errors, failed or interrupted turns, storage faults, and unexpected Pi child exits. On Linux, these appear in the user service journal. The records contain status, known error codes, or opaque identifiers and process metadata, not request contents, credentials, or raw Pi diagnostics.
+
 <a id="technology"></a>
 
 ## Technology

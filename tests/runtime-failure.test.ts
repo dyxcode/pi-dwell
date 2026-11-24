@@ -121,11 +121,26 @@ test("shutdown escalates for an unresponsive Pi and observes its actual exit", a
   assert.throws(() => process.kill(pi.pid ?? 0, 0), /ESRCH/);
 });
 
+test("unexpected Pi exit logs only process metadata, not stderr or prompt content", async (t) => {
+  const pi = await PiProcess.start(await options(t, "crash"));
+  t.after(() => pi.stop());
+  const logged = t.mock.method(console, "error", () => {});
+  await assert.rejects(pi.run("private-prompt"), /unknown|exited/i);
+  await pi.stop();
+  assert.match(pi.stderrTail, /private-diagnostic/u);
+  assert.deepEqual(
+    logged.mock.calls.map((call) => call.arguments),
+    [[JSON.stringify({ event: "pi_child_exit", pid: pi.pid, code: 23, signal: null })]],
+  );
+});
+
 test("private stderr diagnostics are bounded and excluded from ordinary errors", async (t) => {
   const pi = await PiProcess.start(await options(t, "stderr"));
   t.after(() => pi.stop());
   assert.ok(pi.stderrTail.length > 0 && pi.stderrTail.length <= 16 * 1024);
+  const logged = t.mock.method(console, "error", () => {});
   await pi.stop();
+  assert.equal(logged.mock.callCount(), 0);
   await assert.rejects(
     pi.getState(),
     (error: unknown) => error instanceof Error && !error.message.includes("private-diagnostic"),

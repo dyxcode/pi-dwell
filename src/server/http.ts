@@ -95,9 +95,43 @@ async function readJson(request: IncomingMessage, limit = 8192): Promise<Record<
     fail(400, "invalid_input", "Request body must be a JSON object.");
   return Object.fromEntries(Object.entries(value));
 }
+const HTTP_DIAGNOSTIC_CODES = new Set([
+  "directory_unavailable",
+  "discovery_cleanup_failed",
+  "home_directory_unavailable",
+  "internal_error",
+  "invalid_catalog",
+  "library_unavailable",
+  "memory_unavailable",
+  "model_capabilities_failed",
+  "model_change_failed",
+  "model_discovery_failed",
+  "native_abort_failed",
+  "runtime_mismatch",
+  "runtime_unavailable",
+  "session_start_failed",
+  "shutting_down",
+  "source_busy",
+  "storage_unavailable",
+  "stream_unavailable",
+  "unavailable",
+  "unsupported_pi_version",
+]);
+
 function send(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status);
   response.end(JSON.stringify(body));
+  if (status >= 500 && status < 600) {
+    const error = body && typeof body === "object" && "error" in body ? body.error : undefined;
+    const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+    console.error(
+      JSON.stringify({
+        event: "http_error",
+        status,
+        code: typeof code === "string" && HTTP_DIAGNOSTIC_CODES.has(code) ? code : "unclassified",
+      }),
+    );
+  }
 }
 function parseHistoryCursor(query: string): string | undefined {
   const parameters = new URLSearchParams(query);

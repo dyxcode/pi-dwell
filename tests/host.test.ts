@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
@@ -43,6 +44,29 @@ test("loopback host serves public health/assets and authenticated status", async
   assert.equal(write.status, 405);
   assert.equal(write.headers.get("allow"), "GET");
   assert.equal(write.headers.get("access-control-allow-origin"), null);
+});
+
+test("HTTP 5xx diagnostics omit request credentials and bodies", async (t) => {
+  const dataDir = await directory(t);
+  const host = await startHost({ port: 0, dataDir });
+  t.after(() => host.close());
+  const token = (await readFile(join(dataDir, "auth-token"), "utf8")).trim();
+  const logged = t.mock.method(console, "error", () => {});
+  const response = await fetch(`${host.url}/api/v1/sessions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Cookie: "secret=private-cookie",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ requestId: randomUUID(), directory: "/private-request-body" }),
+  });
+  assert.equal(response.status, 503);
+  await response.json();
+  assert.deepEqual(
+    logged.mock.calls.map((call) => call.arguments),
+    [[JSON.stringify({ event: "http_error", status: 503, code: "runtime_unavailable" })]],
+  );
 });
 
 test("closing is repeatable and releases the listening port", async (t) => {

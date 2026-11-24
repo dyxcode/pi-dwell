@@ -229,6 +229,7 @@ export class PiProcess {
   #run: ActiveRun | undefined;
   #lastNativeExecution: NativeExecutionEvent | undefined;
   #stopping: Promise<void> | undefined;
+  #expectedExit = false;
   #error: Error | undefined;
 
   private constructor(
@@ -255,6 +256,9 @@ export class PiProcess {
         this.#fail(new Error("Cannot start the configured Pi executable.")),
       );
       child.once("close", (code, signal) => {
+        if (!this.#expectedExit && child.pid !== undefined) {
+          console.error(JSON.stringify({ event: "pi_child_exit", pid: child.pid, code, signal }));
+        }
         if (this.#state !== "stopping" && this.#state !== "failed") {
           this.#fail(
             new Error(
@@ -696,6 +700,7 @@ export class PiProcess {
       await this.#closed;
       return;
     }
+    this.#expectedExit = true;
     if (this.#state !== "failed") this.#setState("stopping");
     this.#rpc.close(new Error("Pi runtime is stopping; execution outcome may be unknown."));
     this.#child.stdin.end();

@@ -832,19 +832,17 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #conversation .thinking-run>summary{display:flex;align-items:center;width:fit-content;max-width:100%;min-height:36px;padding:0;list-style:none;font:12px/1.5 var(--sans);color:#797267}
 #conversation .thinking-content{margin:0;padding:2px 0 8px;color:#797267;font:13px/1.65 var(--sans);background:none;border:0}
 #conversation .thinking-content h1,#conversation .thinking-content h2,#conversation .thinking-content h3{font:500 13px/1.65 var(--sans);margin:8px 0}
-#conversation .message-body .tool-run{margin:8px 0 12px;padding:0;background:none;border:0;border-radius:0;box-shadow:none;overflow:visible}
-#conversation .tool-run>summary{min-height:40px;padding:6px 0;gap:8px;font:12px/1.6 var(--mono);color:#797267}
+#conversation .message-body :is(.activity-group,.tool-run){margin:8px 0 12px;padding:0;background:none;border:0;border-radius:0;box-shadow:none;overflow:visible}
+#conversation :is(.activity-group,.tool-run)>summary{min-height:40px;padding:6px 0;gap:8px;font:12px/1.6 var(--mono);color:#797267}
 #conversation .tool-run>summary code{font:inherit;color:inherit;background:none;border:0;border-radius:0;box-shadow:none;padding:0;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
 #conversation .tool-run .tool-status{margin-left:auto;padding:0 2px 0 8px;color:#797267;font-size:11px}
 #conversation .tool-run .tool-output{margin:0;padding:0 0 8px;background:none;border:0;color:#797267;font:12px/1.65 var(--mono);white-space:pre;overflow-x:auto;max-height:220px}
 #conversation .tool-run.error .tool-status{color:var(--close-ink,#904d3c)}
 #conversation .context-source>summary::before{content:'';display:block;width:5px;height:5px;flex:0 0 5px;margin:0 4px 0 2px;border:solid currentColor;border-width:1px 1px 0 0;box-sizing:border-box;transform:rotate(45deg);transform-origin:center}
 #conversation .context-source[open]>summary::before{transform:rotate(135deg)}
-#conversation .activity-group{margin:0 0 4px;color:#797267}
-#conversation .activity-group>summary{display:flex;align-items:center;gap:8px;width:fit-content;max-width:100%;min-height:36px;list-style:none;cursor:pointer;font:13px/1.5 var(--sans)}
-#conversation .activity-group>summary::-webkit-details-marker{display:none}
-#conversation .activity-action{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#conversation .activity-failures{color:var(--close-ink,#904d3c);white-space:nowrap}
+#conversation .activity-action{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#conversation :is(.activity-count,.activity-failures){flex:none;white-space:nowrap;font-size:11px}
+#conversation .activity-failures{color:var(--close-ink,#904d3c)}
 #conversation :is(.activity-group,.thinking-run,.tool-run)>summary{position:relative;text-decoration:none}
 #conversation :is(.activity-group,.thinking-run,.tool-run)>summary::before{content:'';position:absolute;left:-11px;top:50%;width:5px;height:5px;margin:0;border:solid currentColor;border-width:1px 1px 0 0;transform:translateY(-50%) rotate(45deg);transform-origin:center;box-sizing:border-box}
 #conversation :is(.activity-group,.thinking-run,.tool-run)[open]>summary::before{transform:translateY(-50%) rotate(135deg)}
@@ -865,7 +863,7 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #conversation .thinking-run{margin:0 0 4px}
 #conversation .thinking-run>summary{min-height:32px}
 #conversation .thinking-content{padding:2px 0 6px}
-#conversation .message-body .tool-run{margin:4px 0 6px}
+#conversation .message-body :is(.activity-group,.tool-run){margin:4px 0 6px}
 #conversation .tool-run .tool-output{padding-bottom:4px}
 @media(max-width:760px){#rail{width:min(360px,85vw)}#conversation .thinking-run>summary{min-height:36px}}
 
@@ -1003,7 +1001,7 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  .code-block figcaption,.session-details>summary,.session-details-caption,.context-source>summary{font-size:var(--type-meta)}
  .markdown table,.context-content{font-size:var(--type-ui)}
  .context-content.markdown h1,.context-content.markdown h2{font-size:var(--type-reading)}
- #conversation .thinking-run>summary,#conversation .tool-run>summary,#conversation .tool-run .tool-output,#conversation .tool-run .tool-command-full{font-size:14px}
+ #conversation :is(.activity-group,.thinking-run,.tool-run)>summary,#conversation .tool-run .tool-output,#conversation .tool-run .tool-command-full{font-size:14px}
  #conversation .thinking-content,#conversation .thinking-content :is(h1,h2,h3){font-size:var(--type-ui)}
  #conversation .tool-run :is(.tool-status,.tool-caption,.tool-command-lines),.history-recovery{font-size:var(--type-meta)}
  #composer #message,#composer.expanded #message{font-size:var(--type-reading);line-height:28px;min-height:32px}

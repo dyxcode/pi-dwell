@@ -124,7 +124,7 @@ Local dependencies： [clients/web/icons.ts](../../../../src/clients/web/icons.t
 
 功能背景：[Read and navigate a conversation](implementation/read-conversation.md)
 
-[查看源码](../../../../src/clients/web/client.ts) · 2999 行
+[查看源码](../../../../src/clients/web/client.ts) · 3001 行
 
 Local dependencies： [shared/discovery.ts](../../../../src/shared/discovery.ts), [shared/history.ts](../../../../src/shared/history.ts), [shared/protocol.ts](../../../../src/shared/protocol.ts), [shared/sessions.ts](../../../../src/shared/sessions.ts), [shared/turns.ts](../../../../src/shared/turns.ts), [clients/web/events.ts](../../../../src/clients/web/events.ts), [clients/web/tool-command.ts](../../../../src/clients/web/tool-command.ts), [clients/web/icons.ts](../../../../src/clients/web/icons.ts), [clients/web/attachments.ts](../../../../src/clients/web/attachments.ts), [clients/web/markdown.ts](../../../../src/clients/web/markdown.ts), [clients/web/conversation.ts](../../../../src/clients/web/conversation.ts), [clients/web/dom.ts](../../../../src/clients/web/dom.ts), [shared/images.ts](../../../../src/shared/images.ts), [shared/events.ts](../../../../src/shared/events.ts), [shared/thinking.ts](../../../../src/shared/thinking.ts), [clients/web/input.ts](../../../../src/clients/web/input.ts), [clients/web/transport.ts](../../../../src/clients/web/transport.ts).
 
@@ -262,35 +262,35 @@ Local dependencies： [shared/discovery.ts](../../../../src/shared/discovery.ts)
 | [`openFromSidebar`](../../../../src/clients/web/client.ts#L1567) | Function | id | [文字解释](implementation/session-lifecycle.md#execution) |
 | [`identifyLiveThinking`](../../../../src/clients/web/client.ts#L1603) | Function | message | [文字解释](implementation/models.md#mechanisms) |
 | [`renderConversation`](../../../../src/clients/web/client.ts#L1619) | Function |  | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`historyProblem`](../../../../src/clients/web/client.ts#L1844) | Function |  | [文字解释](implementation/saved-history.md#mechanisms) |
-| [`resetHistoryRecovery`](../../../../src/clients/web/client.ts#L1848) | Function | more | [文字解释](implementation/saved-history.md#mechanisms) |
-| [`uncoveredHistoryRun`](../../../../src/clients/web/client.ts#L1864) | Function |  | [文字解释](implementation/saved-history.md#mechanisms) |
-| [`scheduleHistoryRecovery`](../../../../src/clients/web/client.ts#L1875) | Function | more | [文字解释](implementation/saved-history.md#mechanisms) |
-| [`loadHistory`](../../../../src/clients/web/client.ts#L1884) | Function | more | [文字解释](implementation/saved-history.md#mechanisms) |
-| [`stopStream`](../../../../src/clients/web/client.ts#L1990) | Function |  | [文字解释](implementation/stop-work.md#mechanisms) |
-| [`renderFrame`](../../../../src/clients/web/client.ts#L1995) | Module value | `number \| undefined` | [文字解释](implementation/read-conversation.md#behavior) |
-| [`scheduleStreamRender`](../../../../src/clients/web/client.ts#L1996) | Function |  | [文字解释](implementation/reconnect.md#execution) |
-| [`stream`](../../../../src/clients/web/client.ts#L2004) | Function | id, epoch | [文字解释](implementation/reconnect.md#execution) |
-| [`select`](../../../../src/clients/web/client.ts#L2144) | Function | id | [文字解释](implementation/reconnect.md#execution) |
-| [`connection`](../../../../src/clients/web/client.ts#L2182) | Function | text | [文字解释](implementation/reconnect.md#execution) |
-| [`refresh`](../../../../src/clients/web/client.ts#L2185) | Function |  | [文字解释](implementation/reconnect.md#execution) |
-| [`poll`](../../../../src/clients/web/client.ts#L2253) | Function |  | [文字解释](implementation/reconnect.md#execution) |
-| [`disconnect`](../../../../src/clients/web/client.ts#L2289) | Function | reason | [文字解释](implementation/reconnect.md#execution) |
-| [`connect`](../../../../src/clients/web/client.ts#L2325) | Function |  | [文字解释](implementation/reconnect.md#execution) |
-| [`submit`](../../../../src/clients/web/client.ts#L2366) | Function |  | [文字解释](implementation/send-message.md#mechanisms) |
-| [`browse`](../../../../src/clients/web/client.ts#L2469) | Function | path | [文字解释](implementation/models.md#execution) |
-| [`renderModels`](../../../../src/clients/web/client.ts#L2518) | Function |  | [文字解释](implementation/models.md#mechanisms) |
-| [`showModels`](../../../../src/clients/web/client.ts#L2546) | Function |  | [文字解释](implementation/models.md#mechanisms) |
-| [`showThinking`](../../../../src/clients/web/client.ts#L2597) | Function | choice | [文字解释](implementation/models.md#mechanisms) |
-| [`changeModel`](../../../../src/clients/web/client.ts#L2658) | Function | choice, thinkingLevel | [文字解释](implementation/models.md#mechanisms) |
-| [`newSession`](../../../../src/clients/web/client.ts#L2703) | Function |  | [文字解释](implementation/models.md#execution) |
-| [`createSession`](../../../../src/clients/web/client.ts#L2711) | Function |  | [文字解释](implementation/models.md#execution) |
-| [`resetCloseDialog`](../../../../src/clients/web/client.ts#L2808) | Function |  | [文字解释](implementation/session-lifecycle.md#execution) |
-| [`dismissCloseDialog`](../../../../src/clients/web/client.ts#L2821) | Function |  | [文字解释](implementation/session-lifecycle.md#execution) |
-| [`pairingCode`](../../../../src/clients/web/client.ts#L2848) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
-| [`viewport`](../../../../src/clients/web/client.ts#L2945) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
-| [`responsive`](../../../../src/clients/web/client.ts#L2946) | Function |  | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`resume`](../../../../src/clients/web/client.ts#L2968) | Function |  | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`historyProblem`](../../../../src/clients/web/client.ts#L1846) | Function |  | [文字解释](implementation/saved-history.md#mechanisms) |
+| [`resetHistoryRecovery`](../../../../src/clients/web/client.ts#L1850) | Function | more | [文字解释](implementation/saved-history.md#mechanisms) |
+| [`uncoveredHistoryRun`](../../../../src/clients/web/client.ts#L1866) | Function |  | [文字解释](implementation/saved-history.md#mechanisms) |
+| [`scheduleHistoryRecovery`](../../../../src/clients/web/client.ts#L1877) | Function | more | [文字解释](implementation/saved-history.md#mechanisms) |
+| [`loadHistory`](../../../../src/clients/web/client.ts#L1886) | Function | more | [文字解释](implementation/saved-history.md#mechanisms) |
+| [`stopStream`](../../../../src/clients/web/client.ts#L1992) | Function |  | [文字解释](implementation/stop-work.md#mechanisms) |
+| [`renderFrame`](../../../../src/clients/web/client.ts#L1997) | Module value | `number \| undefined` | [文字解释](implementation/read-conversation.md#behavior) |
+| [`scheduleStreamRender`](../../../../src/clients/web/client.ts#L1998) | Function |  | [文字解释](implementation/reconnect.md#execution) |
+| [`stream`](../../../../src/clients/web/client.ts#L2006) | Function | id, epoch | [文字解释](implementation/reconnect.md#execution) |
+| [`select`](../../../../src/clients/web/client.ts#L2146) | Function | id | [文字解释](implementation/reconnect.md#execution) |
+| [`connection`](../../../../src/clients/web/client.ts#L2184) | Function | text | [文字解释](implementation/reconnect.md#execution) |
+| [`refresh`](../../../../src/clients/web/client.ts#L2187) | Function |  | [文字解释](implementation/reconnect.md#execution) |
+| [`poll`](../../../../src/clients/web/client.ts#L2255) | Function |  | [文字解释](implementation/reconnect.md#execution) |
+| [`disconnect`](../../../../src/clients/web/client.ts#L2291) | Function | reason | [文字解释](implementation/reconnect.md#execution) |
+| [`connect`](../../../../src/clients/web/client.ts#L2327) | Function |  | [文字解释](implementation/reconnect.md#execution) |
+| [`submit`](../../../../src/clients/web/client.ts#L2368) | Function |  | [文字解释](implementation/send-message.md#mechanisms) |
+| [`browse`](../../../../src/clients/web/client.ts#L2471) | Function | path | [文字解释](implementation/models.md#execution) |
+| [`renderModels`](../../../../src/clients/web/client.ts#L2520) | Function |  | [文字解释](implementation/models.md#mechanisms) |
+| [`showModels`](../../../../src/clients/web/client.ts#L2548) | Function |  | [文字解释](implementation/models.md#mechanisms) |
+| [`showThinking`](../../../../src/clients/web/client.ts#L2599) | Function | choice | [文字解释](implementation/models.md#mechanisms) |
+| [`changeModel`](../../../../src/clients/web/client.ts#L2660) | Function | choice, thinkingLevel | [文字解释](implementation/models.md#mechanisms) |
+| [`newSession`](../../../../src/clients/web/client.ts#L2705) | Function |  | [文字解释](implementation/models.md#execution) |
+| [`createSession`](../../../../src/clients/web/client.ts#L2713) | Function |  | [文字解释](implementation/models.md#execution) |
+| [`resetCloseDialog`](../../../../src/clients/web/client.ts#L2810) | Function |  | [文字解释](implementation/session-lifecycle.md#execution) |
+| [`dismissCloseDialog`](../../../../src/clients/web/client.ts#L2823) | Function |  | [文字解释](implementation/session-lifecycle.md#execution) |
+| [`pairingCode`](../../../../src/clients/web/client.ts#L2850) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
+| [`viewport`](../../../../src/clients/web/client.ts#L2947) | Module value | 由 initializer 推断 | [文字解释](implementation/read-conversation.md#behavior) |
+| [`responsive`](../../../../src/clients/web/client.ts#L2948) | Function |  | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`resume`](../../../../src/clients/web/client.ts#L2970) | Function |  | [文字解释](implementation/read-conversation.md#mechanisms) |
 | [`savedHistoryWarning`](../../../../src/clients/web/client.ts#L940) | Function | | [Feature context](implementation/read-conversation.md#mechanisms) |
 | [`sameLibraryReference`](../../../../src/clients/web/client.ts#L245) | Function | | [阅读说明](implementation/library.md#mechanisms) |
 | [`libraryFailure`](../../../../src/clients/web/client.ts#L248) | Function | | [阅读说明](implementation/library.md#mechanisms) |
@@ -330,7 +330,7 @@ Feature context: [Search and read Memory](implementation/memory.md)
 
 功能背景：[Read and navigate a conversation](implementation/read-conversation.md)
 
-[查看源码](../../../../src/clients/web/conversation.ts) · 629 行
+[查看源码](../../../../src/clients/web/conversation.ts) · 637 行
 
 Local dependencies： [shared/events.ts](../../../../src/shared/events.ts), [shared/history.ts](../../../../src/shared/history.ts), [clients/web/icons.ts](../../../../src/clients/web/icons.ts), [clients/web/markdown.ts](../../../../src/clients/web/markdown.ts), [clients/web/tool-command.ts](../../../../src/clients/web/tool-command.ts).
 
@@ -351,26 +351,26 @@ Local dependencies： [shared/events.ts](../../../../src/shared/events.ts), [sha
 | [`thinkingDisclosure`](../../../../src/clients/web/conversation.ts#L149) | Function | text, key, entryId | [文字解释](implementation/read-conversation.md#mechanisms) |
 | [`renderLiveMessageBlock`](../../../../src/clients/web/conversation.ts#L164) | Function | message, block | [文字解释](implementation/read-conversation.md#mechanisms) |
 | [`groupActivity`](../../../../src/clients/web/conversation.ts#L194) | Function | body, working | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`thinkingDetails`](../../../../src/clients/web/conversation.ts#L242) | Function | entry, block, index | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`appendRawOutput`](../../../../src/clients/web/conversation.ts#L254) | Function | parent, entry, renderImage, blocks | [文字解释](implementation/read-conversation.md#execution) |
-| [`bashCommand`](../../../../src/clients/web/conversation.ts#L275) | Function | call | [文字解释](implementation/read-conversation.md#execution) |
-| [`toolRun`](../../../../src/clients/web/conversation.ts#L293) | Function | owner, call, result, renderImage, key, options | [文字解释](implementation/read-conversation.md#execution) |
-| [`appendTruncated`](../../../../src/clients/web/conversation.ts#L358) | Function | parent, entry | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`renderUser`](../../../../src/clients/web/conversation.ts#L363) | Function | entry, renderImage | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`renderAssistant`](../../../../src/clients/web/conversation.ts#L375) | Function | entries, renderImage, liveTools | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`renderSpecial`](../../../../src/clients/web/conversation.ts#L460) | Function | entry, renderImage | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`renderContext`](../../../../src/clients/web/conversation.ts#L488) | Function | sources, truncated | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`renderSavedConversation`](../../../../src/clients/web/conversation.ts#L528) | Function | entries, contextSources, contextSourcesTruncated, renderImage, liveTools | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`SavedConversationRenderer`](../../../../src/clients/web/conversation.ts#L552) | Class |  | [文字解释](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#entries`](../../../../src/clients/web/conversation.ts#L553) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#groups`](../../../../src/clients/web/conversation.ts#L554) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#contextSources`](../../../../src/clients/web/conversation.ts#L555) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#contextTruncated`](../../../../src/clients/web/conversation.ts#L556) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#contextSignature`](../../../../src/clients/web/conversation.ts#L557) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#versions`](../../../../src/clients/web/conversation.ts#L558) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#serial`](../../../../src/clients/web/conversation.ts#L559) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.clear`](../../../../src/clients/web/conversation.ts#L561) | Method |  | [文字解释](implementation/read-conversation.md#mechanisms) |
-| [`SavedConversationRenderer.render`](../../../../src/clients/web/conversation.ts#L567) | Method | entries, contextSources, contextSourcesTruncated, renderImage, liveTools | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`thinkingDetails`](../../../../src/clients/web/conversation.ts#L248) | Function | entry, block, index | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`appendRawOutput`](../../../../src/clients/web/conversation.ts#L260) | Function | parent, entry, renderImage, blocks | [文字解释](implementation/read-conversation.md#execution) |
+| [`bashCommand`](../../../../src/clients/web/conversation.ts#L281) | Function | call | [文字解释](implementation/read-conversation.md#execution) |
+| [`toolRun`](../../../../src/clients/web/conversation.ts#L299) | Function | owner, call, result, renderImage, key, options | [文字解释](implementation/read-conversation.md#execution) |
+| [`appendTruncated`](../../../../src/clients/web/conversation.ts#L366) | Function | parent, entry | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`renderUser`](../../../../src/clients/web/conversation.ts#L371) | Function | entry, renderImage | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`renderAssistant`](../../../../src/clients/web/conversation.ts#L383) | Function | entries, renderImage, liveTools | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`renderSpecial`](../../../../src/clients/web/conversation.ts#L468) | Function | entry, renderImage | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`renderContext`](../../../../src/clients/web/conversation.ts#L496) | Function | sources, truncated | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`renderSavedConversation`](../../../../src/clients/web/conversation.ts#L536) | Function | entries, contextSources, contextSourcesTruncated, renderImage, liveTools | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`SavedConversationRenderer`](../../../../src/clients/web/conversation.ts#L560) | Class |  | [文字解释](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#entries`](../../../../src/clients/web/conversation.ts#L561) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#groups`](../../../../src/clients/web/conversation.ts#L562) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#contextSources`](../../../../src/clients/web/conversation.ts#L563) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#contextTruncated`](../../../../src/clients/web/conversation.ts#L564) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#contextSignature`](../../../../src/clients/web/conversation.ts#L565) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#versions`](../../../../src/clients/web/conversation.ts#L566) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#serial`](../../../../src/clients/web/conversation.ts#L567) | Property |  | [文字解释](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.clear`](../../../../src/clients/web/conversation.ts#L569) | Method |  | [文字解释](implementation/read-conversation.md#mechanisms) |
+| [`SavedConversationRenderer.render`](../../../../src/clients/web/conversation.ts#L575) | Method | entries, contextSources, contextSourcesTruncated, renderImage, liveTools | [文字解释](implementation/read-conversation.md#mechanisms) |
 
 
 ## src/clients/web/dom.ts
@@ -535,7 +535,7 @@ Local dependencies: [shared/memory.ts](../../../../src/shared/memory.ts).
 
 功能背景：[Read and navigate a conversation](implementation/read-conversation.md)
 
-[查看源码](../../../../src/clients/web/page.ts) · 1051 行
+[查看源码](../../../../src/clients/web/page.ts) · 1049 行
 
 | Symbol | 类型 | Parameter 或 type | 文字解释 |
 | --- | --- | --- | --- |

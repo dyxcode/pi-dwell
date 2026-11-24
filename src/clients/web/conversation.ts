@@ -4,7 +4,7 @@ import type { LiveMessage, LiveMessageBlock, LiveTool } from "../../shared/event
 import type { ContextSource, HistoryBlock, HistoryEntry } from "../../shared/history.ts";
 import { actionIcon } from "./icons.ts";
 import { renderMarkdown } from "./markdown.ts";
-import { appendToolCommand } from "./tool-command.ts";
+import { appendToolCommand, commandPresentation } from "./tool-command.ts";
 
 export type SavedConversationGroup =
   | { kind: "user"; entry: HistoryEntry }
@@ -200,11 +200,17 @@ export function groupActivity(body: HTMLElement, working = false): void {
   let action: string | undefined;
   const finish = (tail = false): void => {
     if (!summary) return;
-    const running = action !== undefined || (working && tail);
+    const current = working && tail ? group?.lastElementChild : undefined;
+    const thinking = current?.matches(".thinking-run")
+      ? current.querySelector(":scope > summary")?.textContent
+      : null;
+    let label = working && tail ? "Working" : "Activity";
+    if (action) label = `Running: ${action}`;
+    else if (thinking) label = thinking === "Thinking" ? thinking : `Thinking: ${thinking}`;
     const count = `${steps} ${steps === 1 ? "step" : "steps"}`;
-    summary.append(node("span", `${running ? "Working" : "Activity"} · ${count}`));
-    if (action) summary.append(node("span", ` · Running: ${action}`, "activity-action"));
-    if (failures) summary.append(node("span", ` · ${failures} failed`, "activity-failures"));
+    summary.append(node("span", label, "activity-action"));
+    if (failures) summary.append(node("span", `${failures} failed`, "activity-failures"));
+    summary.append(node("span", count, "activity-count"));
     group = summary = undefined;
     pendingAnchors = [];
     steps = failures = 0;
@@ -321,7 +327,9 @@ function toolRun(
             ? "Orphan result"
             : "No result saved";
   const indicator = node("span", status === "✓" ? "" : status, "tool-status");
-  if (status === "Running") details.dataset.activityAction = label;
+  if (status === "Running")
+    details.dataset.activityAction =
+      command === null ? label : commandPresentation(command).preview;
   if (status === "✓") {
     indicator.append(actionIcon("check"));
     indicator.setAttribute("aria-label", "Completed");

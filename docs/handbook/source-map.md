@@ -122,7 +122,7 @@ Local dependencies: [clients/web/icons.ts](../../src/clients/web/icons.ts), [sha
 
 Feature context: [Read and navigate a conversation](implementation/read-conversation.md)
 
-[Open source](../../src/clients/web/client.ts) · 2999 lines
+[Open source](../../src/clients/web/client.ts) · 3001 lines
 
 Local dependencies: [clients/web/attachments.ts](../../src/clients/web/attachments.ts), [clients/web/conversation.ts](../../src/clients/web/conversation.ts), [clients/web/dom.ts](../../src/clients/web/dom.ts), [clients/web/events.ts](../../src/clients/web/events.ts), [clients/web/icons.ts](../../src/clients/web/icons.ts), [clients/web/input.ts](../../src/clients/web/input.ts), [clients/web/markdown.ts](../../src/clients/web/markdown.ts), [clients/web/memory.ts](../../src/clients/web/memory.ts), [clients/web/tool-command.ts](../../src/clients/web/tool-command.ts), [clients/web/transport.ts](../../src/clients/web/transport.ts), [shared/discovery.ts](../../src/shared/discovery.ts), [shared/events.ts](../../src/shared/events.ts), [shared/history.ts](../../src/shared/history.ts), [shared/images.ts](../../src/shared/images.ts), [shared/library.ts](../../src/shared/library.ts), [shared/memory.ts](../../src/shared/memory.ts), [shared/protocol.ts](../../src/shared/protocol.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/turns.ts](../../src/shared/turns.ts).
 
@@ -260,35 +260,35 @@ Local dependencies: [clients/web/attachments.ts](../../src/clients/web/attachmen
 | [`openFromSidebar`](../../src/clients/web/client.ts#L1567) | Function | id | [Feature context](implementation/session-lifecycle.md#execution) |
 | [`identifyLiveThinking`](../../src/clients/web/client.ts#L1603) | Function | message | [Feature context](implementation/models.md#mechanisms) |
 | [`renderConversation`](../../src/clients/web/client.ts#L1619) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`historyProblem`](../../src/clients/web/client.ts#L1844) | Function |  | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`resetHistoryRecovery`](../../src/clients/web/client.ts#L1848) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`uncoveredHistoryRun`](../../src/clients/web/client.ts#L1864) | Function |  | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`scheduleHistoryRecovery`](../../src/clients/web/client.ts#L1875) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`loadHistory`](../../src/clients/web/client.ts#L1884) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`stopStream`](../../src/clients/web/client.ts#L1990) | Function |  | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`renderFrame`](../../src/clients/web/client.ts#L1995) | Module value | `number \| undefined` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`scheduleStreamRender`](../../src/clients/web/client.ts#L1996) | Function |  | [Feature context](implementation/reconnect.md#execution) |
-| [`stream`](../../src/clients/web/client.ts#L2004) | Function | id, epoch | [Feature context](implementation/reconnect.md#execution) |
-| [`select`](../../src/clients/web/client.ts#L2144) | Function | id | [Feature context](implementation/reconnect.md#execution) |
-| [`connection`](../../src/clients/web/client.ts#L2182) | Function | text | [Feature context](implementation/reconnect.md#execution) |
-| [`refresh`](../../src/clients/web/client.ts#L2185) | Function |  | [Feature context](implementation/reconnect.md#execution) |
-| [`poll`](../../src/clients/web/client.ts#L2253) | Function |  | [Feature context](implementation/reconnect.md#execution) |
-| [`disconnect`](../../src/clients/web/client.ts#L2289) | Function | reason | [Feature context](implementation/reconnect.md#execution) |
-| [`connect`](../../src/clients/web/client.ts#L2325) | Function |  | [Feature context](implementation/reconnect.md#execution) |
-| [`submit`](../../src/clients/web/client.ts#L2366) | Function |  | [Feature context](implementation/send-message.md#mechanisms) |
-| [`browse`](../../src/clients/web/client.ts#L2469) | Function | path | [Feature context](implementation/models.md#execution) |
-| [`renderModels`](../../src/clients/web/client.ts#L2518) | Function |  | [Feature context](implementation/models.md#mechanisms) |
-| [`showModels`](../../src/clients/web/client.ts#L2546) | Function |  | [Feature context](implementation/models.md#mechanisms) |
-| [`showThinking`](../../src/clients/web/client.ts#L2597) | Function | choice | [Feature context](implementation/models.md#mechanisms) |
-| [`changeModel`](../../src/clients/web/client.ts#L2658) | Function | choice, thinkingLevel | [Feature context](implementation/models.md#mechanisms) |
-| [`newSession`](../../src/clients/web/client.ts#L2703) | Function |  | [Feature context](implementation/models.md#execution) |
-| [`createSession`](../../src/clients/web/client.ts#L2711) | Function |  | [Feature context](implementation/models.md#execution) |
-| [`resetCloseDialog`](../../src/clients/web/client.ts#L2808) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`dismissCloseDialog`](../../src/clients/web/client.ts#L2821) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`pairingCode`](../../src/clients/web/client.ts#L2848) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`viewport`](../../src/clients/web/client.ts#L2945) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`responsive`](../../src/clients/web/client.ts#L2946) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`resume`](../../src/clients/web/client.ts#L2968) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`historyProblem`](../../src/clients/web/client.ts#L1846) | Function |  | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`resetHistoryRecovery`](../../src/clients/web/client.ts#L1850) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`uncoveredHistoryRun`](../../src/clients/web/client.ts#L1866) | Function |  | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`scheduleHistoryRecovery`](../../src/clients/web/client.ts#L1877) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`loadHistory`](../../src/clients/web/client.ts#L1886) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`stopStream`](../../src/clients/web/client.ts#L1992) | Function |  | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`renderFrame`](../../src/clients/web/client.ts#L1997) | Module value | `number \| undefined` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`scheduleStreamRender`](../../src/clients/web/client.ts#L1998) | Function |  | [Feature context](implementation/reconnect.md#execution) |
+| [`stream`](../../src/clients/web/client.ts#L2006) | Function | id, epoch | [Feature context](implementation/reconnect.md#execution) |
+| [`select`](../../src/clients/web/client.ts#L2146) | Function | id | [Feature context](implementation/reconnect.md#execution) |
+| [`connection`](../../src/clients/web/client.ts#L2184) | Function | text | [Feature context](implementation/reconnect.md#execution) |
+| [`refresh`](../../src/clients/web/client.ts#L2187) | Function |  | [Feature context](implementation/reconnect.md#execution) |
+| [`poll`](../../src/clients/web/client.ts#L2255) | Function |  | [Feature context](implementation/reconnect.md#execution) |
+| [`disconnect`](../../src/clients/web/client.ts#L2291) | Function | reason | [Feature context](implementation/reconnect.md#execution) |
+| [`connect`](../../src/clients/web/client.ts#L2327) | Function |  | [Feature context](implementation/reconnect.md#execution) |
+| [`submit`](../../src/clients/web/client.ts#L2368) | Function |  | [Feature context](implementation/send-message.md#mechanisms) |
+| [`browse`](../../src/clients/web/client.ts#L2471) | Function | path | [Feature context](implementation/models.md#execution) |
+| [`renderModels`](../../src/clients/web/client.ts#L2520) | Function |  | [Feature context](implementation/models.md#mechanisms) |
+| [`showModels`](../../src/clients/web/client.ts#L2548) | Function |  | [Feature context](implementation/models.md#mechanisms) |
+| [`showThinking`](../../src/clients/web/client.ts#L2599) | Function | choice | [Feature context](implementation/models.md#mechanisms) |
+| [`changeModel`](../../src/clients/web/client.ts#L2660) | Function | choice, thinkingLevel | [Feature context](implementation/models.md#mechanisms) |
+| [`newSession`](../../src/clients/web/client.ts#L2705) | Function |  | [Feature context](implementation/models.md#execution) |
+| [`createSession`](../../src/clients/web/client.ts#L2713) | Function |  | [Feature context](implementation/models.md#execution) |
+| [`resetCloseDialog`](../../src/clients/web/client.ts#L2810) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`dismissCloseDialog`](../../src/clients/web/client.ts#L2823) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`pairingCode`](../../src/clients/web/client.ts#L2850) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`viewport`](../../src/clients/web/client.ts#L2947) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`responsive`](../../src/clients/web/client.ts#L2948) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`resume`](../../src/clients/web/client.ts#L2970) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
 | [`savedHistoryWarning`](../../src/clients/web/client.ts#L940) | Function | | [Feature context](implementation/read-conversation.md#mechanisms) |
 | [`sameLibraryReference`](../../src/clients/web/client.ts#L245) | Function | | [Feature context](implementation/library.md#mechanisms) |
 | [`libraryFailure`](../../src/clients/web/client.ts#L248) | Function | | [Feature context](implementation/library.md#mechanisms) |
@@ -327,7 +327,7 @@ Local dependencies: [clients/web/attachments.ts](../../src/clients/web/attachmen
 
 Feature context: [Read and navigate a conversation](implementation/read-conversation.md)
 
-[Open source](../../src/clients/web/conversation.ts) · 629 lines
+[Open source](../../src/clients/web/conversation.ts) · 637 lines
 
 Local dependencies: [shared/events.ts](../../src/shared/events.ts), [shared/history.ts](../../src/shared/history.ts), [clients/web/icons.ts](../../src/clients/web/icons.ts), [clients/web/markdown.ts](../../src/clients/web/markdown.ts), [clients/web/tool-command.ts](../../src/clients/web/tool-command.ts).
 
@@ -348,26 +348,26 @@ Local dependencies: [shared/events.ts](../../src/shared/events.ts), [shared/hist
 | [`thinkingDisclosure`](../../src/clients/web/conversation.ts#L149) | Function | text, key, entryId | [Feature context](implementation/read-conversation.md#mechanisms) |
 | [`renderLiveMessageBlock`](../../src/clients/web/conversation.ts#L164) | Function | message, block | [Feature context](implementation/read-conversation.md#mechanisms) |
 | [`groupActivity`](../../src/clients/web/conversation.ts#L194) | Function | body, working | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`thinkingDetails`](../../src/clients/web/conversation.ts#L242) | Function | entry, block, index | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`appendRawOutput`](../../src/clients/web/conversation.ts#L254) | Function | parent, entry, renderImage, blocks | [Feature context](implementation/read-conversation.md#execution) |
-| [`bashCommand`](../../src/clients/web/conversation.ts#L275) | Function | call | [Feature context](implementation/read-conversation.md#execution) |
-| [`toolRun`](../../src/clients/web/conversation.ts#L293) | Function | owner, call, result, renderImage, key, options | [Feature context](implementation/read-conversation.md#execution) |
-| [`appendTruncated`](../../src/clients/web/conversation.ts#L358) | Function | parent, entry | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`renderUser`](../../src/clients/web/conversation.ts#L363) | Function | entry, renderImage | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`renderAssistant`](../../src/clients/web/conversation.ts#L375) | Function | entries, renderImage, liveTools | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`renderSpecial`](../../src/clients/web/conversation.ts#L460) | Function | entry, renderImage | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`renderContext`](../../src/clients/web/conversation.ts#L488) | Function | sources, truncated | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`renderSavedConversation`](../../src/clients/web/conversation.ts#L528) | Function | entries, contextSources, contextSourcesTruncated, renderImage, liveTools | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`SavedConversationRenderer`](../../src/clients/web/conversation.ts#L552) | Class |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#entries`](../../src/clients/web/conversation.ts#L553) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#groups`](../../src/clients/web/conversation.ts#L554) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#contextSources`](../../src/clients/web/conversation.ts#L555) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#contextTruncated`](../../src/clients/web/conversation.ts#L556) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#contextSignature`](../../src/clients/web/conversation.ts#L557) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#versions`](../../src/clients/web/conversation.ts#L558) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.#serial`](../../src/clients/web/conversation.ts#L559) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`SavedConversationRenderer.clear`](../../src/clients/web/conversation.ts#L561) | Method |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`SavedConversationRenderer.render`](../../src/clients/web/conversation.ts#L567) | Method | entries, contextSources, contextSourcesTruncated, renderImage, liveTools | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`thinkingDetails`](../../src/clients/web/conversation.ts#L248) | Function | entry, block, index | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`appendRawOutput`](../../src/clients/web/conversation.ts#L260) | Function | parent, entry, renderImage, blocks | [Feature context](implementation/read-conversation.md#execution) |
+| [`bashCommand`](../../src/clients/web/conversation.ts#L281) | Function | call | [Feature context](implementation/read-conversation.md#execution) |
+| [`toolRun`](../../src/clients/web/conversation.ts#L299) | Function | owner, call, result, renderImage, key, options | [Feature context](implementation/read-conversation.md#execution) |
+| [`appendTruncated`](../../src/clients/web/conversation.ts#L366) | Function | parent, entry | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`renderUser`](../../src/clients/web/conversation.ts#L371) | Function | entry, renderImage | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`renderAssistant`](../../src/clients/web/conversation.ts#L383) | Function | entries, renderImage, liveTools | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`renderSpecial`](../../src/clients/web/conversation.ts#L468) | Function | entry, renderImage | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`renderContext`](../../src/clients/web/conversation.ts#L496) | Function | sources, truncated | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`renderSavedConversation`](../../src/clients/web/conversation.ts#L536) | Function | entries, contextSources, contextSourcesTruncated, renderImage, liveTools | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`SavedConversationRenderer`](../../src/clients/web/conversation.ts#L560) | Class |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#entries`](../../src/clients/web/conversation.ts#L561) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#groups`](../../src/clients/web/conversation.ts#L562) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#contextSources`](../../src/clients/web/conversation.ts#L563) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#contextTruncated`](../../src/clients/web/conversation.ts#L564) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#contextSignature`](../../src/clients/web/conversation.ts#L565) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#versions`](../../src/clients/web/conversation.ts#L566) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.#serial`](../../src/clients/web/conversation.ts#L567) | Property |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`SavedConversationRenderer.clear`](../../src/clients/web/conversation.ts#L569) | Method |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`SavedConversationRenderer.render`](../../src/clients/web/conversation.ts#L575) | Method | entries, contextSources, contextSourcesTruncated, renderImage, liveTools | [Feature context](implementation/read-conversation.md#mechanisms) |
 
 
 ## src/clients/web/dom.ts
@@ -532,7 +532,7 @@ Local dependencies: [shared/memory.ts](../../src/shared/memory.ts).
 
 Feature context: [Read and navigate a conversation](implementation/read-conversation.md)
 
-[Open source](../../src/clients/web/page.ts) · 1051 lines
+[Open source](../../src/clients/web/page.ts) · 1049 lines
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |

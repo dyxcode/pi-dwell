@@ -50,7 +50,7 @@ import { actionIcon, labelWithIcon } from "./icons.ts";
 import { setupComposer } from "./input.ts";
 import { MemoryPanel, type MemoryPanelState } from "./memory.ts";
 import { renderMarkdown } from "./markdown.ts";
-import { appendToolCommand } from "./tool-command.ts";
+import { appendToolCommand, commandPresentation } from "./tool-command.ts";
 import { ApiError, api, binding, headers, message, responseError } from "./transport.ts";
 
 function el<T extends HTMLElement>(id: string, type: { new (): T }): T {
@@ -1739,7 +1739,9 @@ function renderConversation(): void {
             "",
             tool.status === "failed" ? "tool-run error" : "tool-run",
           );
-          if (tool.status === "running") detail.dataset.activityAction = tool.name;
+          if (tool.status === "running")
+            detail.dataset.activityAction =
+              command === null ? tool.name : commandPresentation(command).preview;
           detail.dataset.key =
             tool.callId && tool.ownerKey
               ? `tool-call:${tool.ownerKey}/${tool.callId}`

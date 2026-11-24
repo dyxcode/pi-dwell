@@ -926,7 +926,15 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
         ],{error:true}),
         entry("activity-answer","assistant","message",[block("text","Visible final answer.")])
       ]));
-      fixture.append(focusSource,renderSavedConversation(entries),rhythm,activity);
+      const running=document.createElement("div");
+      running.id="running-activity-test-fixture";
+      running.append(renderSavedConversation([
+        entry("running-activity","assistant","message",[
+          block("thinking","Already thought about it."),
+          block("tool_call",JSON.stringify({command:longCommand}),"running-tool","bash")
+        ],{nativeKey:"running-owner"})
+      ],[],false,undefined,[{ownerKey:"running-owner",callId:"running-tool",status:"running",output:""}]));
+      fixture.append(focusSource,renderSavedConversation(entries),rhythm,activity,running);
       document.querySelector("#conversation").append(fixture);
       return true;
     })()`),
@@ -941,8 +949,23 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
       const groups=[...root.querySelectorAll(".activity-group")];
       const answer=[...root.querySelectorAll(".markdown p")];
       const visible=item=>item.checkVisibility({contentVisibilityAuto:true});
+      const [summary,failureSummary]=groups.map(group=>group.querySelector(":scope>summary"));
+      const count=summary.lastElementChild;
+      const toolSummary=root.querySelector(".tool-run>summary");
+      const running=document.querySelector("#running-activity-test-fixture .activity-group>summary");
+      const action=running.firstElementChild;
+      const runningCount=running.lastElementChild;
       return {
-        summaries:groups.map(group=>group.querySelector(":scope>summary").textContent),
+        cleanWrapper:groups.every(group=>{
+          const style=getComputedStyle(group);
+          return style.backgroundColor==="rgba(0, 0, 0, 0)" && style.borderTopWidth==="0px";
+        }),
+        matchesToolFont:getComputedStyle(summary).font===getComputedStyle(toolSummary).font,
+        countAtRight:Math.abs(count.getBoundingClientRect().right-summary.getBoundingClientRect().right)<4,
+        labels:[...summary.children].map(item=>item.textContent),
+        failureLabels:[...failureSummary.children].map(item=>item.textContent),
+        runningLabels:[...running.children].map(item=>item.textContent),
+        runningFits:action.scrollWidth>action.clientWidth && action.getBoundingClientRect().right<runningCount.getBoundingClientRect().left && getComputedStyle(action).textOverflow==="ellipsis",
         open:groups.map(group=>group.open),
         steps:groups.map(group=>group.querySelectorAll(".thinking-run,.tool-run").length),
         visibleText:answer.filter(visible).map(item=>item.textContent),
@@ -950,7 +973,13 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
       };
     })()`),
       {
-        summaries: ["Activity · 30 steps", "Activity · 1 step · 1 failed"],
+        cleanWrapper: true,
+        matchesToolFont: true,
+        countAtRight: true,
+        labels: ["Activity", "30 steps"],
+        failureLabels: ["Activity", "1 failed", "1 step"],
+        runningLabels: [`Running: $ ${longCommand}`, "2 steps"],
+        runningFits: true,
         open: [false, false],
         steps: [30, 1],
         visibleText: ["Visible progress update.", "Visible final answer."],
@@ -3566,13 +3595,12 @@ for (const mode of modes) {
       false,
       "live thinking starts collapsed",
     );
-    assert.match(
-      String(
-        await second.evaluate(
-          'document.querySelector(".live .activity-group>summary").textContent',
-        ),
+    assert.deepEqual(
+      await second.evaluate(
+        '[...document.querySelector(".live .activity-group>summary").children].map(item=>item.textContent)',
       ),
-      /^Working · 1 step/u,
+      ["Thinking: Checking the response", "1 step"],
+      "live activity identifies the current thinking step",
     );
     await second.click(".live .activity-group>summary");
     await second.click(".live .thinking-run>summary");

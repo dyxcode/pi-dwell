@@ -45,6 +45,8 @@ test("authenticated library routes search and read an exact saved Current versio
     id: sessionId,
     displayName: null,
     metadataRevision: 0,
+    workspaceOpen: false,
+    openedAt: null,
     requestId: randomUUID(),
     payloadIdentity: "a".repeat(64),
     directory: environment.cwd,
@@ -99,8 +101,12 @@ test("authenticated library routes search and read an exact saved Current versio
     versionId: oldVersion.versionId,
   };
   const referencesPath = `${host.url}/api/v1/sessions/${sessionId}/library-references`;
-  const unauthorized = await fetch(referencesPath);
-  assert.equal(unauthorized.status, 401);
+  const bare = await fetch(referencesPath);
+  assert.equal(bare.status, 403);
+  const invalidToken = await fetch(referencesPath, {
+    headers: { Authorization: "Bearer invalid" },
+  });
+  assert.equal(invalidToken.status, 401);
   const added = await fetch(referencesPath, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
@@ -143,7 +149,7 @@ test("authenticated library routes search and read an exact saved Current versio
     (await fetch(`${host.url}/api/v1/library/latest?limit=1&limit=2`, { headers })).status,
     400,
   );
-  assert.equal((await fetch(`${host.url}/api/v1/library/latest`)).status, 401);
+  assert.equal((await fetch(`${host.url}/api/v1/library/latest`)).status, 403);
 });
 
 test("authenticated library routes report when the optional library is absent", async (t) => {

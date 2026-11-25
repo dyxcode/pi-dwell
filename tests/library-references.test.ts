@@ -239,6 +239,8 @@ test("catalog schema v6 migrates to v8 and keeps names, turns, and usable refere
     id: randomUUID(),
     displayName: "Preserved v6 session name",
     metadataRevision: 4,
+    workspaceOpen: false,
+    openedAt: null,
     requestId: randomUUID(),
     payloadIdentity: "a".repeat(64),
     directory: environment.cwd,
@@ -272,7 +274,7 @@ test("catalog schema v6 migrates to v8 and keeps names, turns, and usable refere
   try {
     const check = new DatabaseSync(path, { readOnly: true });
     try {
-      assert.equal(check.prepare("PRAGMA user_version").get()?.user_version, 8);
+      assert.equal(check.prepare("PRAGMA user_version").get()?.user_version, 9);
       assert.deepEqual(check.prepare("PRAGMA foreign_key_check").all(), []);
       assert.ok(
         check

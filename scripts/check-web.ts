@@ -320,6 +320,9 @@ async function assertSidebarLabel(
   model: string,
   thinkingLevel?: string,
 ): Promise<void> {
+  await page.until(
+    `document.querySelector('#session-list [data-session-id="${sessionId}"] .session-title')?.clientWidth > 0`,
+  );
   const label = record(
     await page.evaluate(`(()=>{
       const row=[...document.querySelectorAll("#session-list .name-row")].find(item=>item.dataset.sessionId===${JSON.stringify(sessionId)});
@@ -1108,7 +1111,7 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
     assert.equal(presentation.markdownCodeText, "const answer = 42;");
 
     const commands = record(
-      await page.evaluate(`(async()=>{
+      await page.evaluate(`(()=>{
         const root=document.querySelector("#quiet-process-test-fixture");
         const multiline=root.querySelector('.tool-run[data-entry-id="quiet-command-call"]');
         const longline=root.querySelector('.tool-run[data-entry-id="quiet-long-command-call"]');
@@ -1130,11 +1133,11 @@ async function assertQuietProcessPresentation(page: BrowserPage, viewport: strin
           toolBackground:getComputedStyle(multiline).backgroundColor,documentWidth:document.documentElement.scrollWidth
         };
         multiline.open=true;
-        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        // Measure synchronously: a live history refresh can replace the test fixture between frames.
+        full.getBoundingClientRect();
         const multilineOpen={fullVisible:full.checkVisibility({contentVisibilityAuto:true}),fullWhiteSpace:getComputedStyle(full).whiteSpace,fullBackground:getComputedStyle(full).backgroundColor};
         multiline.open=false;
         longline.open=true;
-        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
         const longOpen={preview:readPreview(longPreview),documentWidth:document.documentElement.scrollWidth};
         longline.open=false;
         return {present:true,closed,multilineOpen,longOpen,viewportWidth:innerWidth};
@@ -2469,12 +2472,23 @@ async function runMemoryBrowserAcceptance(
         sessions: { env: environment.env, extensions: [environment.extensionPath] },
       });
       await checkCapability(mode);
-      for (const id of sessionIds) await request(`/sessions/${id}/open`, {});
+      for (const id of sessionIds) {
+        const session = record(await request(`/sessions/${id}`));
+        assert.equal(session.workspaceOpen, true);
+        assert.equal(session.runtimeState, "closed");
+      }
+      await page.call("Page.reload");
       await page.until(
         `document.querySelector("#app").classList.contains("with-memory")===${JSON.stringify(MEMORY_CAPABILITY_FIXTURES[mode].memory.configured)} && document.querySelectorAll("#status-list .status-tab").length===2`,
       );
       await assertMemoryBrowserMode(page, mode);
-      console.log(`PASS HTTP Chrome ${mode} mode refreshes after Host restart`);
+      const tabs = await page.evaluate(
+        'Array.from(document.querySelectorAll(".status-tab"), tab => tab.dataset.sessionId)',
+      );
+      assert.deepEqual(tabs, sessionIds);
+      for (const id of sessionIds)
+        assert.equal(record(await request(`/sessions/${id}`)).runtimeState, "closed");
+      console.log(`PASS HTTP Chrome ${mode} mode keeps open, sleeping tabs after Host restart`);
     }
 
     await restartIn("current");
@@ -2643,6 +2657,7 @@ async function runMemoryBrowserAcceptance(
 
     await restartIn("both");
     await assertBrowserControlReachable(page, "#memory-query", "both-integrations Memory");
+    await page.type("#memory-query", "BrowserMemoryToken");
     await page.evaluate(`(()=>{
       const original=window.fetch.bind(window);
       let release=()=>{};
@@ -3265,7 +3280,7 @@ for (const mode of modes) {
     console.log(`PASS ${mode} two browsers, detach without cancellation, and explicit stop`);
     await first.call("Page.navigate", { url: browserOrigin });
     await first.until(
-      `!document.querySelector("#app").hidden && document.querySelector("#session-list").textContent.includes(${JSON.stringify(longPathParts.at(-1))})`,
+      `document.querySelector("#app")?.hidden === false && document.querySelector("#session-list")?.textContent.includes(${JSON.stringify(longPathParts.at(-1))})`,
     );
     await first.until(
       'document.querySelector("#connection-badge").textContent==="Connected" && document.querySelector("#conversation").textContent.includes("Hello from the offline Pi fixture.")',
@@ -4176,24 +4191,32 @@ for (const mode of modes) {
     );
 
     const hostPort = Number(new URL(host.url).port);
+    await second.type("#message", "workspace restart draft");
     await host.close();
     host = await startHost({
       port: hostPort,
       dataDir,
       sessions: { env: environment.env, extensions: [environment.extensionPath] },
     });
-    await second.until(
-      'document.querySelector("#connection-badge").textContent==="Connected" && document.querySelectorAll(".status-tab").length===0',
-    );
-    assert.equal(record(await request(`/sessions/${currentId}`)).runtimeState, "closed");
-    await second.evaluate(
-      `Array.from(document.querySelectorAll('#session-list .name-row')).find(e=>e.textContent.includes(${JSON.stringify(longPathParts.at(-1))})).click()`,
-    );
-    await second.until(
-      'document.querySelector("#conversation").textContent.includes("Received: <img") && document.querySelectorAll(".status-tab").length===1',
-    );
     proxy?.setUpstreamPort(hostPort);
-    console.log(`PASS ${mode} host restart preserves closed history for explicit reopen`);
+    await second.until(
+      'document.querySelector("#connection-badge").textContent==="Connected" && document.querySelectorAll(".status-tab").length===1 && document.querySelector("#conversation").textContent.includes("Received: <img")',
+    );
+    const sleeping = record(await request(`/sessions/${currentId}`));
+    assert.equal(sleeping.runtimeState, "closed");
+    assert.equal(sleeping.workspaceOpen, true);
+    assert.equal(
+      await second.evaluate('document.querySelector("#message").value'),
+      "workspace restart draft",
+    );
+    await second.click("#send");
+    await second.until(
+      'document.querySelector("#conversation").textContent.includes("Received: workspace restart draft")',
+    );
+    assert.equal(record(await request(`/sessions/${currentId}`)).runtimeState, "ready");
+    console.log(
+      `PASS ${mode} host restart preserves an open tab, saved history, and draft; Send wakes Pi`,
+    );
     assert.equal(
       await second.evaluate('document.querySelector("#notice").hidden'),
       true,

@@ -38,6 +38,8 @@ function session(id: string, updatedAt = 1000): StoredSession {
     id,
     displayName: null,
     metadataRevision: 0,
+    workspaceOpen: false,
+    openedAt: null,
     requestId: id === SESSION_A ? REQUEST_A : REQUEST_B,
     payloadIdentity: HASH_A,
     directory: "/tmp/project",

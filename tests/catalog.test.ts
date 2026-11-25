@@ -24,6 +24,8 @@ function session(overrides: Partial<StoredSession> = {}): StoredSession {
     id: "session-a",
     displayName: null,
     metadataRevision: 0,
+    workspaceOpen: false,
+    openedAt: null,
     requestId: "request-a",
     payloadIdentity: "payload-a",
     directory: "/tmp/project-a",
@@ -150,7 +152,7 @@ test("schema-seven migration preserves turns and exact library references", asyn
   const migrated = await SessionCatalog.open(dataDir);
   t.after(() => migrated.close());
   const version = new DatabaseSync(databasePath);
-  assert.equal(version.prepare("PRAGMA user_version").get()?.user_version, 8);
+  assert.equal(version.prepare("PRAGMA user_version").get()?.user_version, 9);
   assert.ok(
     version
       .prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'source_observations'")
@@ -270,6 +272,8 @@ test("version-one catalogs migrate transactionally while preserving sessions and
       displayName: null,
       metadataRevision: 0,
       requestId: "22222222-2222-4222-8222-222222222222",
+      workspaceOpen: false,
+      openedAt: null,
       payloadIdentity: "payload-v1",
       directory: "/tmp/project-v1",
       provider: "test-provider",
@@ -288,7 +292,7 @@ test("version-one catalogs migrate transactionally while preserving sessions and
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 8n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 9n);
   assert.equal(
     migrated.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE name = 'turns'").get()
       ?.count,
@@ -314,6 +318,8 @@ test("version-two migration preserves sessions, turns, indexes, and foreign keys
     displayName: null,
     metadataRevision: 0,
     requestId: "22222222-2222-4222-8222-222222222222",
+    workspaceOpen: false,
+    openedAt: null,
     payloadIdentity: "payload-v2",
     directory: "/tmp/project-v2",
     provider: "test-provider",
@@ -354,7 +360,7 @@ test("version-two migration preserves sessions, turns, indexes, and foreign keys
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 8n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 9n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   const index = migrated
     .prepare("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = ?")
@@ -379,6 +385,8 @@ test("version-three migration preserves sessions and turns while adding thinking
     displayName: null,
     metadataRevision: 0,
     requestId: "22222222-2222-4222-8222-222222222222",
+    workspaceOpen: false,
+    openedAt: null,
     payloadIdentity: "payload-v3",
     directory: "/tmp/project-v3",
     provider: "test-provider",
@@ -410,7 +418,7 @@ test("version-three migration preserves sessions and turns while adding thinking
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 8n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 9n);
   assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
   assert.ok(
     migrated
@@ -467,7 +475,7 @@ test("version-five migration adds shared names without changing sessions or turn
   catalog.close();
 
   const migrated = new DatabaseSync(path, { readOnly: true, readBigInts: true });
-  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 8n);
+  assert.equal(migrated.prepare("PRAGMA user_version").get()?.user_version, 9n);
   migrated.close();
 });
 

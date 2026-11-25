@@ -7,13 +7,32 @@ import type {
   DistillStorage,
   DistillUse,
   DistillUseSource,
+  DistillWorkspaceStorage,
 } from "../integrations/distill.ts";
+import { supportsWorkspaceHolds } from "../integrations/distill.ts";
 
 const SOURCE_ACCESS_WAIT_MS = 1_000;
 const SOURCE_ACCESS_RETRY_MS = 10;
 import type { StoredSession } from "../storage/catalog.ts";
 
 type SourceSession = Pick<StoredSession, "piSessionId" | "piSessionFile" | "directory">;
+
+function sourceReference(source: SourceSession): DistillUseSource {
+  return {
+    sessionId: source.piSessionId,
+    cwd: source.directory,
+    ...(source.piSessionFile === null ? {} : { sessionFile: source.piSessionFile }),
+  };
+}
+
+function hasExited(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return typeof error === "object" && error !== null && "code" in error && error.code === "ESRCH";
+  }
+}
 
 export interface SourceReadObservation<T> {
   readonly value: T;
@@ -57,16 +76,55 @@ export class SourceAccessError extends Error {
 /** Owns Dwell's short reads and the reservations for its actual Pi children. */
 export class SessionSourceAccess {
   readonly #storage: DistillStorage | undefined;
+  readonly #workspace: DistillWorkspaceStorage | undefined;
   readonly #reads = new Set<DistillRead>();
   readonly #children = new Set<string>();
   readonly #releases = new Map<string, () => boolean>();
 
   constructor(storage?: DistillStorage) {
     this.#storage = storage;
+    this.#workspace = supportsWorkspaceHolds(storage) ? storage : undefined;
     for (const use of storage?.listPendingHostUses() ?? []) {
       if (use.state === "attached" && use.child)
         storage?.recoverHostUse(use.id, { kind: "child-exited", child: use.child });
+      else if (use.state === "opening" && hasExited(use.ownerPid))
+        storage?.recoverHostUse(use.id, { kind: "opening-abandoned" });
     }
+  }
+
+  get managesWorkspace(): boolean {
+    return this.#workspace !== undefined;
+  }
+
+  heldWorkspaceIds(): Set<string> {
+    return new Set(this.#workspace?.listWorkspaceHolds().map((hold) => hold.sessionId));
+  }
+
+  async holdWorkspace(source: SourceSession, signal?: AbortSignal): Promise<void> {
+    const workspace = this.#workspace;
+    if (!workspace) {
+      if (this.#storage)
+        throw new Error(
+          "Update the configured Distill adapter before starting hosted Pi; workspace holds are required.",
+        );
+      return;
+    }
+    const reference = sourceReference(source);
+    const deadline = Date.now() + SOURCE_ACCESS_WAIT_MS;
+    while (true) {
+      signal?.throwIfAborted();
+      if (workspace.holdWorkspaceSession(reference)) return;
+      if (Date.now() >= deadline) throw new SourceAccessError();
+      await delay(SOURCE_ACCESS_RETRY_MS, undefined, signal ? { signal } : undefined);
+    }
+  }
+
+  releaseWorkspace(source: SourceSession, leafId: string | null): void {
+    if (!this.#workspace) throw new Error("Distill workspace storage is unavailable.");
+    this.#workspace.releaseWorkspaceHold(sourceReference(source), {
+      enqueueDistill: source.piSessionFile !== null,
+      leafId,
+    });
   }
 
   async read<T>(
@@ -145,15 +203,7 @@ export class SessionSourceAccess {
   async begin(source: SourceSession, signal?: AbortSignal): Promise<OpeningSource | undefined> {
     const storage = this.#storage;
     if (!storage) return undefined;
-    const use = await this.#acquireBegin(
-      storage,
-      {
-        sessionId: source.piSessionId,
-        cwd: source.directory,
-        ...(source.piSessionFile === null ? {} : { sessionFile: source.piSessionFile }),
-      },
-      signal,
-    );
+    const use = await this.#acquireBegin(storage, sourceReference(source), signal);
     let spawned = false;
     return {
       onSpawn: (pid, closed) => {

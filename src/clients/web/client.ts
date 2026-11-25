@@ -950,8 +950,15 @@ function savedHistoryWarning(s: SessionInfo): string | null {
       return null;
   }
 }
-function runtimeOpen(s: SessionInfo): boolean {
-  return s.runtimeState !== "closed";
+function workspaceTabs(): SessionInfo[] {
+  return sessions
+    .filter((s) => s.workspaceOpen)
+    .sort(
+      (left, right) =>
+        (left.openedAt ?? 0) - (right.openedAt ?? 0) ||
+        left.createdAt - right.createdAt ||
+        left.id.localeCompare(right.id),
+    );
 }
 function nativeRunning(s: SessionInfo | undefined): string | null {
   return s?.nativeExecution?.status === "running" ? s.nativeExecution.id : null;
@@ -1031,11 +1038,12 @@ function tabSymbol(value: keyof typeof statusPaths): HTMLElement {
   return wrapper;
 }
 function synchronizeTabSlots(): void {
-  const open = new Set(sessions.filter(runtimeOpen).map((s) => s.id));
+  const ordered = workspaceTabs();
+  const open = new Set(ordered.map((s) => s.id));
   for (const id of tabSlots.keys()) if (!open.has(id)) tabSlots.delete(id);
   const used = new Set(tabSlots.values());
-  for (const s of sessions) {
-    if (!open.has(s.id) || tabSlots.has(s.id)) continue;
+  for (const s of ordered) {
+    if (tabSlots.has(s.id)) continue;
     let slot = 1;
     while (used.has(slot)) slot++;
     tabSlots.set(s.id, slot);
@@ -1043,7 +1051,7 @@ function synchronizeTabSlots(): void {
   }
 }
 function openTabIds(): string[] {
-  return sessions.filter(runtimeOpen).map((s) => s.id);
+  return workspaceTabs().map((s) => s.id);
 }
 function closeBlockedReason(): string | null {
   if (!authenticated) return "Reconnect to close a session.";
@@ -1090,10 +1098,10 @@ function navigation(): void {
     const history = savedHistoryWarning(s);
     row.title = history === null ? label(s) : `${label(s)}\n${history}`;
     row.setAttribute("aria-label", history === null ? label(s) : `${label(s)}, ${history}`);
-    row.setAttribute("aria-current", String(s.id === selected && runtimeOpen(s)));
+    row.setAttribute("aria-current", String(s.id === selected && s.workspaceOpen));
     row.disabled = !authenticated || attachments.busy || openingSessions.has(s.id);
     row.append(
-      node("span", runtimeOpen(s) ? slotNumber(s.id) : "", "sidebar-slot"),
+      node("span", s.workspaceOpen ? slotNumber(s.id) : "", "sidebar-slot"),
       node("span", label(s), "session-title"),
     );
     row.onclick = () => {
@@ -1101,8 +1109,7 @@ function navigation(): void {
     };
     listNodes.append(row);
   });
-  for (const s of sessions) {
-    if (!runtimeOpen(s)) continue;
+  for (const s of workspaceTabs()) {
     const number = slotNumber(s.id),
       selectedTab = s.id === selected,
       armed = selectedTab && closeArmedSession === s.id,
@@ -1191,7 +1198,7 @@ function navigation(): void {
     !s ||
     !authenticated ||
     s.status !== "ready" ||
-    s.runtimeState !== "ready" ||
+    !s.workspaceOpen ||
     busy ||
     sending ||
     changingModel !== null ||
@@ -1297,9 +1304,9 @@ function neighborAfterClose(id: string, previousTabs: readonly string[]): string
   }
   return openTabIds()[0] ?? null;
 }
-function reconcileClosedRuntime(id: string, previousTabs: readonly string[]): void {
+function reconcileClosedWorkspace(id: string, previousTabs: readonly string[]): void {
   const current = sessions.find((session) => session.id === id);
-  if (!current || runtimeOpen(current) || closingSession === id) return;
+  if (!current || current.workspaceOpen || closingSession === id) return;
   if (closeTarget?.id === id && closeDialog.open) {
     closeDialog.close();
     showError(new Error("This session was closed from another browser."));
@@ -1330,7 +1337,7 @@ async function prepareClose(id: string): Promise<void> {
     showError(new Error(blocked));
     return;
   }
-  if (selected !== id || !sessions.some((session) => session.id === id && runtimeOpen(session)))
+  if (selected !== id || !sessions.some((session) => session.id === id && session.workspaceOpen))
     return;
   const authentication = authAttempt,
     selectedAtStart = selectionGeneration,
@@ -1373,8 +1380,8 @@ async function prepareClose(id: string): Promise<void> {
       throw new Error("Invalid session response while preparing to close.");
     const previousTabs = updatedSession(latestSession);
     navigation();
-    if (!runtimeOpen(latestSession)) {
-      reconcileClosedRuntime(id, previousTabs);
+    if (!latestSession.workspaceOpen) {
+      reconcileClosedWorkspace(id, previousTabs);
       showError(new Error("This session was closed elsewhere."));
       return;
     }
@@ -1433,17 +1440,13 @@ async function waitForTurnAndRuntime(
     if (authentication !== authAttempt || !authenticated) return null;
     const session = await sessionSnapshot(id);
     if (authentication !== authAttempt || !authenticated) return null;
-    const previousTabs = updatedSession(session);
+    updatedSession(session);
     navigation();
     if (session.activeTurnId !== null && session.activeTurnId !== runId)
       throw new Error("A new response started. Review and close again.");
     if (!turnIsActive(turn) && session.activeTurnId === null) return session;
     if (Date.now() >= deadline)
       throw new Error("The response is still active. Review and close again.");
-    if (session.runtimeState === "closed") {
-      reconcileClosedRuntime(id, previousTabs);
-      return session;
-    }
     await new Promise<void>((resolve) => window.setTimeout(resolve, 250));
   }
 }
@@ -1532,13 +1535,13 @@ async function confirmSessionClose(): Promise<void> {
       if (sessionBusy(session)) throw new Error("A response started. Review and close again.");
     }
     if (authentication !== authAttempt || !authenticated) return;
-    if (session.runtimeState === "closed") {
+    if (!session.workspaceOpen) {
       await finishClose(target.id, previousTabs);
       return;
     }
     const value = await api(`/api/v1/sessions/${target.id}/close`, {});
     if (authentication !== authAttempt || !authenticated) return;
-    if (!isSessionInfo(value) || value.id !== target.id || value.runtimeState !== "closed")
+    if (!isSessionInfo(value) || value.id !== target.id || value.workspaceOpen)
       throw new Error("Invalid close-session response.");
     updatedSession(value);
     await finishClose(target.id, previousTabs);
@@ -1552,7 +1555,7 @@ async function confirmSessionClose(): Promise<void> {
     try {
       await refresh();
       const latest = sessions.find((session) => session.id === target.id);
-      if (latest && !runtimeOpen(latest)) await finishClose(target.id, previousTabs);
+      if (latest && !latest.workspaceOpen) await finishClose(target.id, previousTabs);
     } catch {
       /* The visible error remains; polling will refresh authoritative state. */
     }
@@ -1577,7 +1580,7 @@ async function openFromSidebar(id: string): Promise<void> {
     selectedAtStart = selectionGeneration;
   closeArmedSession = null;
   nav(false);
-  if (runtimeOpen(session) && session.runtimeState !== "failed") {
+  if (session.workspaceOpen && session.runtimeState !== "failed") {
     await select(id);
     return;
   }
@@ -2096,7 +2099,7 @@ async function stream(id: string, epoch: number): Promise<void> {
               ? modelCapabilityKey(previous.provider, previous.model)
               : null;
             const previousTabs = updatedSession(state.session);
-            if (!runtimeOpen(state.session)) reconcileClosedRuntime(id, previousTabs);
+            if (!state.session.workspaceOpen) reconcileClosedWorkspace(id, previousTabs);
             const current = activeSession();
             if (
               id === selected &&
@@ -2155,7 +2158,8 @@ async function stream(id: string, epoch: number): Promise<void> {
 }
 async function select(id: string | null): Promise<void> {
   if (selected === id) return;
-  if (id !== null && !sessions.some((session) => session.id === id && runtimeOpen(session))) return;
+  if (id !== null && !sessions.some((session) => session.id === id && session.workspaceOpen))
+    return;
   selectionGeneration++;
   closeArmedSession = null;
   modelDialog.close();
@@ -2218,7 +2222,7 @@ async function refresh(): Promise<void> {
   });
   sessionStateGeneration++;
   synchronizeTabSlots();
-  if (selected && !sessions.some((session) => session.id === selected && runtimeOpen(session))) {
+  if (selected && !sessions.some((session) => session.id === selected && session.workspaceOpen)) {
     const closedId = selected;
     if (closeTarget?.id === closedId && closingSession !== closedId && closeDialog.open) {
       closeDialog.close();
@@ -2226,7 +2230,7 @@ async function refresh(): Promise<void> {
     }
     await select(neighborAfterClose(closedId, previousTabs));
   }
-  const openSessions = sessions.filter(runtimeOpen);
+  const openSessions = workspaceTabs();
   if (!selected && openSessions.length) {
     const preferred = openSessions.find((session) => session.id === localPreferences.selected);
     await select((preferred ?? openSessions[0])?.id ?? null);

@@ -48,7 +48,12 @@ import {
   type ThinkingLevel,
 } from "../shared/thinking.ts";
 import { isTurnCreateRequest, type TurnCreateRequest, type TurnInfo } from "../shared/turns.ts";
-import { SessionCatalog, type StoredSession, type StoredTurn } from "../storage/catalog.ts";
+import {
+  SessionCatalog,
+  type StoredSession,
+  type StoredTurn,
+  type WorkspaceClose,
+} from "../storage/catalog.ts";
 import {
   InvalidCursorError,
   SessionEvents,
@@ -93,6 +98,14 @@ export interface SessionServiceOptions {
 
 const HISTORY_UNAVAILABLE = "Saved session history is unavailable.";
 const MAX_OPEN_SESSIONS = 8;
+
+function idleTimeout(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const milliseconds = Number(value);
+  if (!/^\d+$/u.test(value) || !Number.isSafeInteger(milliseconds) || milliseconds <= 0)
+    throw new Error("DWELL_IDLE_TIMEOUT_MS must be a positive integer in milliseconds, or unset.");
+  return milliseconds;
+}
 
 function turnPayloadIdentity(message: string, images: readonly ImageContent[]): string {
   const hash = createHash("sha256");
@@ -230,6 +243,9 @@ export class SessionService {
   readonly #extensions: readonly string[];
   readonly #now: () => number;
   readonly #runtimes = new Map<string, PiProcess>();
+  readonly #lastActivityAt = new WeakMap<PiProcess, number>();
+  readonly #idleTimeoutMs: number | undefined;
+  #idleTimer: ReturnType<typeof setTimeout> | undefined;
   readonly #runtimeObservers = new Map<string, () => void>();
   readonly #historyIdentity = new Map<string, HistoryIdentity>();
   readonly #nativeExecutions = new Map<string, NativeExecutionRecord>();
@@ -261,6 +277,15 @@ export class SessionService {
     this.#sessionFiles = new SessionFiles(dataDir);
     this.#sourceAccess = new SessionSourceAccess(options.distill);
     this.#env = { ...(options.env ?? process.env) };
+    this.#idleTimeoutMs = idleTimeout(this.#env.DWELL_IDLE_TIMEOUT_MS);
+    if (
+      this.#idleTimeoutMs !== undefined &&
+      options.distill &&
+      !this.#sourceAccess.managesWorkspace
+    )
+      throw new Error(
+        "Idle reclamation requires a Distill adapter with workspace holds, or standalone Dwell.",
+      );
     this.#extensions = options.extensions ?? [];
     this.#now = options.now ?? Date.now;
     this.#checkpoint = options.turnCheckpoint;
@@ -283,7 +308,17 @@ export class SessionService {
           JSON.stringify({ event: "turn_recovery", status: "interrupted", count: interrupted }),
         );
       }
-      return new SessionService(catalog, dataDir, options);
+      const service = new SessionService(catalog, dataDir, options);
+      if (service.#sourceAccess.managesWorkspace) {
+        for (const close of catalog.pendingWorkspaceCloses()) service.#finishWorkspaceClose(close);
+        const held = service.#sourceAccess.heldWorkspaceIds();
+        for (const stored of catalog.list()) {
+          if (stored.workspaceOpen) await service.#holdWorkspace(stored);
+          else if (held.has(stored.piSessionId)) catalog.setWorkspace(stored.id, service.#now());
+        }
+      }
+      service.#scheduleIdleCheck();
+      return service;
     } catch (error) {
       catalog.close();
       throw error;
@@ -446,11 +481,17 @@ export class SessionService {
     }
   }
 
-  listSessionModels(id: string): Promise<PiSessionModelOption[]> {
+  async listSessionModels(id: string): Promise<PiSessionModelOption[]> {
     try {
       this.#admit();
-      this.#stored(id);
+      const stored = this.#stored(id);
       this.#checkStorage(id);
+      if (stored.workspaceOpen && !this.#runtimes.has(id)) {
+        await this.#mutate(async () => {
+          const latest = this.#stored(id);
+          if (latest.workspaceOpen && !this.#runtimes.has(id)) await this.#open(latest);
+        });
+      }
       const runtime = this.#runtimes.get(id);
       if (!runtime || (runtime.state !== "ready" && runtime.state !== "running"))
         throw new SessionError(409, "session_not_open", "Open the session to choose a model.");
@@ -480,8 +521,14 @@ export class SessionService {
         });
       this.#sessionModelReads.set(runtime, read);
       void read.then(
-        () => this.#sessionModelReads.delete(runtime),
-        () => this.#sessionModelReads.delete(runtime),
+        () => {
+          this.#sessionModelReads.delete(runtime);
+          this.#markActivity(id);
+        },
+        () => {
+          this.#sessionModelReads.delete(runtime);
+          this.#markActivity(id);
+        },
       );
       return read;
     } catch (error) {
@@ -680,6 +727,8 @@ export class SessionService {
         piSessionFile: null,
         historyExpected: false,
         historyCheck: null,
+        workspaceOpen: true,
+        openedAt: now,
         status: "creating",
         createdAt: now,
         updatedAt: now,
@@ -805,6 +854,7 @@ export class SessionService {
           "The selected model could not be saved. Repair storage and restart the host.",
         );
       }
+      this.#markActivity(id);
       this.#publishState(id);
       return this.#view(updated);
     });
@@ -817,7 +867,7 @@ export class SessionService {
   closeSession(id: string): Promise<SessionInfo> {
     return this.#mutate(async () => {
       const stored = this.#stored(id);
-      if (this.#turns.has(id))
+      if (this.#turns.has(id) || this.#nativeExecutions.get(id)?.info.status === "running")
         throw new SessionError(
           409,
           "session_busy",
@@ -845,15 +895,45 @@ export class SessionService {
           if (!(error instanceof SessionError)) throw error;
           // File observations remain available after this optional refresh fails.
         } finally {
-          await runtime.stop();
-          this.#runtimeObservers.get(id)?.();
-          this.#runtimeObservers.delete(id);
-          this.#runtimes.delete(id);
-          this.#publishState(id);
+          await this.#stopRuntime(id, runtime);
         }
-      } else this.#publishState(id);
-      return this.#view(this.#stored(id));
+      }
+      const pending = this.#catalog
+        .pendingWorkspaceCloses()
+        .find((close) => close.sessionId === id);
+      if (pending) {
+        this.#finishWorkspaceClose(pending);
+        return this.#view(this.#stored(id));
+      }
+      if (!stored.workspaceOpen) return this.#view(this.#stored(id));
+      if (!this.#sourceAccess.managesWorkspace) {
+        const closed = this.#catalog.setWorkspace(id, null);
+        this.#publishState(id);
+        return this.#view(closed);
+      }
+      // Read the final saved boundary only after the child can no longer append.
+      const history = await this.#savedHistory(this.#stored(id), {
+        signal: this.#shutdownController.signal,
+        cancelQueuedOnly: true,
+      });
+      if (history?.incompleteTail)
+        throw new SessionError(409, "invalid_history", "The saved session boundary is incomplete.");
+      const sessionFile = history ? this.#stored(id).piSessionFile : null;
+      const leafId = history?.leafId ?? null;
+      const closed = this.#catalog.recordWorkspaceClose(id, sessionFile, leafId);
+      this.#publishState(id);
+      this.#finishWorkspaceClose({ sessionId: id, sessionFile, leafId });
+      return this.#view(closed);
     });
+  }
+
+  #finishWorkspaceClose(close: WorkspaceClose): void {
+    const stored = this.#stored(close.sessionId);
+    this.#sourceAccess.releaseWorkspace(
+      { ...stored, piSessionFile: close.sessionFile },
+      close.leafId,
+    );
+    this.#catalog.finishWorkspaceClose(close.sessionId);
   }
 
   getContext(id: string): Promise<{ messages: Record<string, unknown>[] }> {
@@ -864,6 +944,7 @@ export class SessionService {
         throw new SessionError(503, "runtime_unavailable", "Pi runtime is unavailable.");
       const messages = await runtime.getMessages();
       await this.#rememberHistory(this.#stored(id), runtime);
+      this.#markActivity(id);
       return { messages };
     });
   }
@@ -1078,6 +1159,7 @@ export class SessionService {
         historyMaterialized: this.#stored(id).historyExpected,
       };
       this.#turns.set(id, slot);
+      this.#markActivity(id);
       this.#publishState(id, true);
       setImmediate(() => {
         void this.#executeTurn(slot, request.message, images)
@@ -1486,6 +1568,7 @@ export class SessionService {
       }
       unobserve?.();
       if (this.#turns.get(id) === slot) this.#turns.delete(id);
+      this.#markActivity(id);
       this.#events.endTurn(id, slot.runId);
       this.#publishState(id, true);
     }
@@ -1557,6 +1640,7 @@ export class SessionService {
   shutdown(): Promise<void> {
     if (this.#shutdown) return this.#shutdown;
     this.#stopping = true;
+    clearTimeout(this.#idleTimer);
     let failedBeforeQueue = false;
     for (const slot of this.#turns.values()) {
       if (slot.dispatched) continue;
@@ -1697,7 +1781,8 @@ export class SessionService {
 
   #view(stored: StoredSession): SessionInfo {
     validateStored(stored);
-    const state = this.#runtimes.get(stored.id)?.state;
+    const runtime = this.#runtimes.get(stored.id);
+    const state = runtime?.state;
     return {
       id: stored.id,
       displayName: stored.displayName,
@@ -1709,6 +1794,9 @@ export class SessionService {
       piSessionId: stored.piSessionId,
       createdAt: stored.createdAt,
       updatedAt: stored.updatedAt,
+      workspaceOpen: stored.workspaceOpen,
+      openedAt: stored.openedAt,
+      idleSince: stored.workspaceOpen && runtime ? this.#idleSince(stored.id, runtime) : null,
       status: stored.status,
       runtimeState:
         state === "starting"
@@ -1761,15 +1849,55 @@ export class SessionService {
     );
   }
 
+  async #stopRuntime(id: string, runtime: PiProcess): Promise<void> {
+    await runtime.stop();
+    this.#runtimeObservers.get(id)?.();
+    this.#runtimeObservers.delete(id);
+    this.#runtimes.delete(id);
+    this.#publishState(id);
+  }
+
   async #prune(): Promise<void> {
     for (const [id, runtime] of this.#runtimes)
-      if (runtime.state === "failed" || runtime.state === "exited") {
-        await runtime.stop();
-        this.#runtimeObservers.get(id)?.();
-        this.#runtimeObservers.delete(id);
-        this.#runtimes.delete(id);
-        this.#publishState(id);
-      }
+      if (runtime.state === "failed" || runtime.state === "exited")
+        await this.#stopRuntime(id, runtime);
+  }
+
+  #markActivity(id: string): void {
+    const runtime = this.#runtimes.get(id);
+    if (runtime) this.#lastActivityAt.set(runtime, this.#now());
+  }
+
+  #idleSince(id: string, runtime: PiProcess): number | null {
+    return runtime.isIdle &&
+      !this.#turns.has(id) &&
+      this.#nativeExecutions.get(id)?.info.status !== "running"
+      ? (this.#lastActivityAt.get(runtime) ?? null)
+      : null;
+  }
+
+  #scheduleIdleCheck(): void {
+    const timeout = this.#idleTimeoutMs;
+    if (timeout === undefined || this.#stopping) return;
+    this.#idleTimer = setTimeout(
+      () => {
+        void this.#mutate(async () => {
+          for (const [id, runtime] of this.#runtimes) {
+            if (this.#stopping) break;
+            const since = this.#idleSince(id, runtime);
+            if (since !== null && this.#now() - since >= timeout && this.#stored(id).workspaceOpen)
+              await this.#stopRuntime(id, runtime);
+          }
+        })
+          .catch(() => {
+            if (!this.#stopping)
+              console.error(JSON.stringify({ event: "idle_reclamation", status: "failed" }));
+          })
+          .finally(() => this.#scheduleIdleCheck());
+      },
+      Math.min(timeout, 1000),
+    );
+    this.#idleTimer.unref();
   }
 
   async #checkHistory<T>(
@@ -2061,6 +2189,7 @@ export class SessionService {
 
   #observeRuntime(sessionId: string, runtime: PiProcess): void {
     const unobserveState = runtime.subscribeState(() => {
+      this.#markActivity(sessionId);
       this.#publishState(sessionId);
     });
     let nativeWasActiveOnAttach = runtime.activeExecution?.source === "native";
@@ -2094,6 +2223,7 @@ export class SessionService {
   }
 
   #nativeExecutionEvent(sessionId: string, event: NativeExecutionEvent, startedLate = false): void {
+    this.#markActivity(sessionId);
     if (event.type === "started") {
       const current = this.#nativeExecutions.get(sessionId);
       if (current?.info.id === event.executionId && current.info.status === "running") return;
@@ -2291,10 +2421,23 @@ export class SessionService {
     }
   }
 
+  async #holdWorkspace(stored: StoredSession, signal?: AbortSignal): Promise<void> {
+    try {
+      await this.#sourceAccess.holdWorkspace(stored, signal);
+    } catch (error) {
+      if (error instanceof SourceAccessError)
+        throw new SessionError(503, "source_busy", error.message);
+      throw error;
+    }
+  }
+
   async #open(stored: StoredSession, options: { signal?: AbortSignal } = {}): Promise<SessionInfo> {
     if (options.signal?.aborted) throw options.signal.reason;
     const existing = this.#runtimes.get(stored.id);
-    if (existing && existing.state === "ready") return this.#view(stored);
+    if (existing && existing.state === "ready") {
+      this.#markActivity(stored.id);
+      return this.#view(stored);
+    }
     if (existing && existing.state === "running")
       throw new SessionError(409, "session_busy", "The session is running.");
     await this.#prune();
@@ -2312,6 +2455,10 @@ export class SessionService {
         "directory_changed",
         "The saved project directory now resolves to a different location.",
       );
+    const pending = this.#catalog
+      .pendingWorkspaceCloses()
+      .find((close) => close.sessionId === stored.id);
+    if (pending) this.#finishWorkspaceClose(pending);
     let opening: OpeningSource | undefined;
     try {
       opening = await this.#sourceAccess.begin(stored, options.signal);
@@ -2339,6 +2486,14 @@ export class SessionService {
       const historyIdentity = this.#identityForHistory(
         history.state === "readable" ? history.value : undefined,
       );
+      await this.#holdWorkspace(
+        { ...stored, piSessionFile: resumeFile ?? stored.piSessionFile },
+        options.signal,
+      );
+      if (!stored.workspaceOpen) {
+        stored = this.#catalog.setWorkspace(stored.id, this.#now());
+        this.#publishState(stored.id);
+      }
       if (options.signal?.aborted) throw options.signal.reason;
       let runtime: PiProcess;
       try {
@@ -2428,6 +2583,7 @@ export class SessionService {
           historyExpected: latest.historyExpected,
         };
         this.#catalog.update(ready);
+        this.#markActivity(stored.id);
         this.#publishState(stored.id);
         return this.#view(ready);
       } catch (error) {

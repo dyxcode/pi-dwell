@@ -71,16 +71,28 @@ test("sessions start without Pi configuration and create/reopen empty identities
   assert.equal(first.status, "ready");
   assert.equal(first.runtimeState, "ready");
   assert.equal(first.historyState, "empty");
+  assert.equal(first.workspaceOpen, true);
+  assert.equal(typeof first.openedAt, "number");
   await service.shutdown();
   const restored = await SessionService.create(options);
   t.after(() => restored.shutdown());
   assert.equal(restored.listSessions()[0]?.id, first.id);
   assert.equal(restored.listSessions()[0]?.runtimeState, "closed");
+  assert.equal(restored.getSession(first.id).workspaceOpen, true);
+  assert.equal(restored.getSession(first.id).openedAt, first.openedAt);
+  assert.equal(restored.runtimeCount, 0);
+  await restored.getHistory(first.id);
+  assert.equal(restored.runtimeCount, 0);
   const reopened = await restored.openSession(first.id);
   assert.equal(reopened.piSessionId, first.piSessionId);
   assert.deepEqual(await restored.getContext(first.id), { messages: [] });
-  await restored.closeSession(first.id);
+  const closed = await restored.closeSession(first.id);
+  assert.equal(closed.workspaceOpen, false);
+  assert.equal(closed.openedAt, null);
   await restored.shutdown();
+  const afterClose = await SessionService.create(options);
+  t.after(() => afterClose.shutdown());
+  assert.equal(afterClose.getSession(first.id).workspaceOpen, false);
 });
 
 test("session names are host-owned, revisioned and separate from Pi history", async (t) => {

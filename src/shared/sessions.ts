@@ -52,6 +52,10 @@ export interface SessionInfo {
   piSessionId: string;
   createdAt: number;
   updatedAt: number;
+  workspaceOpen: boolean;
+  openedAt: number | null;
+  /** Timestamp when the live child last became idle; a sleeping workspace has no live idle clock. */
+  idleSince: number | null;
   status: "creating" | "ready" | "failed" | "interrupted";
   runtimeState: "closed" | "opening" | "ready" | "failed" | "closing";
   historyState: "empty" | "available" | "unavailable" | "retired";
@@ -119,6 +123,20 @@ export function isSessionInfo(value: unknown): value is SessionInfo {
     "updatedAt" in value &&
     typeof value.updatedAt === "number" &&
     Number.isSafeInteger(value.updatedAt) &&
+    "workspaceOpen" in value &&
+    "openedAt" in value &&
+    (value.workspaceOpen === false
+      ? value.openedAt === null
+      : value.workspaceOpen === true &&
+        typeof value.openedAt === "number" &&
+        Number.isSafeInteger(value.openedAt) &&
+        value.openedAt >= 0) &&
+    "idleSince" in value &&
+    (value.idleSince === null ||
+      (value.workspaceOpen === true &&
+        typeof value.idleSince === "number" &&
+        Number.isSafeInteger(value.idleSince) &&
+        value.idleSince >= 0)) &&
     "status" in value &&
     typeof value.status === "string" &&
     ["creating", "ready", "failed", "interrupted"].includes(value.status) &&

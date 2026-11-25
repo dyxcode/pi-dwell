@@ -63,6 +63,10 @@ export class PiRpc {
     });
   }
 
+  get hasPendingRequest(): boolean {
+    return this.#pending.size !== 0;
+  }
+
   request(command: string, fields: Record<string, unknown> = {}): Promise<unknown> {
     if (this.#closed) return Promise.reject(this.#closed);
     if (this.#pending.size >= 32)

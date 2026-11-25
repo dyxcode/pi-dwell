@@ -61,7 +61,24 @@ export interface DistillUse {
   releaseAfterClose(child: DistillChild): boolean;
 }
 
-export interface DistillStorage {
+export interface DistillWorkspaceHold {
+  readonly sessionId: string;
+  readonly sessionFile: string | null;
+  readonly cwd: string;
+  readonly sourceGeneration: string | null;
+  readonly createdAt: number;
+}
+
+export interface DistillWorkspaceStorage {
+  holdWorkspaceSession(source: DistillUseSource): DistillWorkspaceHold | undefined;
+  releaseWorkspaceHold(
+    source: DistillUseSource,
+    options: { enqueueDistill: boolean; leafId: string | null },
+  ): boolean;
+  listWorkspaceHolds(): readonly DistillWorkspaceHold[];
+}
+
+export interface DistillStorage extends Partial<DistillWorkspaceStorage> {
   readonly version: 1;
   acquireSourceRead(source: DistillSource): DistillRead | undefined;
   beginHostUse(source: DistillUseSource): DistillUse | undefined;
@@ -69,6 +86,16 @@ export interface DistillStorage {
   recoverHostUse(id: string, evidence: DistillRecovery): boolean;
   getCompletedDeletion(source: DistillSource): DistillDeletionReceipt | undefined;
   close(): void;
+}
+
+export function supportsWorkspaceHolds(
+  storage: DistillStorage | undefined,
+): storage is DistillStorage & DistillWorkspaceStorage {
+  return (
+    typeof storage?.holdWorkspaceSession === "function" &&
+    typeof storage.releaseWorkspaceHold === "function" &&
+    typeof storage.listWorkspaceHolds === "function"
+  );
 }
 
 function isDistillStorage(value: unknown): value is DistillStorage {
@@ -80,7 +107,15 @@ function isDistillStorage(value: unknown): value is DistillStorage {
     typeof value.listPendingHostUses === "function" &&
     typeof value.recoverHostUse === "function" &&
     typeof value.getCompletedDeletion === "function" &&
-    typeof value.close === "function"
+    typeof value.close === "function" &&
+    (!(
+      "holdWorkspaceSession" in value ||
+      "releaseWorkspaceHold" in value ||
+      "listWorkspaceHolds" in value
+    ) ||
+      (typeof value.holdWorkspaceSession === "function" &&
+        typeof value.releaseWorkspaceHold === "function" &&
+        typeof value.listWorkspaceHolds === "function"))
   );
 }
 

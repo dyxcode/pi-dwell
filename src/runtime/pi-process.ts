@@ -411,6 +411,15 @@ export class PiProcess {
     return this.#stderr;
   }
 
+  get isIdle(): boolean {
+    return (
+      this.#state === "ready" &&
+      !this.#run &&
+      !this.#rpc.hasPendingRequest &&
+      this.#dialogs.size === 0
+    );
+  }
+
   get activeExecution(): ActiveExecution | undefined {
     const run = this.#run;
     if (!run) return undefined;

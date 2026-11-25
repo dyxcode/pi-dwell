@@ -30,10 +30,18 @@ export interface StoredSession {
   piSessionFile: string | null;
   historyExpected: boolean;
   historyCheck: HistoryCheck | null;
+  workspaceOpen: boolean;
+  openedAt: number | null;
   status: "creating" | "ready" | "failed" | "interrupted";
   createdAt: number;
   updatedAt: number;
   error: string | null;
+}
+
+export interface WorkspaceClose {
+  sessionId: string;
+  sessionFile: string | null;
+  leafId: string | null;
 }
 
 export interface StoredSourceObservation {
@@ -45,7 +53,8 @@ export interface StoredTurn extends TurnInfo {
   payloadIdentity: string;
 }
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
+const V8_SCHEMA_VERSION = 8;
 const V1_SCHEMA_VERSION = 1;
 const V2_SCHEMA_VERSION = 2;
 const V3_SCHEMA_VERSION = 3;
@@ -54,11 +63,12 @@ const V5_SCHEMA_VERSION = 5;
 const V6_SCHEMA_VERSION = 6;
 const V7_SCHEMA_VERSION = 7;
 const DATABASE_NAME = "catalog.sqlite";
-const SESSION_COLUMNS = `
+const V8_SESSION_COLUMNS = `
   id, request_id, payload_identity, directory, provider, model, pi_session_id,
   pi_session_file, history_expected, status, created_at, updated_at, error,
   thinking_level, history_check_state, history_checked_at, display_name, metadata_revision
 `;
+const SESSION_COLUMNS = `${V8_SESSION_COLUMNS}, workspace_open, opened_at`;
 const V5_SESSION_COLUMNS = `
   id, request_id, payload_identity, directory, provider, model, pi_session_id,
   pi_session_file, history_expected, status, created_at, updated_at, error,
@@ -86,8 +96,16 @@ const V5_SESSIONS_SCHEMA =
   "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, thinking_level TEXT CHECK (thinking_level IS NULL OR thinking_level IN ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')), history_check_state TEXT CHECK (history_check_state IS NULL OR history_check_state IN ('not-created', 'readable', 'missing', 'invalid')), history_checked_at INTEGER, CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT";
 const V7_SESSIONS_SCHEMA =
   "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, thinking_level TEXT CHECK (thinking_level IS NULL OR thinking_level IN ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')), history_check_state TEXT CHECK (history_check_state IS NULL OR history_check_state IN ('not-created', 'readable', 'missing', 'invalid')), history_checked_at INTEGER, display_name TEXT CHECK (display_name IS NULL OR (length(display_name) BETWEEN 1 AND 80 AND instr(display_name, char(0)) = 0)), metadata_revision INTEGER NOT NULL DEFAULT 0 CHECK (metadata_revision >= 0), CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT";
-const SESSIONS_SCHEMA =
+const V8_SESSIONS_SCHEMA =
   "CREATE TABLE sessions (id TEXT NOT NULL PRIMARY KEY CHECK (length(id) > 0), request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) > 0), directory TEXT NOT NULL CHECK (length(directory) > 0), provider TEXT CHECK (provider IS NULL OR length(provider) > 0), model TEXT CHECK (model IS NULL OR length(model) > 0), pi_session_id TEXT NOT NULL CHECK (length(pi_session_id) > 0), pi_session_file TEXT CHECK (pi_session_file IS NULL OR length(pi_session_file) > 0), history_expected INTEGER NOT NULL CHECK (history_expected IN (0, 1)), status TEXT NOT NULL CHECK (status IN ('creating', 'ready', 'failed', 'interrupted')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error TEXT, thinking_level TEXT CHECK (thinking_level IS NULL OR thinking_level IN ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')), history_check_state TEXT CHECK (history_check_state IS NULL OR history_check_state IN ('not-created', 'readable', 'missing', 'invalid', 'retired')), history_checked_at INTEGER, display_name TEXT CHECK (display_name IS NULL OR (length(display_name) BETWEEN 1 AND 80 AND instr(display_name, char(0)) = 0)), metadata_revision INTEGER NOT NULL DEFAULT 0 CHECK (metadata_revision >= 0), CHECK ((provider IS NULL) = (model IS NULL)), CHECK (status != 'ready' OR provider IS NOT NULL)) STRICT";
+const WORKSPACE_OPEN_COLUMN =
+  "workspace_open INTEGER NOT NULL DEFAULT 0 CHECK (workspace_open IN (0, 1))";
+const OPENED_AT_COLUMN =
+  "opened_at INTEGER CHECK ((opened_at IS NOT NULL) = workspace_open AND (opened_at IS NULL OR opened_at >= 0))";
+const SESSIONS_SCHEMA = V8_SESSIONS_SCHEMA.replace(
+  ", CHECK ((provider IS NULL)",
+  `, ${WORKSPACE_OPEN_COLUMN}, ${OPENED_AT_COLUMN}, CHECK ((provider IS NULL)`,
+);
 const TURNS_SCHEMA =
   "CREATE TABLE turns (run_id TEXT NOT NULL PRIMARY KEY CHECK (length(run_id) > 0), session_id TEXT NOT NULL REFERENCES sessions(id), request_id TEXT NOT NULL CHECK (length(request_id) > 0), payload_identity TEXT NOT NULL CHECK (length(payload_identity) = 64), status TEXT NOT NULL CHECK (status IN ('accepted', 'dispatching', 'running', 'completed', 'failed', 'aborted', 'interrupted')), cancellation_requested INTEGER NOT NULL CHECK (cancellation_requested IN (0, 1)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, error_code TEXT, error_message TEXT, entry_ids TEXT NOT NULL CHECK (json_valid(entry_ids)), UNIQUE (session_id, request_id), CHECK ((error_code IS NULL AND error_message IS NULL) OR (length(error_code) > 0 AND length(error_message) > 0))) STRICT";
 const ACTIVE_TURN_INDEX =
@@ -100,6 +118,9 @@ const SESSION_LIBRARY_REFERENCES_SCHEMA =
   "CREATE TABLE session_library_references (session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, binding TEXT NOT NULL REFERENCES library_bindings(binding), item_id TEXT NOT NULL CHECK (length(item_id) = 36), version_id TEXT NOT NULL CHECK (length(version_id) = 36), PRIMARY KEY (session_id, binding, item_id, version_id)) STRICT";
 const SOURCE_OBSERVATIONS_SCHEMA =
   "CREATE TABLE source_observations (session_id TEXT NOT NULL PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, generation TEXT CHECK (generation IS NULL OR length(generation) > 0), deletion_intent TEXT CHECK (deletion_intent IS NULL OR length(deletion_intent) > 0), CHECK (generation IS NOT NULL OR deletion_intent IS NULL)) STRICT";
+
+const WORKSPACE_CLOSES_SCHEMA =
+  "CREATE TABLE workspace_closes (session_id TEXT NOT NULL PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, session_file TEXT CHECK (session_file IS NULL OR length(session_file) > 0), leaf_id TEXT CHECK (leaf_id IS NULL OR (session_file IS NOT NULL AND length(leaf_id) > 0))) STRICT";
 
 const SESSION_STATUSES = new Set(["creating", "ready", "failed", "interrupted"]);
 const TURN_STATUSES = new Set<string>([
@@ -206,6 +227,10 @@ function isStoredSession(value: unknown): value is StoredSession {
     !("historyExpected" in value) ||
     !Object.hasOwn(value, "historyCheck") ||
     !("historyCheck" in value) ||
+    !Object.hasOwn(value, "workspaceOpen") ||
+    !("workspaceOpen" in value) ||
+    !Object.hasOwn(value, "openedAt") ||
+    !("openedAt" in value) ||
     !Object.hasOwn(value, "status") ||
     !("status" in value) ||
     !Object.hasOwn(value, "createdAt") ||
@@ -217,7 +242,7 @@ function isStoredSession(value: unknown): value is StoredSession {
   ) {
     return false;
   }
-  if (Object.keys(value).length !== 17) {
+  if (Object.keys(value).length !== 19) {
     return false;
   }
   return (
@@ -235,6 +260,11 @@ function isStoredSession(value: unknown): value is StoredSession {
     isNullableNonEmptyString(value.piSessionFile) &&
     typeof value.historyExpected === "boolean" &&
     (value.historyCheck === null || isHistoryCheck(value.historyCheck)) &&
+    (value.workspaceOpen === false
+      ? value.openedAt === null
+      : value.workspaceOpen === true &&
+        isSafeIntegerValue(value.openedAt) &&
+        value.openedAt >= 0) &&
     isSessionStatus(value.status) &&
     (value.status !== "ready" ||
       (isNonEmptyString(value.provider) && isNonEmptyString(value.model))) &&
@@ -415,6 +445,14 @@ function sessionFromDatabase(row: Record<string, SQLOutputValue>): StoredSession
   if ((historyExpected !== 0 && historyExpected !== 1) || !isSessionStatus(status)) {
     throw invalidCatalog("session status or history flag is invalid");
   }
+  const workspaceOpen = integerFromDatabase(row, "workspace_open");
+  const openedAt = row.opened_at === null ? null : integerFromDatabase(row, "opened_at");
+  if (
+    workspaceOpen === 0
+      ? openedAt !== null
+      : workspaceOpen !== 1 || openedAt === null || openedAt < 0
+  )
+    throw invalidCatalog("workspace state is invalid");
   const session: StoredSession = {
     id: stringFromDatabase(row, "id"),
     displayName: nullableStringFromDatabase(row, "display_name"),
@@ -429,6 +467,8 @@ function sessionFromDatabase(row: Record<string, SQLOutputValue>): StoredSession
     piSessionFile: nullableStringFromDatabase(row, "pi_session_file"),
     historyExpected: historyExpected === 1,
     historyCheck: nullableHistoryCheckFromDatabase(row),
+    workspaceOpen: workspaceOpen === 1,
+    openedAt,
     status,
     createdAt: integerFromDatabase(row, "created_at"),
     updatedAt: integerFromDatabase(row, "updated_at"),
@@ -511,7 +551,7 @@ function hasUserSchema(database: DatabaseSync): boolean {
   );
 }
 
-function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8): void {
+function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9): void {
   const rows = databaseRows(
     database,
     "SELECT type, name, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -527,8 +567,10 @@ function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4 | 5 | 6 | 7
             ? V5_SESSIONS_SCHEMA
             : version === V6_SCHEMA_VERSION || version === V7_SCHEMA_VERSION
               ? V7_SESSIONS_SCHEMA
-              : SESSIONS_SCHEMA;
-  const hasLibraryTables = version === V7_SCHEMA_VERSION || version === SCHEMA_VERSION;
+              : version === V8_SCHEMA_VERSION
+                ? V8_SESSIONS_SCHEMA
+                : SESSIONS_SCHEMA;
+  const hasLibraryTables = version >= V7_SCHEMA_VERSION;
   const expected =
     version === V1_SCHEMA_VERSION
       ? [
@@ -551,10 +593,13 @@ function verifySchema(database: DatabaseSync, version: 1 | 2 | 3 | 4 | 5 | 6 | 7
               ]
             : []),
           { type: "table", name: "sessions", sql: sessionSchema },
-          ...(version === SCHEMA_VERSION
+          ...(version >= V8_SCHEMA_VERSION
             ? [{ type: "table", name: "source_observations", sql: SOURCE_OBSERVATIONS_SCHEMA }]
             : []),
           { type: "table", name: "turns", sql: TURNS_SCHEMA },
+          ...(version === SCHEMA_VERSION
+            ? [{ type: "table", name: "workspace_closes", sql: WORKSPACE_CLOSES_SCHEMA }]
+            : []),
         ];
   if (
     rows.length !== expected.length ||
@@ -637,9 +682,9 @@ function migrateV7ToV8(database: DatabaseSync): void {
   database.exec("ALTER TABLE session_library_references RENAME TO session_library_references_v7");
   database.exec("ALTER TABLE turns RENAME TO turns_v7");
   database.exec("ALTER TABLE sessions RENAME TO sessions_v7");
-  database.exec(SESSIONS_SCHEMA);
+  database.exec(V8_SESSIONS_SCHEMA);
   database.exec(
-    `INSERT INTO sessions (${SESSION_COLUMNS}) SELECT ${SESSION_COLUMNS} FROM sessions_v7`,
+    `INSERT INTO sessions (${V8_SESSION_COLUMNS}) SELECT ${V8_SESSION_COLUMNS} FROM sessions_v7`,
   );
   database.exec(TURNS_SCHEMA);
   database.exec(`INSERT INTO turns (${TURN_COLUMNS}) SELECT ${TURN_COLUMNS} FROM turns_v7`);
@@ -652,6 +697,14 @@ function migrateV7ToV8(database: DatabaseSync): void {
   database.exec("DROP TABLE sessions_v7");
   database.exec(ACTIVE_TURN_INDEX);
   database.exec(SOURCE_OBSERVATIONS_SCHEMA);
+  database.exec(`PRAGMA user_version = ${V8_SCHEMA_VERSION}`);
+  verifySchema(database, V8_SCHEMA_VERSION);
+}
+
+function migrateV8ToV9(database: DatabaseSync): void {
+  database.exec(`ALTER TABLE sessions ADD COLUMN ${WORKSPACE_OPEN_COLUMN}`);
+  database.exec(`ALTER TABLE sessions ADD COLUMN ${OPENED_AT_COLUMN}`);
+  database.exec(WORKSPACE_CLOSES_SCHEMA);
   database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   verifySchema(database, SCHEMA_VERSION);
 }
@@ -674,6 +727,7 @@ function initializeSchema(database: DatabaseSync): void {
         database.exec(LIBRARY_BINDINGS_SCHEMA);
         database.exec(SESSION_LIBRARY_REFERENCES_SCHEMA);
         database.exec(SOURCE_OBSERVATIONS_SCHEMA);
+        database.exec(WORKSPACE_CLOSES_SCHEMA);
         database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
         verifySchema(database, SCHEMA_VERSION);
       } else if (version === V1_SCHEMA_VERSION) {
@@ -714,6 +768,8 @@ function initializeSchema(database: DatabaseSync): void {
         migrateV6ToV7(database);
       } else if (version === V7_SCHEMA_VERSION) {
         verifySchema(database, V7_SCHEMA_VERSION);
+      } else if (version === V8_SCHEMA_VERSION) {
+        verifySchema(database, V8_SCHEMA_VERSION);
       } else if (version === SCHEMA_VERSION) {
         verifySchema(database, SCHEMA_VERSION);
       } else {
@@ -722,8 +778,10 @@ function initializeSchema(database: DatabaseSync): void {
 
       const latestVersion = database.prepare("PRAGMA user_version").get();
       if (!latestVersion) throw invalidCatalog("schema version is missing");
-      if (integerFromDatabase(latestVersion, "user_version") === V7_SCHEMA_VERSION)
-        migrateV7ToV8(database);
+      const migratedVersion = integerFromDatabase(latestVersion, "user_version");
+      if (migratedVersion === V7_SCHEMA_VERSION) migrateV7ToV8(database);
+      if (migratedVersion === V7_SCHEMA_VERSION || migratedVersion === V8_SCHEMA_VERSION)
+        migrateV8ToV9(database);
 
       const foreignKeyErrors = databaseRows(database, "PRAGMA foreign_key_check");
       if (foreignKeyErrors.length > 0)
@@ -915,7 +973,7 @@ export class SessionCatalog {
     validateRecord(record);
     this.database
       .prepare(
-        `INSERT INTO sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         record.id,
@@ -936,7 +994,57 @@ export class SessionCatalog {
         record.historyCheck?.checkedAt ?? null,
         record.displayName,
         record.metadataRevision,
+        record.workspaceOpen ? 1 : 0,
+        record.openedAt,
       );
+  }
+
+  setWorkspace(id: string, openedAt: number | null): StoredSession {
+    if (openedAt !== null && (!Number.isSafeInteger(openedAt) || openedAt < 0))
+      throw new TypeError("Invalid workspace opening timestamp.");
+    const row = this.database
+      .prepare(
+        `UPDATE sessions SET workspace_open = ?, opened_at = CASE WHEN ? IS NULL THEN NULL ELSE COALESCE(opened_at, ?) END WHERE id = ? RETURNING ${SESSION_COLUMNS}`,
+      )
+      .get(openedAt === null ? 0 : 1, openedAt, openedAt, id);
+    if (!row) throw new Error(`Cannot update workspace for missing session: ${id}.`);
+    return sessionFromDatabase(row);
+  }
+
+  recordWorkspaceClose(
+    id: string,
+    sessionFile: string | null,
+    leafId: string | null,
+  ): StoredSession {
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const closed = this.setWorkspace(id, null);
+      this.database
+        .prepare(
+          "INSERT INTO workspace_closes (session_id, session_file, leaf_id) VALUES (?, ?, ?)",
+        )
+        .run(id, sessionFile, leafId);
+      this.database.exec("COMMIT");
+      return closed;
+    } catch (error) {
+      if (this.database.isTransaction) this.database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  pendingWorkspaceCloses(): WorkspaceClose[] {
+    return databaseRows(
+      this.database,
+      "SELECT session_id, session_file, leaf_id FROM workspace_closes",
+    ).map((row) => ({
+      sessionId: stringFromDatabase(row, "session_id"),
+      sessionFile: nullableStringFromDatabase(row, "session_file"),
+      leafId: nullableStringFromDatabase(row, "leaf_id"),
+    }));
+  }
+
+  finishWorkspaceClose(id: string): void {
+    this.database.prepare("DELETE FROM workspace_closes WHERE session_id = ?").run(id);
   }
 
   rename(

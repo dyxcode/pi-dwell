@@ -113,6 +113,8 @@ function sessionRecord(input: {
     id: input.id,
     displayName: "Synthetic retirement session",
     metadataRevision: 4,
+    workspaceOpen: false,
+    openedAt: null,
     requestId: randomUUID(),
     payloadIdentity: "b".repeat(64),
     directory: input.directory,

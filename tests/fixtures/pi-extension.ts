@@ -272,6 +272,21 @@ function scriptedStream(
     }
 
     const prompt = latestUserText(context);
+    if (process.env.DWELL_TEST_DISTILL_EXTRACTION === "1") {
+      const text = context.messages
+        .flatMap((item) => ("content" in item ? [contentText(item.content)] : []))
+        .join("\n");
+      const key = text.match(/"key"\s*:\s*"([^"\n]+)"/u)?.[1];
+      if (key) {
+        const extraction = JSON.stringify({
+          operations: [
+            { action: "create", content: "Synthetic Dwell workspace memory.", sourceKeys: [key] },
+          ],
+        });
+        emitText(stream, message, extraction, [extraction]);
+        return;
+      }
+    }
     const lastUser = [...context.messages].reverse().find((item) => item.role === "user");
     const attached =
       lastUser && Array.isArray(lastUser.content)
@@ -418,8 +433,8 @@ export default function registerDwellFixture(pi: ExtensionAPI): void {
         input: ["text"],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         reasoning: false,
-        contextWindow: 4096,
-        maxTokens: 256,
+        contextWindow: process.env.DWELL_TEST_DISTILL_EXTRACTION === "1" ? 32768 : 4096,
+        maxTokens: process.env.DWELL_TEST_DISTILL_EXTRACTION === "1" ? 8192 : 256,
       },
       {
         id: ALT_MODEL,

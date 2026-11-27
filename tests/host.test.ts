@@ -175,3 +175,31 @@ test("Host, Origin, CSRF, media type, and body sizes are enforced", async (t) =>
     413,
   );
 });
+
+test("the browser page preserves same-origin POST Origin without accepting null Origin", async (t) => {
+  const dataDir = await directory(t);
+  const host = await startHost({ port: 0, dataDir });
+  t.after(() => host.close());
+  const page = await fetch(`${host.url}/`);
+  assert.equal(page.status, 200);
+  await page.text();
+  assert.equal(page.headers.get("referrer-policy"), "same-origin");
+
+  const post = (origin: string) =>
+    fetch(`${host.url}/api/v1/memory/list`, {
+      method: "POST",
+      headers: {
+        Origin: origin,
+        "Sec-Fetch-Site": "same-origin",
+        "X-Dwell-Request": "1",
+        "Content-Type": "application/json",
+      },
+      body: "{",
+    });
+  const rejected = await post("null");
+  assert.equal(rejected.status, 403);
+  assert.equal((await rejected.json()).error.code, "forbidden_origin");
+  const admitted = await post(host.url);
+  assert.equal(admitted.status, 400);
+  assert.equal((await admitted.json()).error.code, "invalid_json");
+});

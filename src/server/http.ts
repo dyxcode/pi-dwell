@@ -224,7 +224,7 @@ export async function startHost({
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("X-Content-Type-Options", "nosniff");
-    response.setHeader("Referrer-Policy", "no-referrer");
+    response.setHeader("Referrer-Policy", "same-origin");
     response.setHeader(
       "Content-Security-Policy",
       "default-src 'none'; script-src 'self'; style-src 'self'; img-src blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",

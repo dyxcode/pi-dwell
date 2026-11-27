@@ -95,7 +95,17 @@ const confirmClose = el("confirm-session-close", HTMLButtonElement);
 const modelDialog = el("model-dialog", HTMLDialogElement);
 const modelSearch = el("model-search", HTMLInputElement);
 const chooseModel = el("choose-model", HTMLButtonElement);
-const libraryDialog = el("library-dialog", HTMLDialogElement);
+const libraryView = el("library-view", HTMLElement);
+const libraryQuery = el("library-query", HTMLInputElement);
+const knowledgeTabs = el("knowledge-tabs", HTMLElement);
+const memoryTab = el("memory-tab", HTMLButtonElement);
+const libraryTab = el("library-tab", HTMLButtonElement);
+const openNav = el("open-nav", HTMLButtonElement);
+const closeNav = el("close-nav", HTMLButtonElement);
+const viewport = matchMedia("(max-width:760px)");
+type SidebarView = "conversations" | "memory" | "library";
+let sidebarView: SidebarView = "conversations";
+let drawerOpen = false;
 const libraryItems = el("library-items", HTMLElement);
 const libraryReferences = el("library-references", HTMLElement);
 const libraryError = el("library-error", HTMLElement);
@@ -108,7 +118,8 @@ const memorySearchMore = el("memory-search-more", HTMLButtonElement);
 const memoryReadMore = el("memory-read-more", HTMLButtonElement);
 const memoryRetry = el("memory-retry", HTMLButtonElement);
 let libraryReadGeneration = 0;
-let libraryDialogGeneration = 0;
+let libraryViewGeneration = 0;
+let libraryReferencesSession: string | null = null;
 let libraryReferencesGeneration = 0;
 let libraryReferenceMutationPending = false;
 let currentLibraryItem: LibraryItemView | null = null;
@@ -345,7 +356,8 @@ function renderLibraryReader(): void {
   const attached = currentLibraryReferences.some((reference) =>
     sameLibraryReference(reference, item.reference),
   );
-  action.disabled = selected === null || libraryReferenceMutationPending;
+  action.disabled =
+    selected === null || selected !== libraryReferencesSession || libraryReferenceMutationPending;
   action.textContent =
     selected === null
       ? "Select a session to attach"
@@ -356,11 +368,12 @@ function renderLibraryReader(): void {
 }
 async function loadLibraryReferences(): Promise<void> {
   const sessionId = selected;
-  const dialogAttempt = libraryDialogGeneration;
+  const viewAttempt = libraryViewGeneration;
   const attempt = ++libraryReferencesGeneration;
-  libraryError.textContent = "";
+  libraryReferencesSession = null;
   currentLibraryReferences = [];
   renderLibraryReferences();
+  renderLibraryReader();
   el("library-session-label", HTMLElement).textContent = sessionId
     ? `Session ${sessionId.slice(0, 8)}`
     : "Browse saved content without attaching it to a session.";
@@ -368,113 +381,72 @@ async function loadLibraryReferences(): Promise<void> {
   try {
     const value = await api(`/api/v1/sessions/${sessionId}/library-references`);
     if (
-      !libraryDialog.open ||
-      dialogAttempt !== libraryDialogGeneration ||
+      viewAttempt !== libraryViewGeneration ||
       attempt !== libraryReferencesGeneration ||
       selected !== sessionId
     )
       return;
     if (!isLibraryReferencesResponse(value)) throw new Error("Invalid saved library references.");
+    libraryReferencesSession = sessionId;
     currentLibraryReferences = value.references;
     renderLibraryReferences();
     renderLibraryReader();
   } catch (error) {
-    if (
-      attempt === libraryReferencesGeneration &&
-      dialogAttempt === libraryDialogGeneration &&
-      libraryDialog.open
-    )
+    if (attempt === libraryReferencesGeneration && viewAttempt === libraryViewGeneration)
       libraryFailure(error);
   }
 }
-async function loadLatestLibraryItems(): Promise<void> {
-  const dialogAttempt = libraryDialogGeneration;
-  const sessionId = selected;
+async function loadLibraryItems(query: string): Promise<void> {
   const attempt = ++libraryReadGeneration;
   libraryError.textContent = "";
-  el("library-items-title", HTMLElement).textContent = "Latest items";
+  libraryItems.replaceChildren();
+  currentLibraryItem = null;
+  renderLibraryReader();
+  el("library-items-title", HTMLElement).textContent = query ? "Search results" : "Latest items";
   try {
-    const value = await api("/api/v1/library/latest");
-    if (
-      !libraryDialog.open ||
-      dialogAttempt !== libraryDialogGeneration ||
-      selected !== sessionId ||
-      attempt !== libraryReadGeneration
-    )
-      return;
-    if (!isLibraryLatestResponse(value)) throw new Error("Invalid Current library response.");
-    renderLibraryItems(value.items);
+    const value = query
+      ? await api("/api/v1/library/search", { query })
+      : await api("/api/v1/library/latest");
+    if (attempt !== libraryReadGeneration) return;
+    const page = query
+      ? isLibraryItemsResponse(value)
+        ? value
+        : null
+      : isLibraryLatestResponse(value)
+        ? value
+        : null;
+    if (!page) throw new Error("Invalid Current library response.");
+    renderLibraryItems(page.items);
   } catch (error) {
-    if (
-      attempt === libraryReadGeneration &&
-      dialogAttempt === libraryDialogGeneration &&
-      selected === sessionId &&
-      libraryDialog.open
-    )
-      libraryFailure(error);
-  }
-}
-async function searchLibrary(query: string): Promise<void> {
-  const dialogAttempt = libraryDialogGeneration;
-  const sessionId = selected;
-  const attempt = ++libraryReadGeneration;
-  libraryError.textContent = "";
-  el("library-items-title", HTMLElement).textContent = "Search results";
-  try {
-    const value = await api("/api/v1/library/search", { query });
-    if (
-      !libraryDialog.open ||
-      dialogAttempt !== libraryDialogGeneration ||
-      selected !== sessionId ||
-      attempt !== libraryReadGeneration
-    )
-      return;
-    if (!isLibraryItemsResponse(value)) throw new Error("Invalid Current library response.");
-    renderLibraryItems(value.items);
-  } catch (error) {
-    if (
-      attempt === libraryReadGeneration &&
-      dialogAttempt === libraryDialogGeneration &&
-      selected === sessionId &&
-      libraryDialog.open
-    )
-      libraryFailure(error);
+    if (attempt === libraryReadGeneration) libraryFailure(error);
   }
 }
 async function readLibraryItem(reference: LibraryReference): Promise<void> {
-  const dialogAttempt = libraryDialogGeneration;
-  const sessionId = selected;
   const attempt = ++libraryReadGeneration;
   libraryError.textContent = "";
   currentLibraryItem = null;
   renderLibraryReader();
   try {
     const value = await api(libraryItemPath(reference));
-    if (
-      !libraryDialog.open ||
-      dialogAttempt !== libraryDialogGeneration ||
-      selected !== sessionId ||
-      attempt !== libraryReadGeneration
-    )
-      return;
+    if (attempt !== libraryReadGeneration) return;
     if (!isLibraryItemView(value) || !sameLibraryReference(value.reference, reference))
       throw new Error("The host returned a different saved item version.");
     currentLibraryItem = value;
     renderLibraryReader();
+    if (sidebarOpen()) el("library-reader-title", HTMLElement).focus();
   } catch (error) {
-    if (
-      attempt === libraryReadGeneration &&
-      dialogAttempt === libraryDialogGeneration &&
-      selected === sessionId &&
-      libraryDialog.open
-    )
-      libraryFailure(error);
+    if (attempt === libraryReadGeneration) libraryFailure(error);
   }
 }
 async function changeLibraryReference(reference: LibraryReference, add: boolean): Promise<void> {
   const sessionId = selected;
-  if (sessionId === null || libraryReferenceMutationPending) return;
-  const dialogAttempt = libraryDialogGeneration;
+  if (
+    sessionId === null ||
+    sessionId !== libraryReferencesSession ||
+    libraryReferenceMutationPending
+  )
+    return;
+  const viewAttempt = libraryViewGeneration;
   libraryReferenceMutationPending = true;
   renderLibraryReferences();
   renderLibraryReader();
@@ -492,30 +464,28 @@ async function changeLibraryReference(reference: LibraryReference, add: boolean)
     failed = true;
     failure = error;
   }
-  if (libraryDialog.open && authenticated) await loadLibraryReferences();
+  if (libraryActive()) await loadLibraryReferences();
   libraryReferenceMutationPending = false;
-  if (libraryDialog.open) {
+  if (libraryActive()) {
     renderLibraryReferences();
     renderLibraryReader();
   }
-  if (
-    failed &&
-    libraryDialog.open &&
-    dialogAttempt === libraryDialogGeneration &&
-    selected === sessionId
-  )
+  if (failed && viewAttempt === libraryViewGeneration && selected === sessionId)
     libraryFailure(failure);
 }
-function openLibrary(): void {
-  if (!authenticated) return;
-  el("library-open", HTMLButtonElement).focus();
-  libraryDialogGeneration++;
-  libraryDialog.showModal();
-  libraryError.textContent = "";
+function libraryActive(): boolean {
+  return authenticated && sidebarView === "library";
+}
+function clearLibrary(): void {
+  libraryViewGeneration++;
+  libraryReadGeneration++;
+  libraryReferencesSession = null;
+  currentLibraryReferences = [];
   currentLibraryItem = null;
+  libraryItems.replaceChildren();
+  libraryReferences.replaceChildren();
+  libraryError.textContent = "";
   renderLibraryReader();
-  void loadLibraryReferences();
-  void loadLatestLibraryItems();
 }
 function memoryConfigured(): boolean {
   return clientCapabilities?.memory.configured === true;
@@ -531,6 +501,7 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
   const capabilityError = el("client-capabilities-error", HTMLElement);
   const queryLength = Array.from(state.query.trim()).length;
   const queryTooLong = queryLength > MEMORY_QUERY_CODEPOINTS;
+  const recent = queryLength === 0;
   const searchButton = el("memory-search", HTMLButtonElement);
   const searchError = el("memory-search-error", HTMLElement);
   const readError = el("memory-read-error", HTMLElement);
@@ -551,7 +522,7 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
   memoryQuery.disabled = !available;
   searchButton.disabled =
     !available || state.searchPending || state.query.trim().length === 0 || queryTooLong;
-  searchButton.textContent = state.searchPending ? "Searching…" : "Search";
+  searchButton.textContent = state.searchPending && !recent ? "Searching…" : "Search";
   searchError.textContent =
     state.searchError ??
     (queryTooLong ? `Search queries can be at most ${MEMORY_QUERY_CODEPOINTS} characters.` : "");
@@ -566,9 +537,11 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
   if (state.items.length === 0) {
     const empty =
       state.searchComplete && state.searchError === null && !state.searchPending
-        ? state.nextCursor !== null
-          ? "No matches in this batch."
-          : "No matching memories."
+        ? recent
+          ? "No memories saved yet."
+          : state.nextCursor !== null
+            ? "No matches in this batch."
+            : "No matching memories."
         : "";
     if (empty) memoryResults.append(node("p", empty, "memory-empty"));
   } else {
@@ -581,14 +554,26 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
       result.setAttribute("aria-label", `Read memory: ${item.preview}`);
       result.title = item.preview;
       result.disabled = !available || state.readPending;
-      result.textContent = item.preview;
+      result.append(node("span", item.preview, "memory-preview"));
+      if (item.updatedAt !== undefined) {
+        const date = node(
+          "time",
+          new Date(item.updatedAt).toLocaleDateString(undefined, { dateStyle: "medium" }),
+        );
+        date.dateTime = item.updatedAt;
+        result.append(date);
+      }
       result.onclick = () => void memoryPanel.read(item);
       memoryResults.append(result);
     }
   }
   memorySearchMore.hidden = state.nextCursor === null;
   memorySearchMore.disabled = !available || state.searchPending;
-  memorySearchMore.textContent = state.searchPending ? "Searching…" : "Continue search";
+  memorySearchMore.textContent = state.searchPending
+    ? "Loading…"
+    : recent
+      ? "More"
+      : "Continue search";
 
   const hasReader = state.selected !== null;
   memoryReader.hidden = !hasReader;
@@ -613,19 +598,73 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
   )
     readerTitle.focus();
 }
+function loadRecentMemory(refresh = false): void {
+  const state = memoryPanel.state;
+  if (
+    sidebarView === "memory" &&
+    sidebarOpen() &&
+    memoryReady() &&
+    !memoryQuery.value.trim() &&
+    !state.searchPending &&
+    (refresh || (!state.searchComplete && state.searchError === null))
+  )
+    void memoryPanel.search(memoryQuery.value);
+}
+function setSidebarView(view: SidebarView): void {
+  const previous = sidebarView;
+  sidebarView = view;
+  if (previous === "library" && view !== previous) clearLibrary();
+  memoryView.hidden = view !== "memory";
+  libraryView.hidden = view !== "library";
+  for (const [tab, panel] of [
+    [memoryTab, memoryView],
+    [libraryTab, libraryView],
+  ] as const) {
+    const active = !panel.hidden;
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+    if (knowledgeTabs.hidden) panel.removeAttribute("role");
+    else panel.setAttribute("role", "tabpanel");
+  }
+  if (view === "memory" && previous !== view) {
+    memoryQuery.value = "";
+    memoryPanel.setQuery("");
+  }
+  loadRecentMemory(previous !== view);
+  if (view === "library" && previous !== view) {
+    void loadLibraryReferences();
+    void loadLibraryItems(libraryQuery.value.trim());
+  }
+}
 function updateClientCapabilityView(): void {
-  const enabled = authenticated && memoryConfigured();
-  app.classList.toggle("with-memory", enabled);
-  el("open-nav", HTMLButtonElement).setAttribute(
-    "aria-label",
-    enabled ? "Memory" : "Open navigation",
-  );
-  el("session-list", HTMLElement).hidden = enabled;
-  memoryView.hidden = !enabled;
-  if (!enabled) {
+  const memory = authenticated && memoryConfigured();
+  const library = authenticated && clientCapabilities?.library.configured === true;
+  const knowledge = memory || library;
+  const label = memory && library ? "Knowledge" : memory ? "Memory" : library ? "Library" : "";
+  app.classList.toggle("with-memory", memory);
+  app.classList.toggle("with-knowledge", knowledge);
+  rail.setAttribute("aria-label", knowledge ? label : "Conversations");
+  openNav.setAttribute("aria-label", knowledge ? `Open ${label}` : "Open navigation");
+  const navLabel = el("nav-knowledge-label", HTMLElement);
+  navLabel.hidden = !knowledge;
+  navLabel.textContent = label;
+  el("session-list", HTMLElement).hidden = knowledge;
+  el("conversations-heading", HTMLElement).hidden = knowledge;
+  knowledgeTabs.hidden = !(memory && library);
+  if (!memory) {
     memoryQuery.value = "";
     memoryPanel.clear();
   }
+  if (!library) libraryQuery.value = "";
+  setSidebarView(
+    library && sidebarView === "library"
+      ? "library"
+      : memory
+        ? "memory"
+        : library
+          ? "library"
+          : "conversations",
+  );
   renderMemoryPanel();
   navigation();
 }
@@ -644,7 +683,6 @@ async function reloadClientCapabilities(force = false): Promise<void> {
     clientCapabilities = value;
     clientCapabilitiesError = null;
     if (notice.textContent === CLIENT_CAPABILITY_NOTICE) clearNotice();
-    if (!value.memory.configured) memoryPanel.clear();
     updateClientCapabilityView();
   } catch (error) {
     if (authentication !== authAttempt || attempt !== clientCapabilityGeneration) return;
@@ -1075,14 +1113,28 @@ function clearNotice(): void {
   notice.hidden = true;
   notice.textContent = "";
 }
+function sidebarOpen(): boolean {
+  return viewport.matches ? drawerOpen : localPreferences.sidebar !== "collapsed";
+}
+function renderSidebar(): void {
+  const mobile = viewport.matches;
+  const open = sidebarOpen();
+  rail.hidden = !mobile && !open;
+  rail.classList.toggle("open", mobile && open);
+  rail.inert = !open;
+  main.inert = mobile && open;
+  app.classList.toggle("sidebar-collapsed", !mobile && !open);
+  el("scrim", HTMLButtonElement).hidden = !mobile || !open;
+  openNav.setAttribute("aria-expanded", String(open));
+  closeNav.setAttribute("aria-label", mobile ? "Close navigation" : "Collapse sidebar");
+  closeNav.textContent = mobile ? "×" : "‹";
+}
 function nav(open: boolean): void {
-  rail.classList.toggle("open", open);
-  main.inert = open;
-  el("scrim", HTMLButtonElement).hidden = !open;
-  el("open-nav", HTMLButtonElement).setAttribute("aria-expanded", String(open));
-  rail.inert = matchMedia("(max-width:760px)").matches && !open;
-  if (open) el("close-nav", HTMLButtonElement).focus();
-  else el("open-nav", HTMLButtonElement).focus();
+  if (viewport.matches) drawerOpen = open;
+  else savePreference("sidebar", open ? "open" : "collapsed");
+  renderSidebar();
+  (open ? closeNav : openNav).focus();
+  if (open) loadRecentMemory(true);
 }
 function navigation(): void {
   const list = el("session-list", HTMLElement),
@@ -1579,7 +1631,7 @@ async function openFromSidebar(id: string): Promise<void> {
   const intent = ++openIntentGeneration,
     selectedAtStart = selectionGeneration;
   closeArmedSession = null;
-  nav(false);
+  if (drawerOpen) nav(false);
   if (session.workspaceOpen && session.runtimeState !== "failed") {
     await select(id);
     return;
@@ -2185,10 +2237,7 @@ async function select(id: string | null): Promise<void> {
   navigation();
   renderConversation();
   scroll.scrollTop = 0;
-  if (libraryDialog.open) {
-    void loadLibraryReferences();
-    renderLibraryReader();
-  }
+  if (libraryActive()) void loadLibraryReferences();
   if (id) {
     probeCurrentModel(id);
     void stream(id, generation);
@@ -2313,11 +2362,10 @@ function disconnect(reason: string): void {
   capabilityRetryPending = false;
   streamRecoveryPending = false;
   pollRecoveryPending = false;
-  memoryQuery.value = "";
-  memoryPanel.clear();
+  drawerOpen = false;
+  renderSidebar();
   releaseImages();
   imageDialog.close();
-  libraryDialog.close();
   authenticated = false;
   authAttempt++;
   generation++;
@@ -2713,7 +2761,7 @@ async function changeModel(choice: PiModelOption, thinkingLevel: ThinkingLevel):
   }
 }
 function newSession(): void {
-  nav(false);
+  if (drawerOpen) nav(false);
   dialog.showModal();
   if (pendingCreate) return;
   el("create-error", HTMLElement).textContent = "";
@@ -2769,8 +2817,20 @@ modelDialog.addEventListener("close", () => {
     probeCurrentModel();
   }
 });
-el("open-nav", HTMLButtonElement).onclick = () => nav(true);
-el("close-nav", HTMLButtonElement).onclick = () => nav(false);
+openNav.onclick = () => nav(true);
+closeNav.onclick = () => nav(false);
+memoryTab.onclick = () => setSidebarView("memory");
+libraryTab.onclick = () => setSidebarView("library");
+knowledgeTabs.onkeydown = (event) => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const tab =
+    event.key === "Home" || (event.key !== "End" && sidebarView === "library")
+      ? memoryTab
+      : libraryTab;
+  tab.click();
+  tab.focus();
+};
 el("scrim", HTMLButtonElement).onclick = () => nav(false);
 el("new-mobile", HTMLButtonElement).onclick = () => {
   void newSession();
@@ -2782,29 +2842,32 @@ el("memory-search-form", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();
   if (memoryReady()) void memoryPanel.search(memoryQuery.value);
 };
-memoryQuery.oninput = () => memoryPanel.setQuery(memoryQuery.value);
+memoryQuery.oninput = () => {
+  memoryPanel.setQuery(memoryQuery.value);
+  loadRecentMemory();
+};
 memorySearchMore.onclick = () => void memoryPanel.continueSearch();
 memoryReadMore.onclick = () => void memoryPanel.continueReading();
 el("memory-reader-close", HTMLButtonElement).onclick = () => {
   memoryPanel.closeReader();
   memoryQuery.focus();
 };
-memoryRetry.onclick = () => void reloadClientCapabilities();
-el("library-open", HTMLButtonElement).onclick = openLibrary;
-el("close-library", HTMLButtonElement).onclick = () => libraryDialog.close();
+memoryRetry.onclick = async () => {
+  await reloadClientCapabilities();
+  if (!memoryReady()) return;
+  if (memoryPanel.state.searchError !== null) void memoryPanel.search(memoryQuery.value);
+  else loadRecentMemory();
+};
 el("library-search-form", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();
-  const query = el("library-query", HTMLInputElement).value.trim();
-  if (query) void searchLibrary(query);
-  else void loadLatestLibraryItems();
+  void loadLibraryItems(libraryQuery.value.trim());
 };
-libraryDialog.addEventListener("close", () => {
-  libraryDialogGeneration++;
+el("library-reader-close", HTMLButtonElement).onclick = () => {
   libraryReadGeneration++;
-  libraryReferencesGeneration++;
   currentLibraryItem = null;
   renderLibraryReader();
-});
+  libraryQuery.focus();
+};
 el("new-session", HTMLButtonElement).onclick = () => {
   void newSession();
 };
@@ -2909,7 +2972,7 @@ document.addEventListener("keydown", (event) => {
       .querySelector<HTMLButtonElement>(`[data-session-id="${armedSession}"] .tab-select`)
       ?.focus();
   }
-  if (rail.classList.contains("open")) nav(false);
+  if (drawerOpen && !document.querySelector("dialog[open]")) nav(false);
 });
 document.addEventListener("click", (event) => {
   if (
@@ -2921,17 +2984,14 @@ document.addEventListener("click", (event) => {
     navigation();
   }
 });
-const viewport = matchMedia("(max-width:760px)");
-function responsive(): void {
-  if (!viewport.matches) {
-    main.inert = false;
-    rail.inert = false;
-    rail.classList.remove("open");
-    el("scrim", HTMLButtonElement).hidden = true;
-  } else rail.inert = !rail.classList.contains("open");
-}
-viewport.addEventListener("change", responsive);
-responsive();
+viewport.addEventListener("change", () => {
+  const focusInSidebar = rail.contains(document.activeElement);
+  drawerOpen = false;
+  renderSidebar();
+  if (focusInSidebar && !sidebarOpen()) openNav.focus();
+  loadRecentMemory();
+});
+renderSidebar();
 window.addEventListener("pagehide", () => {
   suspended = true;
   generation++;

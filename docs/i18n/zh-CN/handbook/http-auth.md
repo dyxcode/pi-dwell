@@ -58,6 +58,7 @@
 | `GET /models` | Either | 封装在 `models` 中的全局隔离发现结果 |
 | `POST /model-capabilities` | Either | Provider/model → thinking levels 和图片支持情况 |
 | `GET /client-capabilities` | Either | Memory 与 Current Library 的 configured/ready/unavailable 状态 |
+| `POST /memory/list` | Either | `{cursor?, limit?}` → 最近更新的 Distill 记录，含 revision、preview、UTC `updatedAt` 和可选 next cursor |
 | `POST /memory/search` | Either | `{query, cursor?, limit?}` → 有界 Distill 匹配结果、revision、preview 和可选 next cursor |
 | `POST /memory/read` | Either | `{id, expectedRevision, cursor?}` → 对应精确 revision 的有界 text page |
 | `POST /library/search` | Either | `{query, source?, limit?}` → saved item 或 discovery-candidate views |

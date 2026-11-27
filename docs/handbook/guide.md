@@ -63,26 +63,26 @@ Sending a message clears its draft after the host confirms acceptance.
 
 ## Switch and reopen sessions
 
-The sidebar lists session identities; the top status tabs show sessions
-Dwell currently considers open, including sessions that need attention.
-Statuses include Ready, Working, Needs attention, Stopped, and Opening.
+The top status tabs show open sessions and their status, including sessions
+that need attention. Without integrations, the **Conversations** sidebar also
+lists closed sessions so you can reopen them.
 
-With Distill configured, the sidebar becomes Memory search and reading. The
-conversation list is replaced by icon-only session controls; the main view
-continues to show the selected conversation and composer, and **New** remains
-available. Without Distill, the sidebar remains the conversation list. See
-[Search and read Memory](#distill-memory).
+With Distill and Current configured, the sidebar shows **Memory** and **Library**
+tabs. With one integration, it opens that view directly. The conversation and
+composer remain beside the sidebar on desktop. The sidebar starts open; Dwell
+remembers if you collapse it in this browser. On screens up to 760 px wide, the
+sidebar starts closed and opens from one button in the top bar.
 
-- Choose a sidebar item to select an already-open session.
-- Choose a closed session in the sidebar to explicitly reopen it.
+- Choose a top status tab to switch between open sessions.
+- In **Conversations**, choose a closed session to explicitly reopen it.
 - A closed session keeps its saved history. Reloading the browser does not
   reopen it automatically.
 - To close the selected runtime, select its status tab to reveal the close
   control, then confirm. If work is active, Dwell asks whether to stop and
   close it.
 
-Closing a runtime leaves the session and its native Pi history available in
-the sidebar. To continue later, reopen that session. The browser retains
+Closing a runtime preserves the session and its native Pi history. In
+**Conversations**, reopen that session to continue later. The browser retains
 unsent drafts only for the lifetime of the current page.
 
 ### Move a transcript between Dwell and Pi
@@ -111,18 +111,15 @@ or omitted. It is not a complete view of the prompt sent to a model.
 
 ## Search and read Distill Memory
 
-When Dwell is explicitly connected to Distill, use **Memory** in the sidebar to
-search saved records and open a result for reading. Search results include a
-short preview; selecting one reads the corresponding record revision. Search
-pages can be empty and still have more results, so continue while the page
-offers that option. If the reader is temporarily unavailable, Memory stays in
-the sidebar and offers **Retry**. The conversation view and its controls remain
-available.
+Open **Memory** to see recently updated records, with a preview and date for
+each. Select **More** for older records or clear the search box to return to
+recents. Selecting a result opens that revision in the sidebar. Search pages
+can be empty and still have more results, so continue while the page offers
+that option. If the reader is temporarily unavailable, Memory offers **Retry**.
 
-Memory is separate from a conversation and from the Current Library. Reading a
-record does not add it to the Pi prompt or saved conversation. To browse
-collected external sources and attach exact-version references, continue to use
-the separate [Current Library](#current-library).
+Reading a memory does not add it to the Pi prompt or saved conversation. Use
+[Library](#current-library) in the same sidebar for collected external sources
+and exact-version references.
 
 ## Stay connected
 
@@ -166,7 +163,7 @@ Build Distill's public Node API with `npm run build:package` in its checkout. In
 }
 ```
 
-Point `database` at the Distill store that manages these Pi sessions, then restart Dwell. This explicit host configuration enables source coordination and the Memory reader exposed by that Distill module; installing or registering the Pi extension alone does not configure Dwell. Dwell coordinates file reads and hosted Pi processes with the store's cleanup. Omitting the Distill entry disables both integrations; with no Distill entry, the existing Conversations sidebar remains.
+Point `database` at the Distill store that manages these Pi sessions, then restart Dwell. This explicit host configuration enables source coordination and the Memory reader exposed by that Distill module; installing or registering the Pi extension alone does not configure Dwell. Dwell coordinates file reads and hosted Pi processes with the store's cleanup. Omitting the Distill entry disables source coordination and Memory. Use a Distill build that supports listing recent memories.
 
 Source-access configuration or module-opening errors still stop startup. Memory reader initialization is optional: when that reader is absent or cannot open, Dwell starts with working source coordination and the sidebar shows Memory as unavailable with **Retry**. See [Memory](implementation/memory.md) and [the access lifecycle](implementation/history-retirement.md#behavior).
 
@@ -190,7 +187,7 @@ Run `npm run build:library` in the Current checkout, then add a `current` object
 Replace both paths with the absolute paths on this host. Keep the same binding for the same canonical root; when Current opens, Dwell rejects a binding that points at a different root. The configuration file is read from Dwell's data directory and must satisfy its private-file permission checks. Omitting `current` leaves the session host available and library routes report `library_unavailable`.
 
 
-Open **Library** to browse latest items, search, and read an exact version. Candidate results show **Article text has not been saved.**, their discovery time, and a link to the original source. Saved items provide article text for reading. With a session selected, use **Attach to session** to save the exact item/version reference, including a confirmed candidate. This leaves the Pi prompt unchanged and does not fetch candidate text. Saved references remain available for listing and removal while Current is unavailable.
+Open **Library** in the sidebar to browse latest items, search, and read an exact version. Candidate results show **Article text has not been saved.**, their discovery time, and a link to the original source. Saved items provide article text for reading. With a session selected, use **Attach to session** to save the exact item/version reference, including a confirmed candidate. This leaves the Pi prompt unchanged and does not fetch candidate text. Saved references remain available for listing and removal when Current is configured but temporarily unavailable.
 
 `current` and `distill` may share one version 1 configuration. See [Library access](implementation/library.md) and [history cleanup](implementation/history-retirement.md).
 

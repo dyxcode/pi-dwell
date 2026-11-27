@@ -120,7 +120,7 @@ Local dependencies: [clients/web/icons.ts](../../src/clients/web/icons.ts), [sha
 
 Feature context: [Read and navigate a conversation](implementation/read-conversation.md)
 
-[Open source](../../src/clients/web/client.ts) · 2969 lines
+[Open source](../../src/clients/web/client.ts) · 3033 lines
 
 Local dependencies: [clients/web/attachments.ts](../../src/clients/web/attachments.ts), [clients/web/conversation.ts](../../src/clients/web/conversation.ts), [clients/web/dom.ts](../../src/clients/web/dom.ts), [clients/web/events.ts](../../src/clients/web/events.ts), [clients/web/icons.ts](../../src/clients/web/icons.ts), [clients/web/input.ts](../../src/clients/web/input.ts), [clients/web/markdown.ts](../../src/clients/web/markdown.ts), [clients/web/memory.ts](../../src/clients/web/memory.ts), [clients/web/tool-command.ts](../../src/clients/web/tool-command.ts), [clients/web/transport.ts](../../src/clients/web/transport.ts), [shared/discovery.ts](../../src/shared/discovery.ts), [shared/events.ts](../../src/shared/events.ts), [shared/history.ts](../../src/shared/history.ts), [shared/images.ts](../../src/shared/images.ts), [shared/library.ts](../../src/shared/library.ts), [shared/memory.ts](../../src/shared/memory.ts), [shared/protocol.ts](../../src/shared/protocol.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/turns.ts](../../src/shared/turns.ts).
 
@@ -154,171 +154,174 @@ Local dependencies: [clients/web/attachments.ts](../../src/clients/web/attachmen
 | [`modelDialog`](../../src/clients/web/client.ts#L95) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
 | [`modelSearch`](../../src/clients/web/client.ts#L96) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
 | [`chooseModel`](../../src/clients/web/client.ts#L97) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
-| [`availableModels`](../../src/clients/web/client.ts#L131) | Module value | `PiModelOption[]` | [Feature context](implementation/models.md#mechanisms) |
-| [`capabilities`](../../src/clients/web/client.ts#L132) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
-| [`capabilityRequests`](../../src/clients/web/client.ts#L133) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
-| [`capabilityErrors`](../../src/clients/web/client.ts#L134) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
-| [`capabilityGeneration`](../../src/clients/web/client.ts#L135) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
-| [`resetCapabilities`](../../src/clients/web/client.ts#L136) | Function |  | [Feature context](implementation/models.md#mechanisms) |
-| [`thinkingChoice`](../../src/clients/web/client.ts#L142) | Module value | `PiModelOption \| null` | [Feature context](implementation/models.md#mechanisms) |
-| [`levelNames`](../../src/clients/web/client.ts#L143) | Module value | `Record<ThinkingLevel, string>` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`modelSession`](../../src/clients/web/client.ts#L152) | Module value | `string \| null` | [Feature context](implementation/models.md#mechanisms) |
-| [`changingModel`](../../src/clients/web/client.ts#L152) | Module value | `string \| null` | [Feature context](implementation/models.md#mechanisms) |
-| [`older`](../../src/clients/web/client.ts#L154) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`drafts`](../../src/clients/web/client.ts#L171) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`turns`](../../src/clients/web/client.ts#L172) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`sessions`](../../src/clients/web/client.ts#L173) | Module value | `SessionInfo[]` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`selected`](../../src/clients/web/client.ts#L173) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`state`](../../src/clients/web/client.ts#L175) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`contextSources`](../../src/clients/web/client.ts#L176) | Module value | `ContextSource[]` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`contextSourcesTruncated`](../../src/clients/web/client.ts#L177) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`entries`](../../src/clients/web/client.ts#L178) | Module value | `HistoryEntry[]` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`nextCursor`](../../src/clients/web/client.ts#L178) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`controller`](../../src/clients/web/client.ts#L180) | Module value | `AbortController \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`generation`](../../src/clients/web/client.ts#L180) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`authenticated`](../../src/clients/web/client.ts#L180) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`reconnectTimer`](../../src/clients/web/client.ts#L185) | Module value | `number \| undefined` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`pollTimer`](../../src/clients/web/client.ts#L185) | Module value | `number \| undefined` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`polling`](../../src/clients/web/client.ts#L186) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`suspended`](../../src/clients/web/client.ts#L186) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`HistoryReadRecovery`](../../src/clients/web/client.ts#L190) | Interface |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`historyRecovery`](../../src/clients/web/client.ts#L195) | Module value | `Record<"latest" \| "older", HistoryReadRecovery>` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`historyContentFailed`](../../src/clients/web/client.ts#L199) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`historyCoverageReads`](../../src/clients/web/client.ts#L200) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`historyCoverageRun`](../../src/clients/web/client.ts#L201) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`resetHistoryPagination`](../../src/clients/web/client.ts#L202) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`historyPending`](../../src/clients/web/client.ts#L203) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`sending`](../../src/clients/web/client.ts#L203) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`pendingSend`](../../src/clients/web/client.ts#L205) | Module value | `{   session: string;   requestId: string;   message: string;   images: ImageContent[]; } \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`pendingCreate`](../../src/clients/web/client.ts#L211) | Module value | `{   requestId: string;   directory: string; } \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`tabSlots`](../../src/clients/web/client.ts#L215) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`openingSessions`](../../src/clients/web/client.ts#L216) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`closeArmedSession`](../../src/clients/web/client.ts#L217) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`preparingCloseSession`](../../src/clients/web/client.ts#L218) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`closeTarget`](../../src/clients/web/client.ts#L219) | Module value | `{   id: string;   activeRunId: string \| null;   nativeExecutionId: string \| null;   attempted: boolean; } \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`closingSession`](../../src/clients/web/client.ts#L225) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`closePreparationGeneration`](../../src/clients/web/client.ts#L226) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`closeAttemptGeneration`](../../src/clients/web/client.ts#L227) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`sessionRefreshGeneration`](../../src/clients/web/client.ts#L228) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`sessionStateGeneration`](../../src/clients/web/client.ts#L229) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`selectionGeneration`](../../src/clients/web/client.ts#L230) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`openIntentGeneration`](../../src/clients/web/client.ts#L231) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`authAttempt`](../../src/clients/web/client.ts#L232) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`browseAttempt`](../../src/clients/web/client.ts#L232) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`modelAttempt`](../../src/clients/web/client.ts#L232) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
-| [`hostMode`](../../src/clients/web/client.ts#L235) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`streamConnected`](../../src/clients/web/client.ts#L235) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`imageDialog`](../../src/clients/web/client.ts#L238) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`showImage`](../../src/clients/web/client.ts#L239) | Function | url, name | [Feature context](implementation/read-conversation.md#ownership) |
-| [`attachments`](../../src/clients/web/client.ts#L667) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`attachButton`](../../src/clients/web/client.ts#L675) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`imageFiles`](../../src/clients/web/client.ts#L676) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`imageCache`](../../src/clients/web/client.ts#L714) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`imageQueue`](../../src/clients/web/client.ts#L715) | Module value | `Promise<unknown>` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`liveOrder`](../../src/clients/web/client.ts#L716) | Module value | `{ kind: "message" \| "tool"; id: string }[]` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`releaseImages`](../../src/clients/web/client.ts#L717) | Function |  | [Feature context](implementation/read-conversation.md#ownership) |
-| [`historyImage`](../../src/clients/web/client.ts#L753) | Function | entryId, index, mimeType | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`localPreferences`](../../src/clients/web/client.ts#L832) | Module value | `Record<string, string>` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`savePreference`](../../src/clients/web/client.ts#L841) | Function | key, value | [Feature context](implementation/models.md#ownership) |
-| [`activeSession`](../../src/clients/web/client.ts#L849) | Function |  | [Feature context](implementation/models.md#ownership) |
-| [`modelCapabilityKey`](../../src/clients/web/client.ts#L852) | Function | provider, model, sessionId | [Feature context](implementation/models.md#mechanisms) |
-| [`requestModelCapabilities`](../../src/clients/web/client.ts#L861) | Function | choice, sessionId | [Feature context](implementation/models.md#mechanisms) |
-| [`probeCurrentModel`](../../src/clients/web/client.ts#L901) | Function | sessionId | [Feature context](implementation/models.md#mechanisms) |
-| [`label`](../../src/clients/web/client.ts#L929) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`directoryName`](../../src/clients/web/client.ts#L938) | Function | directory | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`workspaceTabs`](../../src/clients/web/client.ts#L953) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`nativeRunning`](../../src/clients/web/client.ts#L963) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`sessionBusy`](../../src/clients/web/client.ts#L966) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`status`](../../src/clients/web/client.ts#L969) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`TabStatus`](../../src/clients/web/client.ts#L991) | TypeAlias |  | [Feature context](implementation/read-conversation.md#behavior) |
-| [`tabStatus`](../../src/clients/web/client.ts#L992) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`tabStatusLabel`](../../src/clients/web/client.ts#L1001) | Function | value | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`SVG_NS`](../../src/clients/web/client.ts#L1012) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`statusPaths`](../../src/clients/web/client.ts#L1013) | Module value | `Record<   "ready" \| "working" \| "attention" \| "stopped" \| "opening" \| "close",   string >` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`tabSymbol`](../../src/clients/web/client.ts#L1024) | Function | value | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`synchronizeTabSlots`](../../src/clients/web/client.ts#L1040) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`openTabIds`](../../src/clients/web/client.ts#L1053) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`closeBlockedReason`](../../src/clients/web/client.ts#L1056) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`showError`](../../src/clients/web/client.ts#L1066) | Function | error | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`clearNotice`](../../src/clients/web/client.ts#L1074) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`nav`](../../src/clients/web/client.ts#L1078) | Function | open | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`navigation`](../../src/clients/web/client.ts#L1087) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`updatedSession`](../../src/clients/web/client.ts#L1280) | Function | session | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`neighborAfterClose`](../../src/clients/web/client.ts#L1292) | Function | id, previousTabs | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`reconcileClosedWorkspace`](../../src/clients/web/client.ts#L1307) | Function | id, previousTabs | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`userMessageSnippet`](../../src/clients/web/client.ts#L1316) | Function | values | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`showCloseError`](../../src/clients/web/client.ts#L1329) | Function | error | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`prepareClose`](../../src/clients/web/client.ts#L1333) | Function | id | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`sessionSnapshot`](../../src/clients/web/client.ts#L1417) | Function | id | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`turnSnapshot`](../../src/clients/web/client.ts#L1423) | Function | id, runId | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`turnIsActive`](../../src/clients/web/client.ts#L1429) | Function | turn | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`waitForTurnAndRuntime`](../../src/clients/web/client.ts#L1432) | Function | id, runId, authentication | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`finishClose`](../../src/clients/web/client.ts#L1453) | Function | id, previousTabs | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`confirmSessionClose`](../../src/clients/web/client.ts#L1459) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`openFromSidebar`](../../src/clients/web/client.ts#L1571) | Function | id | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`identifyLiveThinking`](../../src/clients/web/client.ts#L1607) | Function | message | [Feature context](implementation/models.md#mechanisms) |
-| [`renderConversation`](../../src/clients/web/client.ts#L1623) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`historyProblem`](../../src/clients/web/client.ts#L1858) | Function |  | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`resetHistoryRecovery`](../../src/clients/web/client.ts#L1862) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`uncoveredHistoryRun`](../../src/clients/web/client.ts#L1878) | Function |  | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`scheduleHistoryRecovery`](../../src/clients/web/client.ts#L1889) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`loadHistory`](../../src/clients/web/client.ts#L1898) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
-| [`stopStream`](../../src/clients/web/client.ts#L2004) | Function |  | [Feature context](implementation/stop-work.md#mechanisms) |
-| [`renderFrame`](../../src/clients/web/client.ts#L2009) | Module value | `number \| undefined` | [Feature context](implementation/read-conversation.md#behavior) |
-| [`scheduleStreamRender`](../../src/clients/web/client.ts#L2010) | Function |  | [Feature context](implementation/reconnect.md#execution) |
-| [`stream`](../../src/clients/web/client.ts#L2018) | Function | id, epoch | [Feature context](implementation/reconnect.md#execution) |
-| [`select`](../../src/clients/web/client.ts#L2159) | Function | id | [Feature context](implementation/reconnect.md#execution) |
-| [`connection`](../../src/clients/web/client.ts#L2198) | Function | text | [Feature context](implementation/reconnect.md#execution) |
-| [`refresh`](../../src/clients/web/client.ts#L2201) | Function |  | [Feature context](implementation/reconnect.md#execution) |
-| [`poll`](../../src/clients/web/client.ts#L2269) | Function |  | [Feature context](implementation/reconnect.md#execution) |
-| [`disconnect`](../../src/clients/web/client.ts#L2305) | Function | reason | [Feature context](implementation/reconnect.md#execution) |
-| [`connect`](../../src/clients/web/client.ts#L2341) | Function |  | [Feature context](implementation/reconnect.md#execution) |
-| [`submit`](../../src/clients/web/client.ts#L2378) | Function |  | [Feature context](implementation/send-message.md#mechanisms) |
-| [`browse`](../../src/clients/web/client.ts#L2481) | Function | path | [Feature context](implementation/models.md#execution) |
-| [`renderModels`](../../src/clients/web/client.ts#L2530) | Function |  | [Feature context](implementation/models.md#mechanisms) |
-| [`showModels`](../../src/clients/web/client.ts#L2558) | Function |  | [Feature context](implementation/models.md#mechanisms) |
-| [`showThinking`](../../src/clients/web/client.ts#L2609) | Function | choice | [Feature context](implementation/models.md#mechanisms) |
-| [`changeModel`](../../src/clients/web/client.ts#L2670) | Function | choice, thinkingLevel | [Feature context](implementation/models.md#mechanisms) |
-| [`newSession`](../../src/clients/web/client.ts#L2715) | Function |  | [Feature context](implementation/models.md#execution) |
-| [`createSession`](../../src/clients/web/client.ts#L2723) | Function |  | [Feature context](implementation/models.md#execution) |
-| [`resetCloseDialog`](../../src/clients/web/client.ts#L2820) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`dismissCloseDialog`](../../src/clients/web/client.ts#L2833) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
-| [`viewport`](../../src/clients/web/client.ts#L2924) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`responsive`](../../src/clients/web/client.ts#L2925) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`resume`](../../src/clients/web/client.ts#L2942) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`savedHistoryWarning`](../../src/clients/web/client.ts#L941) | Function | | [Feature context](implementation/read-conversation.md#mechanisms) |
-| [`sameLibraryReference`](../../src/clients/web/client.ts#L245) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`libraryFailure`](../../src/clients/web/client.ts#L248) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`renderLibraryReferences`](../../src/clients/web/client.ts#L252) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`renderLibraryItems`](../../src/clients/web/client.ts#L282) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`renderLibraryReader`](../../src/clients/web/client.ts#L307) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`loadLibraryReferences`](../../src/clients/web/client.ts#L357) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`loadLatestLibraryItems`](../../src/clients/web/client.ts#L390) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`searchLibrary`](../../src/clients/web/client.ts#L417) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`readLibraryItem`](../../src/clients/web/client.ts#L444) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`changeLibraryReference`](../../src/clients/web/client.ts#L474) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`openLibrary`](../../src/clients/web/client.ts#L509) | Function | | [Feature context](implementation/library.md#mechanisms) |
-| [`clearRetiredHistory`](../../src/clients/web/client.ts#L727) | Function | | [Feature context](implementation/history-retirement.md#mechanisms) |
-| [`memoryConfigured`](../../src/clients/web/client.ts#L520) | Function |  | [Feature context](implementation/memory.md#behavior) |
-| [`memoryReady`](../../src/clients/web/client.ts#L523) | Function |  | [Feature context](implementation/memory.md#behavior) |
-| [`renderMemoryPanel`](../../src/clients/web/client.ts#L526) | Function | state | [Feature context](implementation/memory.md#behavior) |
-| [`updateClientCapabilityView`](../../src/clients/web/client.ts#L616) | Function |  | [Feature context](implementation/memory.md#execution) |
-| [`reloadClientCapabilities`](../../src/clients/web/client.ts#L632) | Function | force | [Feature context](implementation/memory.md#execution) |
-| [`memoryView`](../../src/clients/web/client.ts#L102) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`memoryQuery`](../../src/clients/web/client.ts#L103) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`memoryResults`](../../src/clients/web/client.ts#L104) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`memoryReader`](../../src/clients/web/client.ts#L105) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`memoryText`](../../src/clients/web/client.ts#L106) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`memorySearchMore`](../../src/clients/web/client.ts#L107) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`memoryReadMore`](../../src/clients/web/client.ts#L108) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`memoryRetry`](../../src/clients/web/client.ts#L109) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`clientCapabilities`](../../src/clients/web/client.ts#L116) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`clientCapabilityGeneration`](../../src/clients/web/client.ts#L117) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`clientCapabilityRequestPending`](../../src/clients/web/client.ts#L118) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`clientCapabilitiesError`](../../src/clients/web/client.ts#L119) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`capabilityRetryPending`](../../src/clients/web/client.ts#L120) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`CLIENT_CAPABILITY_NOTICE`](../../src/clients/web/client.ts#L121) | Module value |  | [Feature context](implementation/memory.md#behavior) |
-| [`memoryPanel`](../../src/clients/web/client.ts#L123) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`availableModels`](../../src/clients/web/client.ts#L142) | Module value | `PiModelOption[]` | [Feature context](implementation/models.md#mechanisms) |
+| [`capabilities`](../../src/clients/web/client.ts#L143) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
+| [`capabilityRequests`](../../src/clients/web/client.ts#L144) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
+| [`capabilityErrors`](../../src/clients/web/client.ts#L145) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
+| [`capabilityGeneration`](../../src/clients/web/client.ts#L146) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
+| [`resetCapabilities`](../../src/clients/web/client.ts#L147) | Function |  | [Feature context](implementation/models.md#mechanisms) |
+| [`thinkingChoice`](../../src/clients/web/client.ts#L153) | Module value | `PiModelOption \| null` | [Feature context](implementation/models.md#mechanisms) |
+| [`levelNames`](../../src/clients/web/client.ts#L154) | Module value | `Record<ThinkingLevel, string>` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`modelSession`](../../src/clients/web/client.ts#L163) | Module value | `string \| null` | [Feature context](implementation/models.md#mechanisms) |
+| [`changingModel`](../../src/clients/web/client.ts#L163) | Module value | `string \| null` | [Feature context](implementation/models.md#mechanisms) |
+| [`older`](../../src/clients/web/client.ts#L165) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`drafts`](../../src/clients/web/client.ts#L182) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`turns`](../../src/clients/web/client.ts#L183) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`sessions`](../../src/clients/web/client.ts#L184) | Module value | `SessionInfo[]` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`selected`](../../src/clients/web/client.ts#L184) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`state`](../../src/clients/web/client.ts#L186) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`contextSources`](../../src/clients/web/client.ts#L187) | Module value | `ContextSource[]` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`contextSourcesTruncated`](../../src/clients/web/client.ts#L188) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`entries`](../../src/clients/web/client.ts#L189) | Module value | `HistoryEntry[]` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`nextCursor`](../../src/clients/web/client.ts#L189) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`controller`](../../src/clients/web/client.ts#L191) | Module value | `AbortController \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`generation`](../../src/clients/web/client.ts#L191) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`authenticated`](../../src/clients/web/client.ts#L191) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`reconnectTimer`](../../src/clients/web/client.ts#L196) | Module value | `number \| undefined` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`pollTimer`](../../src/clients/web/client.ts#L196) | Module value | `number \| undefined` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`polling`](../../src/clients/web/client.ts#L197) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`suspended`](../../src/clients/web/client.ts#L197) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`HistoryReadRecovery`](../../src/clients/web/client.ts#L201) | Interface |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`historyRecovery`](../../src/clients/web/client.ts#L206) | Module value | `Record<"latest" \| "older", HistoryReadRecovery>` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`historyContentFailed`](../../src/clients/web/client.ts#L210) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`historyCoverageReads`](../../src/clients/web/client.ts#L211) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`historyCoverageRun`](../../src/clients/web/client.ts#L212) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`resetHistoryPagination`](../../src/clients/web/client.ts#L213) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`historyPending`](../../src/clients/web/client.ts#L214) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`sending`](../../src/clients/web/client.ts#L214) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`pendingSend`](../../src/clients/web/client.ts#L216) | Module value | `{   session: string;   requestId: string;   message: string;   images: ImageContent[]; } \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`pendingCreate`](../../src/clients/web/client.ts#L222) | Module value | `{   requestId: string;   directory: string; } \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`tabSlots`](../../src/clients/web/client.ts#L226) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`openingSessions`](../../src/clients/web/client.ts#L227) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`closeArmedSession`](../../src/clients/web/client.ts#L228) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`preparingCloseSession`](../../src/clients/web/client.ts#L229) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`closeTarget`](../../src/clients/web/client.ts#L230) | Module value | `{   id: string;   activeRunId: string \| null;   nativeExecutionId: string \| null;   attempted: boolean; } \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`closingSession`](../../src/clients/web/client.ts#L236) | Module value | `string \| null` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`closePreparationGeneration`](../../src/clients/web/client.ts#L237) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`closeAttemptGeneration`](../../src/clients/web/client.ts#L238) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`sessionRefreshGeneration`](../../src/clients/web/client.ts#L239) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`sessionStateGeneration`](../../src/clients/web/client.ts#L240) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`selectionGeneration`](../../src/clients/web/client.ts#L241) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`openIntentGeneration`](../../src/clients/web/client.ts#L242) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`authAttempt`](../../src/clients/web/client.ts#L243) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`browseAttempt`](../../src/clients/web/client.ts#L243) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`modelAttempt`](../../src/clients/web/client.ts#L243) | Module value | Inferred from initializer | [Feature context](implementation/models.md#mechanisms) |
+| [`hostMode`](../../src/clients/web/client.ts#L246) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`streamConnected`](../../src/clients/web/client.ts#L246) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`imageDialog`](../../src/clients/web/client.ts#L249) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`showImage`](../../src/clients/web/client.ts#L250) | Function | url, name | [Feature context](implementation/read-conversation.md#ownership) |
+| [`attachments`](../../src/clients/web/client.ts#L705) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`attachButton`](../../src/clients/web/client.ts#L713) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`imageFiles`](../../src/clients/web/client.ts#L714) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`imageCache`](../../src/clients/web/client.ts#L752) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`imageQueue`](../../src/clients/web/client.ts#L753) | Module value | `Promise<unknown>` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`liveOrder`](../../src/clients/web/client.ts#L754) | Module value | `{ kind: "message" \| "tool"; id: string }[]` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`releaseImages`](../../src/clients/web/client.ts#L755) | Function |  | [Feature context](implementation/read-conversation.md#ownership) |
+| [`historyImage`](../../src/clients/web/client.ts#L791) | Function | entryId, index, mimeType | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`localPreferences`](../../src/clients/web/client.ts#L870) | Module value | `Record<string, string>` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`savePreference`](../../src/clients/web/client.ts#L879) | Function | key, value | [Feature context](implementation/models.md#ownership) |
+| [`activeSession`](../../src/clients/web/client.ts#L887) | Function |  | [Feature context](implementation/models.md#ownership) |
+| [`modelCapabilityKey`](../../src/clients/web/client.ts#L890) | Function | provider, model, sessionId | [Feature context](implementation/models.md#mechanisms) |
+| [`requestModelCapabilities`](../../src/clients/web/client.ts#L899) | Function | choice, sessionId | [Feature context](implementation/models.md#mechanisms) |
+| [`probeCurrentModel`](../../src/clients/web/client.ts#L939) | Function | sessionId | [Feature context](implementation/models.md#mechanisms) |
+| [`label`](../../src/clients/web/client.ts#L967) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`directoryName`](../../src/clients/web/client.ts#L976) | Function | directory | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`workspaceTabs`](../../src/clients/web/client.ts#L991) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`nativeRunning`](../../src/clients/web/client.ts#L1001) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`sessionBusy`](../../src/clients/web/client.ts#L1004) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`status`](../../src/clients/web/client.ts#L1007) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`TabStatus`](../../src/clients/web/client.ts#L1029) | TypeAlias |  | [Feature context](implementation/read-conversation.md#behavior) |
+| [`tabStatus`](../../src/clients/web/client.ts#L1030) | Function | s | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`tabStatusLabel`](../../src/clients/web/client.ts#L1039) | Function | value | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`SVG_NS`](../../src/clients/web/client.ts#L1050) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`statusPaths`](../../src/clients/web/client.ts#L1051) | Module value | `Record<   "ready" \| "working" \| "attention" \| "stopped" \| "opening" \| "close",   string >` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`tabSymbol`](../../src/clients/web/client.ts#L1062) | Function | value | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`synchronizeTabSlots`](../../src/clients/web/client.ts#L1078) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`openTabIds`](../../src/clients/web/client.ts#L1091) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`closeBlockedReason`](../../src/clients/web/client.ts#L1094) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`showError`](../../src/clients/web/client.ts#L1104) | Function | error | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`clearNotice`](../../src/clients/web/client.ts#L1112) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`nav`](../../src/clients/web/client.ts#L1132) | Function | open | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`sidebarOpen`](../../src/clients/web/client.ts#L1116) | Function |  | [Feature context](implementation/memory.md#behavior) |
+| [`renderSidebar`](../../src/clients/web/client.ts#L1119) | Function |  | [Feature context](implementation/memory.md#behavior) |
+| [`navigation`](../../src/clients/web/client.ts#L1139) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`updatedSession`](../../src/clients/web/client.ts#L1332) | Function | session | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`neighborAfterClose`](../../src/clients/web/client.ts#L1344) | Function | id, previousTabs | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`reconcileClosedWorkspace`](../../src/clients/web/client.ts#L1359) | Function | id, previousTabs | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`userMessageSnippet`](../../src/clients/web/client.ts#L1368) | Function | values | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`showCloseError`](../../src/clients/web/client.ts#L1381) | Function | error | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`prepareClose`](../../src/clients/web/client.ts#L1385) | Function | id | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`sessionSnapshot`](../../src/clients/web/client.ts#L1469) | Function | id | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`turnSnapshot`](../../src/clients/web/client.ts#L1475) | Function | id, runId | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`turnIsActive`](../../src/clients/web/client.ts#L1481) | Function | turn | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`waitForTurnAndRuntime`](../../src/clients/web/client.ts#L1484) | Function | id, runId, authentication | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`finishClose`](../../src/clients/web/client.ts#L1505) | Function | id, previousTabs | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`confirmSessionClose`](../../src/clients/web/client.ts#L1511) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`openFromSidebar`](../../src/clients/web/client.ts#L1623) | Function | id | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`identifyLiveThinking`](../../src/clients/web/client.ts#L1659) | Function | message | [Feature context](implementation/models.md#mechanisms) |
+| [`renderConversation`](../../src/clients/web/client.ts#L1675) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`historyProblem`](../../src/clients/web/client.ts#L1910) | Function |  | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`resetHistoryRecovery`](../../src/clients/web/client.ts#L1914) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`uncoveredHistoryRun`](../../src/clients/web/client.ts#L1930) | Function |  | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`scheduleHistoryRecovery`](../../src/clients/web/client.ts#L1941) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`loadHistory`](../../src/clients/web/client.ts#L1950) | Function | more | [Feature context](implementation/saved-history.md#mechanisms) |
+| [`stopStream`](../../src/clients/web/client.ts#L2056) | Function |  | [Feature context](implementation/stop-work.md#mechanisms) |
+| [`renderFrame`](../../src/clients/web/client.ts#L2061) | Module value | `number \| undefined` | [Feature context](implementation/read-conversation.md#behavior) |
+| [`scheduleStreamRender`](../../src/clients/web/client.ts#L2062) | Function |  | [Feature context](implementation/reconnect.md#execution) |
+| [`stream`](../../src/clients/web/client.ts#L2070) | Function | id, epoch | [Feature context](implementation/reconnect.md#execution) |
+| [`select`](../../src/clients/web/client.ts#L2211) | Function | id | [Feature context](implementation/reconnect.md#execution) |
+| [`connection`](../../src/clients/web/client.ts#L2247) | Function | text | [Feature context](implementation/reconnect.md#execution) |
+| [`refresh`](../../src/clients/web/client.ts#L2250) | Function |  | [Feature context](implementation/reconnect.md#execution) |
+| [`poll`](../../src/clients/web/client.ts#L2318) | Function |  | [Feature context](implementation/reconnect.md#execution) |
+| [`disconnect`](../../src/clients/web/client.ts#L2354) | Function | reason | [Feature context](implementation/reconnect.md#execution) |
+| [`connect`](../../src/clients/web/client.ts#L2389) | Function |  | [Feature context](implementation/reconnect.md#execution) |
+| [`submit`](../../src/clients/web/client.ts#L2426) | Function |  | [Feature context](implementation/send-message.md#mechanisms) |
+| [`browse`](../../src/clients/web/client.ts#L2529) | Function | path | [Feature context](implementation/models.md#execution) |
+| [`renderModels`](../../src/clients/web/client.ts#L2578) | Function |  | [Feature context](implementation/models.md#mechanisms) |
+| [`showModels`](../../src/clients/web/client.ts#L2606) | Function |  | [Feature context](implementation/models.md#mechanisms) |
+| [`showThinking`](../../src/clients/web/client.ts#L2657) | Function | choice | [Feature context](implementation/models.md#mechanisms) |
+| [`changeModel`](../../src/clients/web/client.ts#L2718) | Function | choice, thinkingLevel | [Feature context](implementation/models.md#mechanisms) |
+| [`newSession`](../../src/clients/web/client.ts#L2763) | Function |  | [Feature context](implementation/models.md#execution) |
+| [`createSession`](../../src/clients/web/client.ts#L2771) | Function |  | [Feature context](implementation/models.md#execution) |
+| [`resetCloseDialog`](../../src/clients/web/client.ts#L2883) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`dismissCloseDialog`](../../src/clients/web/client.ts#L2896) | Function |  | [Feature context](implementation/session-lifecycle.md#execution) |
+| [`viewport`](../../src/clients/web/client.ts#L105) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`resume`](../../src/clients/web/client.ts#L3002) | Function |  | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`savedHistoryWarning`](../../src/clients/web/client.ts#L979) | Function | | [Feature context](implementation/read-conversation.md#mechanisms) |
+| [`sameLibraryReference`](../../src/clients/web/client.ts#L256) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`libraryFailure`](../../src/clients/web/client.ts#L259) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`renderLibraryReferences`](../../src/clients/web/client.ts#L263) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`renderLibraryItems`](../../src/clients/web/client.ts#L293) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`renderLibraryReader`](../../src/clients/web/client.ts#L318) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`loadLibraryReferences`](../../src/clients/web/client.ts#L369) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`loadLibraryItems`](../../src/clients/web/client.ts#L399) | Function | query | [Feature context](implementation/library.md#mechanisms) |
+| [`readLibraryItem`](../../src/clients/web/client.ts#L424) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`changeLibraryReference`](../../src/clients/web/client.ts#L441) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`libraryActive`](../../src/clients/web/client.ts#L476) | Function |  | [Feature context](implementation/library.md#mechanisms) |
+| [`clearLibrary`](../../src/clients/web/client.ts#L479) | Function |  | [Feature context](implementation/library.md#mechanisms) |
+| [`clearRetiredHistory`](../../src/clients/web/client.ts#L765) | Function | | [Feature context](implementation/history-retirement.md#mechanisms) |
+| [`memoryConfigured`](../../src/clients/web/client.ts#L490) | Function |  | [Feature context](implementation/memory.md#behavior) |
+| [`memoryReady`](../../src/clients/web/client.ts#L493) | Function |  | [Feature context](implementation/memory.md#behavior) |
+| [`renderMemoryPanel`](../../src/clients/web/client.ts#L496) | Function | state | [Feature context](implementation/memory.md#behavior) |
+| [`loadRecentMemory`](../../src/clients/web/client.ts#L601) | Function | refresh | [Feature context](implementation/memory.md#execution) |
+| [`setSidebarView`](../../src/clients/web/client.ts#L613) | Function | view | [Feature context](implementation/memory.md#execution) |
+| [`updateClientCapabilityView`](../../src/clients/web/client.ts#L639) | Function |  | [Feature context](implementation/memory.md#execution) |
+| [`reloadClientCapabilities`](../../src/clients/web/client.ts#L671) | Function | force | [Feature context](implementation/memory.md#execution) |
+| [`memoryView`](../../src/clients/web/client.ts#L112) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`memoryQuery`](../../src/clients/web/client.ts#L113) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`memoryResults`](../../src/clients/web/client.ts#L114) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`memoryReader`](../../src/clients/web/client.ts#L115) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`memoryText`](../../src/clients/web/client.ts#L116) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`memorySearchMore`](../../src/clients/web/client.ts#L117) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`memoryReadMore`](../../src/clients/web/client.ts#L118) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`memoryRetry`](../../src/clients/web/client.ts#L119) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`clientCapabilities`](../../src/clients/web/client.ts#L127) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`clientCapabilityGeneration`](../../src/clients/web/client.ts#L128) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`clientCapabilityRequestPending`](../../src/clients/web/client.ts#L129) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`clientCapabilitiesError`](../../src/clients/web/client.ts#L130) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`capabilityRetryPending`](../../src/clients/web/client.ts#L131) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`CLIENT_CAPABILITY_NOTICE`](../../src/clients/web/client.ts#L132) | Module value |  | [Feature context](implementation/memory.md#behavior) |
+| [`memoryPanel`](../../src/clients/web/client.ts#L134) | Module value |  | [Feature context](implementation/memory.md#behavior) |
 
 ## src/clients/web/conversation.ts
 
@@ -495,35 +498,36 @@ Feature context: [Read and navigate a conversation](implementation/read-conversa
 
 Feature context: [Search and read Memory](implementation/memory.md)
 
-[Open source](../../src/clients/web/memory.ts) · 312 lines
+[Open source](../../src/clients/web/memory.ts) · 302 lines
 
 Local dependencies: [shared/memory.ts](../../src/shared/memory.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`MemoryPanelState`](../../src/clients/web/memory.ts#L13) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryRequest`](../../src/clients/web/memory.ts#L27) | TypeAlias |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`StateChange`](../../src/clients/web/memory.ts#L28) | TypeAlias |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`emptyState`](../../src/clients/web/memory.ts#L30) | Function | query | [Feature context](implementation/memory.md#mechanisms) |
-| [`errorCode`](../../src/clients/web/memory.ts#L46) | Function | error | [Feature context](implementation/memory.md#mechanisms) |
-| [`errorText`](../../src/clients/web/memory.ts#L57) | Function | error | [Feature context](implementation/memory.md#mechanisms) |
-| [`copyState`](../../src/clients/web/memory.ts#L73) | Function | state | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel`](../../src/clients/web/memory.ts#L81) | Class |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.#request`](../../src/clients/web/memory.ts#L82) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.#changed`](../../src/clients/web/memory.ts#L83) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.#state`](../../src/clients/web/memory.ts#L84) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.#searchGeneration`](../../src/clients/web/memory.ts#L85) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.#readGeneration`](../../src/clients/web/memory.ts#L86) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.constructor`](../../src/clients/web/memory.ts#L88) | Constructor | request, changed | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.state`](../../src/clients/web/memory.ts#L93) | GetAccessor |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.setQuery`](../../src/clients/web/memory.ts#L97) | Method | query | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.search`](../../src/clients/web/memory.ts#L105) | Method | query | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.continueSearch`](../../src/clients/web/memory.ts#L149) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.read`](../../src/clients/web/memory.ts#L189) | Method | item | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.continueReading`](../../src/clients/web/memory.ts#L241) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.closeReader`](../../src/clients/web/memory.ts#L292) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.clear`](../../src/clients/web/memory.ts#L305) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryPanel.#emit`](../../src/clients/web/memory.ts#L312) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanelState`](../../src/clients/web/memory.ts#L15) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryRequest`](../../src/clients/web/memory.ts#L29) | TypeAlias |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`StateChange`](../../src/clients/web/memory.ts#L30) | TypeAlias |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`emptyState`](../../src/clients/web/memory.ts#L32) | Function | query | [Feature context](implementation/memory.md#mechanisms) |
+| [`errorCode`](../../src/clients/web/memory.ts#L48) | Function | error | [Feature context](implementation/memory.md#mechanisms) |
+| [`errorText`](../../src/clients/web/memory.ts#L59) | Function | error | [Feature context](implementation/memory.md#mechanisms) |
+| [`copyState`](../../src/clients/web/memory.ts#L75) | Function | state | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel`](../../src/clients/web/memory.ts#L83) | Class |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.#request`](../../src/clients/web/memory.ts#L84) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.#changed`](../../src/clients/web/memory.ts#L85) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.#state`](../../src/clients/web/memory.ts#L86) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.#searchGeneration`](../../src/clients/web/memory.ts#L87) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.#readGeneration`](../../src/clients/web/memory.ts#L88) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.constructor`](../../src/clients/web/memory.ts#L90) | Constructor | request, changed | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.state`](../../src/clients/web/memory.ts#L95) | GetAccessor |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.setQuery`](../../src/clients/web/memory.ts#L99) | Method | query | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.search`](../../src/clients/web/memory.ts#L107) | Method | query | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.continueSearch`](../../src/clients/web/memory.ts#L129) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.#loadPage`](../../src/clients/web/memory.ts#L138) | Method | searchGeneration, query, cursor | [Feature context](implementation/memory.md#execution) |
+| [`MemoryPanel.read`](../../src/clients/web/memory.ts#L176) | Method | item | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.continueReading`](../../src/clients/web/memory.ts#L228) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.closeReader`](../../src/clients/web/memory.ts#L279) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.clear`](../../src/clients/web/memory.ts#L292) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryPanel.#emit`](../../src/clients/web/memory.ts#L299) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
 
 ## src/clients/web/page.ts
 
@@ -534,7 +538,7 @@ Feature context: [Read and navigate a conversation](implementation/read-conversa
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
 | [`HOST_PAGE`](../../src/clients/web/page.ts#L1) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
-| [`STYLE`](../../src/clients/web/page.ts#L179) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
+| [`STYLE`](../../src/clients/web/page.ts#L180) | Module value | Inferred from initializer | [Feature context](implementation/read-conversation.md#behavior) |
 
 
 ## src/clients/web/script.ts
@@ -881,24 +885,24 @@ Local dependencies: [local/files.ts](../../src/local/files.ts), [local/paths.ts]
 
 Feature context: [Run and manage the Host](implementation/host-service.md)
 
-[Open source](../../src/server/http.ts) · 815 lines
+[Open source](../../src/server/http.ts) · 823 lines
 
 Local dependencies: [clients/web/page.ts](../../src/clients/web/page.ts), [clients/web/script.ts](../../src/clients/web/script.ts), [integrations/configuration.ts](../../src/integrations/configuration.ts), [integrations/current.ts](../../src/integrations/current.ts), [integrations/distill.ts](../../src/integrations/distill.ts), [integrations/memory.ts](../../src/integrations/memory.ts), [local/files.ts](../../src/local/files.ts), [local/paths.ts](../../src/local/paths.ts), [server/access.ts](../../src/server/access.ts), [server/auth.ts](../../src/server/auth.ts), [server/sse.ts](../../src/server/sse.ts), [sessions/service.ts](../../src/sessions/service.ts), [shared/library.ts](../../src/shared/library.ts), [shared/memory.ts](../../src/shared/memory.ts), [shared/protocol.ts](../../src/shared/protocol.ts), [shared/sessions.ts](../../src/shared/sessions.ts), [shared/thinking.ts](../../src/shared/thinking.ts), [shared/turns.ts](../../src/shared/turns.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`HostOptions`](../../src/server/http.ts#L30) | Interface |  | [Feature context](implementation/host-service.md#behavior) |
-| [`RunningHost`](../../src/server/http.ts#L40) | Interface |  | [Feature context](implementation/host-service.md#behavior) |
-| [`fail`](../../src/server/http.ts#L45) | Function | status, code, message | [Feature context](implementation/browser-access.md#mechanisms) |
-| [`browserRequest`](../../src/server/http.ts#L48) | Function | request, origin | [Feature context](implementation/browser-access.md#mechanisms) |
-| [`readJson`](../../src/server/http.ts#L58) | Function | request, limit | [Feature context](implementation/browser-access.md#mechanisms) |
-| [`HTTP_DIAGNOSTIC_CODES`](../../src/server/http.ts#L95) | Module value | Inferred from initializer | [Feature context](implementation/host-service.md#mechanisms) |
-| [`send`](../../src/server/http.ts#L118) | Function | response, status, body | [Feature context](implementation/browser-access.md#mechanisms) |
-| [`parseHistoryCursor`](../../src/server/http.ts#L133) | Function | query | [Feature context](implementation/browser-access.md#mechanisms) |
-| [`startHost`](../../src/server/http.ts#L164) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [Feature context](implementation/host-service.md#mechanisms) |
-| [`startHost.openEventStream`](../../src/server/http.ts#L197) | Nested function | response, sessionId, cursor | [Feature context](implementation/host-service.md#mechanisms) |
-| [`startHost.handle`](../../src/server/http.ts#L223) | Nested function | request, response | [Feature context](implementation/host-service.md#execution) |
-| [`parseLibraryLatestQuery`](../../src/server/http.ts#L147) | Function | | [Feature context](implementation/library.md#mechanisms) |
+| [`HostOptions`](../../src/server/http.ts#L31) | Interface |  | [Feature context](implementation/host-service.md#behavior) |
+| [`RunningHost`](../../src/server/http.ts#L41) | Interface |  | [Feature context](implementation/host-service.md#behavior) |
+| [`fail`](../../src/server/http.ts#L46) | Function | status, code, message | [Feature context](implementation/browser-access.md#mechanisms) |
+| [`browserRequest`](../../src/server/http.ts#L49) | Function | request, origin | [Feature context](implementation/browser-access.md#mechanisms) |
+| [`readJson`](../../src/server/http.ts#L59) | Function | request, limit | [Feature context](implementation/browser-access.md#mechanisms) |
+| [`HTTP_DIAGNOSTIC_CODES`](../../src/server/http.ts#L96) | Module value | Inferred from initializer | [Feature context](implementation/host-service.md#mechanisms) |
+| [`send`](../../src/server/http.ts#L119) | Function | response, status, body | [Feature context](implementation/browser-access.md#mechanisms) |
+| [`parseHistoryCursor`](../../src/server/http.ts#L134) | Function | query | [Feature context](implementation/browser-access.md#mechanisms) |
+| [`startHost`](../../src/server/http.ts#L165) | Function | {   port = DEFAULT_PORT,   mode = "production",   dataDir = dataDirectory(mode),   now = Date.now,   sessions: sessionOptions,   eventHeartbeatMs, } | [Feature context](implementation/host-service.md#mechanisms) |
+| [`startHost.openEventStream`](../../src/server/http.ts#L198) | Nested function | response, sessionId, cursor | [Feature context](implementation/host-service.md#mechanisms) |
+| [`startHost.handle`](../../src/server/http.ts#L224) | Nested function | request, response | [Feature context](implementation/host-service.md#execution) |
+| [`parseLibraryLatestQuery`](../../src/server/http.ts#L148) | Function | | [Feature context](implementation/library.md#mechanisms) |
   port = DEFAULT_PORT,
   mode = "production",
   dataDir = dataDirectory(mode),
@@ -1781,27 +1785,28 @@ Local dependencies: [local/paths.ts](../../src/local/paths.ts), [shared/library.
 
 Feature context: [Search and read Memory](implementation/memory.md)
 
-[Open source](../../src/integrations/memory.ts) · 127 lines
+[Open source](../../src/integrations/memory.ts) · 143 lines
 
 Local dependencies: [integrations/distill.ts](../../src/integrations/distill.ts), [runtime/pi-rpc.ts](../../src/runtime/pi-rpc.ts), [shared/memory.ts](../../src/shared/memory.ts).
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
-| [`DistillMemoryReaderV1`](../../src/integrations/memory.ts#L15) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReaderError`](../../src/integrations/memory.ts#L22) | Class |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReaderError.code`](../../src/integrations/memory.ts#L23) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReaderError.constructor`](../../src/integrations/memory.ts#L25) | Constructor | code | [Feature context](implementation/memory.md#mechanisms) |
-| [`memoryErrorMessage`](../../src/integrations/memory.ts#L32) | Function | code | [Feature context](implementation/memory.md#mechanisms) |
-| [`isDistillMemoryReaderV1`](../../src/integrations/memory.ts#L47) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`closeUnknownReader`](../../src/integrations/memory.ts#L57) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`asMemoryReaderError`](../../src/integrations/memory.ts#L66) | Function | error | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReader`](../../src/integrations/memory.ts#L72) | Class |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReader.#reader`](../../src/integrations/memory.ts#L73) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReader.constructor`](../../src/integrations/memory.ts#L75) | Constructor | reader | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReader.search`](../../src/integrations/memory.ts#L79) | Method | request | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReader.read`](../../src/integrations/memory.ts#L91) | Method | request | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReader.close`](../../src/integrations/memory.ts#L104) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`openMemoryReader`](../../src/integrations/memory.ts#L113) | Function | configuration | [Feature context](implementation/memory.md#mechanisms) |
+| [`DistillMemoryReaderV1`](../../src/integrations/memory.ts#L18) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReaderError`](../../src/integrations/memory.ts#L26) | Class |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReaderError.code`](../../src/integrations/memory.ts#L27) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReaderError.constructor`](../../src/integrations/memory.ts#L29) | Constructor | code | [Feature context](implementation/memory.md#mechanisms) |
+| [`memoryErrorMessage`](../../src/integrations/memory.ts#L36) | Function | code | [Feature context](implementation/memory.md#mechanisms) |
+| [`isDistillMemoryReaderV1`](../../src/integrations/memory.ts#L51) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`closeUnknownReader`](../../src/integrations/memory.ts#L62) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`asMemoryReaderError`](../../src/integrations/memory.ts#L71) | Function | error | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReader`](../../src/integrations/memory.ts#L77) | Class |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReader.#reader`](../../src/integrations/memory.ts#L78) | Property |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReader.constructor`](../../src/integrations/memory.ts#L80) | Constructor | reader | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReader.search`](../../src/integrations/memory.ts#L95) | Method | request | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReader.list`](../../src/integrations/memory.ts#L84) | Method | request | [Feature context](implementation/memory.md#execution) |
+| [`MemoryReader.read`](../../src/integrations/memory.ts#L107) | Method | request | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReader.close`](../../src/integrations/memory.ts#L120) | Method |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`openMemoryReader`](../../src/integrations/memory.ts#L129) | Function | configuration | [Feature context](implementation/memory.md#mechanisms) |
 
 ## src/shared/library.ts
 
@@ -1852,7 +1857,7 @@ Feature context: [Read external content in Current’s library](implementation/l
 
 Feature context: [Search and read Memory](implementation/memory.md)
 
-[Open source](../../src/shared/memory.ts) · 198 lines
+[Open source](../../src/shared/memory.ts) · 240 lines
 
 | Symbol | Kind | Parameters or type | Explanation |
 | --- | --- | --- | --- |
@@ -1864,29 +1869,36 @@ Feature context: [Search and read Memory](implementation/memory.md)
 | [`MEMORY_ID_CODEPOINTS`](../../src/shared/memory.ts#L6) | Module value |  | [Feature context](implementation/memory.md#mechanisms) |
 | [`MEMORY_ERROR_CODES`](../../src/shared/memory.ts#L8) | Module value |  | [Feature context](implementation/memory.md#mechanisms) |
 | [`MemoryErrorCode`](../../src/shared/memory.ts#L16) | TypeAlias |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemorySearchRequest`](../../src/shared/memory.ts#L18) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemorySearchItem`](../../src/shared/memory.ts#L24) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemorySearchResponse`](../../src/shared/memory.ts#L30) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReadRequest`](../../src/shared/memory.ts#L35) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`MemoryReadResponse`](../../src/shared/memory.ts#L41) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`ClientCapabilityState`](../../src/shared/memory.ts#L48) | TypeAlias |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`ClientCapability`](../../src/shared/memory.ts#L50) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`ClientCapabilities`](../../src/shared/memory.ts#L55) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
-| [`record`](../../src/shared/memory.ts#L60) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`exact`](../../src/shared/memory.ts#L64) | Function | value, keys | [Feature context](implementation/memory.md#mechanisms) |
-| [`keysWithOptional`](../../src/shared/memory.ts#L70) | Function | value, required, optional | [Feature context](implementation/memory.md#mechanisms) |
-| [`wellFormed`](../../src/shared/memory.ts#L78) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`text`](../../src/shared/memory.ts#L92) | Function | value, limit, allowEmpty, rejectNul | [Feature context](implementation/memory.md#mechanisms) |
-| [`revision`](../../src/shared/memory.ts#L108) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`cursor`](../../src/shared/memory.ts#L112) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`memoryId`](../../src/shared/memory.ts#L116) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`isMemoryErrorCode`](../../src/shared/memory.ts#L120) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`isMemorySearchRequest`](../../src/shared/memory.ts#L124) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`isMemoryReadRequest`](../../src/shared/memory.ts#L138) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`isMemorySearchItem`](../../src/shared/memory.ts#L148) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`isMemorySearchResponse`](../../src/shared/memory.ts#L158) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`isMemoryReadResponse`](../../src/shared/memory.ts#L169) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`isCapability`](../../src/shared/memory.ts#L180) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
-| [`isClientCapabilities`](../../src/shared/memory.ts#L191) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemorySearchRequest`](../../src/shared/memory.ts#L23) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryListRequest`](../../src/shared/memory.ts#L18) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemorySearchItem`](../../src/shared/memory.ts#L27) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryListItem`](../../src/shared/memory.ts#L38) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemorySearchResponse`](../../src/shared/memory.ts#L33) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryListResponse`](../../src/shared/memory.ts#L42) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReadRequest`](../../src/shared/memory.ts#L47) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`MemoryReadResponse`](../../src/shared/memory.ts#L53) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`ClientCapabilityState`](../../src/shared/memory.ts#L60) | TypeAlias |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`ClientCapability`](../../src/shared/memory.ts#L62) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`ClientCapabilities`](../../src/shared/memory.ts#L67) | Interface |  | [Feature context](implementation/memory.md#mechanisms) |
+| [`record`](../../src/shared/memory.ts#L72) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`exact`](../../src/shared/memory.ts#L76) | Function | value, keys | [Feature context](implementation/memory.md#mechanisms) |
+| [`keysWithOptional`](../../src/shared/memory.ts#L82) | Function | value, required, optional | [Feature context](implementation/memory.md#mechanisms) |
+| [`wellFormed`](../../src/shared/memory.ts#L90) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`text`](../../src/shared/memory.ts#L104) | Function | value, limit, allowEmpty, rejectNul | [Feature context](implementation/memory.md#mechanisms) |
+| [`revision`](../../src/shared/memory.ts#L120) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`cursor`](../../src/shared/memory.ts#L124) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`memoryId`](../../src/shared/memory.ts#L128) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`isMemoryErrorCode`](../../src/shared/memory.ts#L132) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`isMemorySearchRequest`](../../src/shared/memory.ts#L153) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`optionalPageRequest`](../../src/shared/memory.ts#L136) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`isMemoryListRequest`](../../src/shared/memory.ts#L147) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`isMemoryReadRequest`](../../src/shared/memory.ts#L162) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`memoryPreview`](../../src/shared/memory.ts#L172) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`memoryPage`](../../src/shared/memory.ts#L180) | Function | value, isItem | [Feature context](implementation/memory.md#mechanisms) |
+| [`isMemorySearchResponse`](../../src/shared/memory.ts#L191) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`isMemoryListResponse`](../../src/shared/memory.ts#L198) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`isMemoryReadResponse`](../../src/shared/memory.ts#L211) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`isCapability`](../../src/shared/memory.ts#L222) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
+| [`isClientCapabilities`](../../src/shared/memory.ts#L233) | Function | value | [Feature context](implementation/memory.md#mechanisms) |
 
 Indexed **52 source files** and **738 callable explanations**.

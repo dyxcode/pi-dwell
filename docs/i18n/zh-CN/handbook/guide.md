@@ -44,16 +44,16 @@ Dwell turn 或 native Pi extension execution 正在运行时，composer 操作�
 
 ## 切换和重新打开 session
 
-侧边栏列出 session identity；顶部状态标签显示 Dwell 当前认为已打开的 session，其中也包括需要处理的 session。状态包括 Ready、Working、Needs attention、Stopped 和 Opening。
+顶栏状态标签显示已打开的会话及其状态，包括需要处理的会话。未配置集成时，**Conversations** 侧栏也会列出已关闭的会话，方便重新打开。
 
-配置 Distill 后，侧边栏会切换为 Memory search 与阅读入口。Conversation list 会由 icon-only session controls 取代；主视图仍显示所选 conversation 和 composer，**New** 仍可用。未配置 Distill 时，侧边栏仍显示 conversation list。详见[搜索与阅读 Memory](#distill-memory)。
+同时配置 Distill 和 Current 时，侧栏提供 **Memory** 与 **Library** 两个标签；只配置一个集成时，直接显示对应视图。桌面上，侧栏与对话、输入区并排显示，默认展开；浏览器记住折叠设置。屏幕宽度不超过 760 px 时，侧栏默认关闭，可通过顶栏的一个按钮打开。
 
-- 选择侧边栏项目可切换到已打开的 session。
-- 选择侧边栏中的已关闭 session 可显式重新打开它。
+- 用顶栏状态标签切换已打开的会话。
+- 在 **Conversations** 中选择已关闭的会话，可将其重新打开。
 - 已关闭的 session 会保留其 saved history。刷新浏览器不会自动重新打开它。
 - 要关闭所选 runtime，请再次选择它的状态标签以显示关闭控件，然后确认。如果仍有工作，Dwell 会询问是否停止并关闭。
 
-关闭 runtime 后，session 及其 Pi native history 仍会显示在侧边栏。稍后要继续时，请重新打开该 session。浏览器只会在当前页面的生命周期内保留未发送的 draft。
+关闭 runtime 后，会话及其 Pi 原生历史仍会保留。可在 **Conversations** 中重新打开会话，继续对话。浏览器只会在当前页面的生命周期内保留未发送的 draft。
 
 <a id="move-a-transcript-between-dwell-and-pi"></a>
 
@@ -75,11 +75,9 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 
 ## 搜索与阅读 Distill Memory
 
-在 Dwell 中显式连接 Distill 后，可以使用 sidebar 的 **Memory** 搜索已保存的记录，并打开结果阅读。Search results 会提供简短 preview；选中结果后读取对应的记录 revision。Reader 暂不可用时，Memory 仍保留在 sidebar 中并提供 **Retry**。Conversation view 及其 controls 继续可用。
+打开 **Memory** 即可查看最近更新的记录，每条都有预览和日期。点击 **More** 可查看更早的记录，清空搜索框则返回最近更新列表。点击结果可在侧栏阅读该版本。搜索某一页即使没有结果，也可能还有后续内容；只要页面提供继续选项，就可以继续。Reader 暂不可用时，Memory 会提供 **Retry**。
 
-Search 页面可能没有结果，但仍有后续内容；只要页面提供继续选项，就可以继续搜索。
-
-Memory 与 conversation 及 Current Library 相互独立。阅读记录不会将内容加入 Pi prompt 或已保存的 conversation。要浏览收集到的外部来源并附加 exact-version references，仍使用独立的 [Current Library](#current-library)。
+阅读不会将记忆加入 Pi prompt 或已保存的对话。同一侧栏中的 [Library](#current-library) 用于浏览收集到的外部资料及附加精确版本引用。
 
 <a id="stay-connected"></a>
 
@@ -117,7 +115,7 @@ Memory 与 conversation 及 Current Library 相互独立。阅读记录不会将
 }
 ```
 
-`database` 指向管理这些 Pi sessions 的 Distill store，然后 restart Dwell。该显式 host configuration 会启用 source coordination，以及由该 Distill module 提供的 Memory reader；仅安装或注册 Pi extension 不会为 Dwell 完成集成配置。Dwell 会让文件读取和 hosted Pi processes 参与 store 的 cleanup coordination。省略 Distill entry 时两项集成都不启用；未配置 Distill 时，现有 Conversations sidebar 保持不变。
+`database` 指向管理这些 Pi sessions 的 Distill store，然后 restart Dwell。该显式 host configuration 会启用 source coordination，以及由该 Distill module 提供的 Memory reader；仅安装或注册 Pi extension 不会为 Dwell 完成集成配置。Dwell 会让文件读取和 hosted Pi processes 参与 store 的 cleanup coordination。省略 Distill entry 时，不启用 source coordination 与 Memory。请使用支持列出最近记忆的 Distill build。
 
 Source-access configuration 或 module opening 出错仍会导致 startup 失败。Memory reader 初始化是 optional：reader 不存在或无法打开时，Dwell 会在 source coordination 可用的情况下正常启动，并在 sidebar 显示 Memory 不可用及 **Retry**。详见 [Memory](implementation/memory.md) 和 [access lifecycle](implementation/history-retirement.md#behavior)。
 
@@ -140,7 +138,7 @@ Source-access configuration 或 module opening 出错仍会导致 startup 失败
 
 请将两个 path 替换为本机 absolute path。同一个 canonical root 应持续使用相同 binding；Current 打开后，若该 binding 指向不同 root，Dwell 会拒绝启动。配置文件从 Dwell data directory 读取，并需满足现有 private-file permission checks。省略 `current` 时 session host 仍可用，library routes 会返回 `library_unavailable`。
 
-打开 **Library** 可查看 latest items、搜索和读取 exact version。Candidate result 会显示 **Article text has not been saved.**、发现时间和原始来源链接。已保存 item 则提供正文供阅读。选中 session 后，使用 **Attach to session** 保存 exact item/version reference，包括已确认的 candidate。该操作不会改变 Pi prompt，也不会获取 candidate text。Current 暂不可用时，已保存 reference 仍可查看和移除。
+在侧栏打开 **Library** 可查看 latest items、搜索和读取 exact version。Candidate result 会显示 **Article text has not been saved.**、发现时间和原始来源链接。已保存 item 则提供正文供阅读。选中 session 后，使用 **Attach to session** 保存 exact item/version reference，包括已确认的 candidate。该操作不会改变 Pi prompt，也不会获取 candidate text。已配置的 Current 暂不可用时，仍可查看和移除已保存的引用。
 
 `current` 和 `distill` 可放在同一个 version 1 configuration 中。详见 [Library](implementation/library.md) 与 [历史清理](implementation/history-retirement.md)。
 

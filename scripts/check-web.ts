@@ -31,6 +31,11 @@ class BrowserPage {
       } else if (value.method === "Runtime.exceptionThrown")
         this.errors.push(JSON.stringify(value.params));
     });
+    this.socket.addEventListener("close", () => {
+      for (const request of this.#requests.values())
+        request.reject(new Error("Browser connection closed."));
+      this.#requests.clear();
+    });
   }
   async open(): Promise<void> {
     await new Promise<void>((resolve, reject) => {
@@ -87,6 +92,27 @@ class BrowserPage {
     await this.evaluate(
       `(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.value=${JSON.stringify(text)};e.dispatchEvent(new Event('input',{bubbles:true}));})()`,
     );
+  }
+}
+async function closeBrowser(
+  chrome: ReturnType<typeof spawn> | undefined,
+  pages: BrowserPage[],
+): Promise<void> {
+  try {
+    if (!chrome?.pid || chrome.exitCode !== null || chrome.signalCode !== null) return;
+    const exited = new Promise<true>((resolve) => chrome.once("exit", () => resolve(true)));
+    const page = pages.find(({ socket }) => socket.readyState === WebSocket.OPEN);
+    // Let Chromium flush and close the profile's network/storage processes before removing it.
+    if (page) {
+      void page.call("Browser.close").catch(() => {});
+      if (await Promise.race([exited, delay(3000, false, { ref: false })])) return;
+    }
+    chrome.kill("SIGTERM");
+    if (await Promise.race([exited, delay(3000, false, { ref: false })])) return;
+    chrome.kill("SIGKILL");
+    await exited;
+  } finally {
+    for (const page of pages) page.socket.close();
   }
 }
 type MemoryCapabilityFixture = {
@@ -233,17 +259,13 @@ function historyTransitionProbeScript(sessionId: string): string {
   })()`;
 }
 
-async function assertLibraryLaunch(page: BrowserPage): Promise<void> {
-  assert.deepEqual(
-    await page.evaluate(`Array.from(document.querySelectorAll('button[aria-haspopup="dialog"]'))
-      .filter(button => button.getAttribute('aria-label') === 'Browse library' || button.textContent.trim() === 'Browse library')
-      .map(button => ({header: !!button.closest('main > header'), width: button.offsetWidth, height: button.offsetHeight}))`),
-    [{ header: true, width: 36, height: 36 }],
+async function assertStandaloneSidebar(page: BrowserPage): Promise<void> {
+  await page.until('!document.querySelector("#session-list").hidden');
+  assert.equal(
+    await page.evaluate(`!document.querySelector('#library-open,#library-dialog') &&
+    document.querySelector('#library-view').hidden && document.querySelector('#knowledge-tabs').hidden`),
+    true,
   );
-  await page.click("#library-open");
-  await page.until('document.querySelector("#library-dialog").open');
-  await page.click("#close-library");
-  assert.equal(await page.evaluate("document.activeElement.id"), "library-open");
 }
 
 async function assertComposerLayout(page: BrowserPage, viewport: string): Promise<void> {
@@ -1906,25 +1928,24 @@ async function runCurrentLibraryBrowserAcceptance(
     });
     await page.call("Page.navigate", { url: host.url });
     await page.until(
-      '!document.querySelector("#app").hidden && document.querySelectorAll("#session-list .name-row").length===2',
+      '!document.querySelector("#app").hidden && !document.querySelector("#library-view").hidden && document.querySelectorAll("#status-list .status-tab").length===2',
     );
-
-    await page.evaluate(
-      "document.querySelector('#session-list .name-row[data-session-id=\"" +
-        secondSession +
-        "\"]').click()",
-    );
-    await page.until(
-      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
-        JSON.stringify(secondSession),
-    );
-    await page.click("#library-open");
-    await page.until('document.querySelector("#library-dialog").open');
+    const selectSession = async (id: string) => {
+      const tab = `#status-list [data-session-id="${id}"]`;
+      if (
+        !(await page.evaluate(
+          `document.querySelector(${JSON.stringify(tab)}).classList.contains('active')`,
+        ))
+      )
+        await page.click(`${tab} .tab-select`);
+      await page.until(
+        `document.querySelector('#status-list .status-tab.active')?.dataset.sessionId===${JSON.stringify(id)}`,
+      );
+    };
+    await selectSession(secondSession);
     await page.until(
       'document.querySelector("#library-items").textContent.includes("Latest Current browser title")',
     );
-    await page.click("#close-library");
-    await page.until('!document.querySelector("#library-dialog").open');
     const candidateSummary = "Synthetic discovery summary with BrowserCandidateSummaryToken.";
     writer = moduleValue.openContentLibrary({ root: canonicalRoot });
     const candidateVersion = await saveCurrentBrowserCandidate(
@@ -1935,16 +1956,6 @@ async function runCurrentLibraryBrowserAcceptance(
     );
     await writer.close();
     writer = undefined;
-    await page.evaluate(
-      "document.querySelector('#session-list .name-row[data-session-id=\"" +
-        firstSession +
-        "\"]').click()",
-    );
-    await page.until(
-      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
-        JSON.stringify(firstSession),
-    );
-
     const firstReferencesPath = `/api/v1/sessions/${firstSession}/library-references`;
     const secondReferencesPath = `/api/v1/sessions/${secondSession}/library-references`;
     await page.evaluate(
@@ -1968,20 +1979,9 @@ async function runCurrentLibraryBrowserAcceptance(
         "return response;" +
         "};})()",
     );
-    await page.click("#library-open");
+    await selectSession(firstSession);
     await page.until("window.__firstLibraryResponseWaiting===true");
-    await page.click("#close-library");
-    await page.until('!document.querySelector("#library-dialog").open');
-    await page.evaluate(
-      "document.querySelector('#session-list .name-row[data-session-id=\"" +
-        secondSession +
-        "\"]').click()",
-    );
-    await page.until(
-      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
-        JSON.stringify(secondSession),
-    );
-    await page.click("#library-open");
+    await selectSession(secondSession);
     await page.until(
       "window.__secondLibraryResponseSeen===true && document.querySelector('#library-session-label').textContent==='Session " +
         secondSession.slice(0, 8) +
@@ -1996,18 +1996,7 @@ async function runCurrentLibraryBrowserAcceptance(
     );
     console.log("PASS HTTP Chrome ignores a delayed reference response from the previous session");
 
-    await page.click("#close-library");
-    await page.until('!document.querySelector("#library-dialog").open');
-    await page.evaluate(
-      "document.querySelector('#session-list .name-row[data-session-id=\"" +
-        firstSession +
-        "\"]').click()",
-    );
-    await page.until(
-      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
-        JSON.stringify(firstSession),
-    );
-    await page.click("#library-open");
+    await selectSession(firstSession);
     await page.until(
       'document.querySelector("#library-references").textContent.includes("' +
         oldVersion.versionId.slice(0, 8) +
@@ -2084,9 +2073,18 @@ async function runCurrentLibraryBrowserAcceptance(
 
     await host.close();
     host = undefined;
-    await writeFile(join(dataDir, "integrations.json"), JSON.stringify({ version: 1 }), {
-      mode: 0o600,
-    });
+    await writeFile(
+      join(dataDir, "integrations.json"),
+      JSON.stringify({
+        version: 1,
+        current: {
+          module: join(environment.root, "missing-current.mjs"),
+          root: canonicalRoot,
+          binding,
+        },
+      }),
+      { mode: 0o600 },
+    );
     host = await startHost({
       port: hostPort,
       dataDir,
@@ -2094,18 +2092,9 @@ async function runCurrentLibraryBrowserAcceptance(
     });
     await page.call("Page.reload");
     await page.until(
-      'document.querySelector("#app")?.hidden===false && document.querySelectorAll("#session-list .name-row").length===2',
+      '!document.querySelector("#app").hidden && !document.querySelector("#library-view").hidden && document.querySelectorAll("#status-list .status-tab").length===2',
     );
-    await page.evaluate(
-      "document.querySelector('#session-list .name-row[data-session-id=\"" +
-        firstSession +
-        "\"]').click()",
-    );
-    await page.until(
-      "document.querySelector('#session-list .name-row.active')?.dataset.sessionId===" +
-        JSON.stringify(firstSession),
-    );
-    await page.click("#library-open");
+    await selectSession(firstSession);
     await page.until(
       'document.querySelector("#library-references").textContent.includes("' +
         latestReference.versionId.slice(0, 8) +
@@ -2137,13 +2126,7 @@ async function runCurrentLibraryBrowserAcceptance(
     );
     console.log("PASS HTTP Chrome shows and removes stored references while Current is offline");
   } finally {
-    for (const browser of pages) browser.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise<void>((resolve) => chrome?.once("exit", () => resolve()));
-      chrome.kill("SIGTERM");
-      await Promise.race([exited, delay(3000)]);
-      if (chrome.exitCode === null) chrome.kill("SIGKILL");
-    }
+    await closeBrowser(chrome, pages);
     await host?.close();
     await writer?.close();
     await environment.cleanup();
@@ -2194,8 +2177,12 @@ async function writeMemoryBrowserConfiguration(
 
 async function assertMemoryBrowserMode(page: BrowserPage, mode: MemoryBrowserMode): Promise<void> {
   const fixture = MEMORY_CAPABILITY_FIXTURES[mode];
+  const knowledge = fixture.memory.configured || fixture.library.configured;
   await page.until(
-    `document.querySelector("#app").classList.contains("with-memory")===${JSON.stringify(fixture.memory.configured)} && document.querySelector("#memory-view").hidden===${JSON.stringify(!fixture.memory.configured)} && document.querySelector("#session-list").hidden===${JSON.stringify(fixture.memory.configured)} && !document.querySelector("#message").disabled`,
+    `document.querySelector("#memory-view").hidden===${!fixture.memory.configured} &&
+     document.querySelector("#library-view").hidden===${mode !== "current"} &&
+     document.querySelector("#knowledge-tabs").hidden===${mode !== "both"} &&
+     document.querySelector("#session-list").hidden===${knowledge} && !document.querySelector("#message").disabled`,
   );
   const view = record(
     await page.evaluate(`(()=>{
@@ -2215,8 +2202,8 @@ async function assertMemoryBrowserMode(page: BrowserPage, mode: MemoryBrowserMod
   );
   assert.equal(
     view.sidebarHeading,
-    fixture.memory.configured ? "none" : "flex",
-    `${mode} toggles the conversation section with Memory`,
+    knowledge ? "none" : "flex",
+    `${mode} toggles the conversation section with Knowledge`,
   );
   assert.equal(view.renameEditor, false, `${mode} has no rename editor`);
   assert.notEqual(view.composer, "none", `${mode} keeps the Pi composer available`);
@@ -2321,25 +2308,6 @@ async function runMemoryBrowserAcceptance(
     currentWriter = undefined;
 
     writer = await openDistillBrowserWriter(distillModulePath, distillDatabase);
-    const createdAt = new Date().toISOString();
-    for (let index = 0; index < 128; index++) {
-      writer.save({
-        id: `a-browser-padding-${String(index).padStart(3, "0")}`,
-        content: `unrelated browser fixture record ${index}`,
-        createdAt,
-      });
-    }
-    writer.save({
-      id: "z-browser-memory-short",
-      content: "BrowserMemoryToken concise synthetic memory entry.",
-      createdAt,
-    });
-    writer.save({ id: memoryId, content: memoryContent, createdAt });
-    writer.save({
-      id: revisionId,
-      content: `Original BrowserRevisionToken ${"r".repeat(8_200)}`,
-      createdAt,
-    });
     await writer.close();
     writer = undefined;
 
@@ -2492,8 +2460,6 @@ async function runMemoryBrowserAcceptance(
     }
 
     await restartIn("current");
-    await page.click("#library-open");
-    await page.until('document.querySelector("#library-dialog").open');
     await page.type("#library-query", "BrowserModeCandidateToken");
     await page.click("#library-search");
     await page.until(
@@ -2503,11 +2469,61 @@ async function runMemoryBrowserAcceptance(
     await page.until(
       'document.querySelector("#library-text").textContent==="Article text has not been saved." && document.querySelector("#library-summary").textContent.includes("BrowserModeCandidateToken")',
     );
-    await page.click("#close-library");
-    await page.until('!document.querySelector("#library-dialog").open');
     console.log("PASS HTTP Chrome Current mode reads a summary-only API v2 candidate");
 
     await restartIn("distill");
+    await page.until(
+      `document.querySelector('#memory-results').textContent==='No memories saved yet.'`,
+    );
+    writer = await openDistillBrowserWriter(distillModulePath, distillDatabase);
+    const createdAt = new Date().toISOString();
+    for (let index = 0; index < 128; index++) {
+      writer.save({
+        id: `a-browser-padding-${String(index).padStart(3, "0")}`,
+        content: `unrelated browser fixture record ${index}`,
+        createdAt,
+      });
+    }
+    writer.save({
+      id: "z-browser-memory-short",
+      content: "BrowserMemoryToken concise synthetic memory entry.",
+      createdAt,
+    });
+    writer.save({ id: memoryId, content: memoryContent, createdAt });
+    writer.save({
+      id: revisionId,
+      content: `Original BrowserRevisionToken ${"r".repeat(8_200)}`,
+      createdAt,
+    });
+    await writer.close();
+    writer = undefined;
+    await page.click("#close-nav");
+    await page.click("#open-nav");
+    await page.until(`document.querySelectorAll('#memory-results .memory-result').length===20 &&
+      document.querySelector('#memory-results time')?.dateTime.length>0`);
+    assert.equal(
+      await page.evaluate(`document.querySelector('#memory-search-more').textContent`),
+      "More",
+    );
+    await page.click("#memory-search-more");
+    await page.until(`document.querySelectorAll('#memory-results .memory-result').length===40`);
+    await page.click("#memory-results .memory-result");
+    await page.until(
+      `document.querySelector('#memory-text').textContent==='unrelated browser fixture record 0'`,
+    );
+    await page.click("#memory-reader-close");
+    await page.click("#close-nav");
+    await page.until(
+      `document.querySelector('#rail').hidden && document.activeElement.id==='open-nav'`,
+    );
+    await page.call("Page.reload");
+    await page.until(
+      `!document.querySelector('#app').hidden && document.querySelector('#rail').hidden`,
+    );
+    await page.click("#open-nav");
+    await page.until(
+      `!document.querySelector('#rail').hidden && document.querySelectorAll('#memory-results .memory-result').length===20`,
+    );
     await page.click(".status-tab.active .tab-select");
     await page.until(
       'document.querySelector(".status-tab.active.close-armed .tab-close")!==null && document.activeElement.classList.contains("tab-close")',
@@ -2532,7 +2548,6 @@ async function runMemoryBrowserAcceptance(
     await assertBrowserControlReachable(page, "#memory-query", "desktop Memory");
     await assertMemoryFocusOutline(page);
     await assertBrowserControlReachable(page, "#memory-search", "desktop Memory");
-    assert.equal(await page.evaluate('document.querySelector("#memory-results").textContent'), "");
     await page.type("#memory-query", "BrowserMemoryToken");
     assert.equal(await page.evaluate('document.querySelector("#memory-results").textContent'), "");
     await page.click("#memory-search");
@@ -2553,6 +2568,10 @@ async function runMemoryBrowserAcceptance(
     );
     await assertBrowserControlReachable(page, "#memory-results .memory-result", "desktop Memory");
     await saveScreenshotIfRequested(page, "memory-desktop-sidebar.png");
+    await page.evaluate(
+      `(()=>{const input=document.querySelector('#memory-query');input.value='';input.dispatchEvent(new Event('input'));})()`,
+    );
+    await page.until(`document.querySelectorAll('#memory-results .memory-result').length===20`);
 
     await page.call("Emulation.setDeviceMetricsOverride", {
       width: 390,
@@ -2656,6 +2675,46 @@ async function runMemoryBrowserAcceptance(
     console.log("PASS HTTP Chrome clears stale read pages after a Distill revision change");
 
     await restartIn("both");
+    await page.until(
+      `!document.querySelector('#knowledge-tabs').hidden && document.querySelector('#memory-tab').getAttribute('aria-selected')==='true'`,
+    );
+    await page.click("#library-tab");
+    await page.until(
+      `!document.querySelector('#library-view').hidden && document.querySelector('#memory-view').hidden && document.querySelector('#library-items').textContent.includes('Memory mode Current candidate')`,
+    );
+    await assertBrowserControlReachable(page, "#message", "conversation beside Library");
+    await page.call("Emulation.setDeviceMetricsOverride", {
+      width: 760,
+      height: 844,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await page.until(`innerWidth===760 && document.querySelector('#rail').inert`);
+    await page.click("#open-nav");
+    await page.until(
+      `!document.querySelector('#library-view').hidden && document.querySelector('#chat-main').inert`,
+    );
+    await assertBrowserControlReachable(
+      page,
+      "#library-query",
+      "Library in mobile Knowledge drawer",
+    );
+    await page.call("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
+    await page.call("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape" });
+    await page.until(
+      `document.querySelector('#rail').inert && document.activeElement.id==='open-nav'`,
+    );
+    await page.call("Emulation.setDeviceMetricsOverride", {
+      width: 1280,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await page.until(`innerWidth===1280 && !document.querySelector('#rail').inert`);
+    await page.click("#memory-tab");
+    await page.until(
+      `document.querySelector('#library-view').hidden && document.querySelector('#memory-results .memory-result')?.dataset.memoryId===${JSON.stringify(revisionId)}`,
+    );
     await assertBrowserControlReachable(page, "#memory-query", "both-integrations Memory");
     await page.type("#memory-query", "BrowserMemoryToken");
     await page.evaluate(`(()=>{
@@ -2706,13 +2765,7 @@ async function runMemoryBrowserAcceptance(
     );
     console.log("PASS HTTP Chrome ignores a delayed Memory response after Host config removal");
   } finally {
-    for (const browser of pages) browser.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise<void>((resolve) => chrome?.once("exit", () => resolve()));
-      chrome.kill("SIGTERM");
-      await Promise.race([exited, delay(3000)]);
-      if (chrome.exitCode === null) chrome.kill("SIGKILL");
-    }
+    await closeBrowser(chrome, pages);
     await host?.close();
     await writer?.close();
     await currentWriter?.close();
@@ -2935,7 +2988,7 @@ for (const mode of modes) {
     await first.until(
       'document.querySelector("#model-label").textContent.trim()==="dwell-test" && document.querySelector("#attach-image").disabled && document.querySelector("#attach-image").title.includes("Choose a model")',
     );
-    await assertLibraryLaunch(first);
+    await assertStandaloneSidebar(first);
     assert.equal(
       record(await request("/model-capabilities", { provider: "dwell-test", model: "dwell-test" }))
         .supportsImages,
@@ -3385,7 +3438,7 @@ for (const mode of modes) {
       deviceScaleFactor: 1,
       mobile: true,
     });
-    await assertLibraryLaunch(second);
+    await assertStandaloneSidebar(second);
     await assertComposerLayout(second, "mobile");
     await assertStatusCloseGeometry(second, "mobile");
     await assertActionIconGeometry(second, "mobile");
@@ -4224,13 +4277,7 @@ for (const mode of modes) {
     );
     for (const browser of pages) assert.deepEqual(browser.errors, []);
   } finally {
-    for (const browser of pages) browser.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise<void>((resolve) => chrome?.once("exit", () => resolve()));
-      chrome.kill("SIGTERM");
-      await Promise.race([exited, delay(3000)]);
-      if (chrome.exitCode === null) chrome.kill("SIGKILL");
-    }
+    await closeBrowser(chrome, pages);
     await host?.close();
     await proxy?.close();
     await environment.cleanup();

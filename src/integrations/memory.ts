@@ -2,6 +2,9 @@ import { pathToFileURL } from "node:url";
 import { isRecord } from "../runtime/pi-rpc.ts";
 import {
   isMemoryErrorCode,
+  isMemoryListResponse,
+  type MemoryListRequest,
+  type MemoryListResponse,
   isMemoryReadResponse,
   isMemorySearchResponse,
   type MemoryErrorCode,
@@ -14,6 +17,7 @@ import type { DistillModuleConfiguration } from "./distill.ts";
 
 interface DistillMemoryReaderV1 {
   readonly version: 1;
+  list(request: MemoryListRequest): unknown;
   search(request: MemorySearchRequest): unknown;
   read(request: MemoryReadRequest): unknown;
   close(): void;
@@ -48,6 +52,7 @@ function isDistillMemoryReaderV1(value: unknown): value is DistillMemoryReaderV1
   return (
     isRecord(value) &&
     value.version === 1 &&
+    typeof value.list === "function" &&
     typeof value.search === "function" &&
     typeof value.read === "function" &&
     typeof value.close === "function"
@@ -74,6 +79,17 @@ export class MemoryReader {
 
   constructor(reader: DistillMemoryReaderV1) {
     this.#reader = reader;
+  }
+
+  async list(request: MemoryListRequest): Promise<MemoryListResponse> {
+    try {
+      const response: unknown = await this.#reader.list(request);
+      if (!isMemoryListResponse(response) || response.items.length > (request.limit ?? 20))
+        throw new MemoryReaderError("memory_unavailable");
+      return response;
+    } catch (error) {
+      throw asMemoryReaderError(error);
+    }
   }
 
   async search(request: MemorySearchRequest): Promise<MemorySearchResponse> {

@@ -22,16 +22,20 @@ export const HOST_PAGE = `<!doctype html>
 <button class="scrim" id="scrim" hidden aria-label="Close navigation">
 </button>
 <aside id="rail" aria-label="Navigation">
-<div class="brand">dwell.<button id="close-nav" class="icon" aria-label="Close navigation">×</button>
+<div class="brand">dwell.<button id="close-nav" type="button" class="text-button" aria-controls="rail" aria-label="Close navigation">×</button>
 </div>
 <button class="new" id="new-session">New conversation <span>＋</span>
 </button>
-<div class="section-head">
+<div class="section-head" id="conversations-heading">
 <span>Conversations</span>
 </div>
 <nav id="session-list" class="session-names" aria-label="Conversations">
 </nav>
-<section id="memory-view" aria-labelledby="memory-title" hidden>
+<div id="knowledge-tabs" role="tablist" aria-label="Knowledge" hidden>
+<button id="memory-tab" type="button" role="tab" aria-controls="memory-view" aria-selected="true">Memory</button>
+<button id="library-tab" type="button" role="tab" aria-controls="library-view" aria-selected="false" tabindex="-1">Library</button>
+</div>
+<section id="memory-view" class="knowledge-view" aria-labelledby="memory-title" hidden>
 <div class="memory-heading"><h2 id="memory-title">Memory</h2></div>
 <p id="memory-capability-status" class="memory-caption" role="status" hidden></p>
 <form id="memory-search-form" class="memory-search">
@@ -50,6 +54,33 @@ export const HOST_PAGE = `<!doctype html>
 </section>
 <button id="memory-retry" class="text-button memory-more" type="button" hidden>Retry Memory</button>
 </section>
+<section id="library-view" class="knowledge-view" aria-labelledby="library-title" hidden>
+<h2 id="library-title">Library</h2>
+<p id="library-session-label" class="footnote"></p>
+<form id="library-search-form" class="library-search">
+<label class="sr-only" for="library-query">Search saved content</label>
+<input id="library-query" type="search" maxlength="200" placeholder="Search saved content…" autocomplete="off">
+<button id="library-search" class="action" type="submit">Search</button>
+</form>
+<p id="library-error" class="feedback" role="status"></p>
+<section class="library-section">
+<h3 id="library-references-title">Attached to this session</h3>
+<div id="library-references"></div>
+</section>
+<section class="library-section">
+<h3 id="library-items-title">Latest items</h3>
+<div id="library-items"></div>
+</section>
+<section id="library-reader" class="library-reader" aria-labelledby="library-reader-title" hidden>
+<div class="memory-reader-heading"><h3 id="library-reader-title" tabindex="-1"></h3><button id="library-reader-close" class="icon" type="button" aria-label="Close article">×</button></div>
+<p id="library-reader-meta" class="footnote"></p>
+<a id="library-source-link" rel="noreferrer noopener" target="_blank">Open original source ↗</a>
+<p id="library-summary" class="library-summary"></p>
+<pre id="library-text"></pre>
+<p id="library-completeness" class="footnote"></p>
+<button id="library-reference-action" class="action" type="button" disabled>Select a session to attach</button>
+</section>
+</section>
 <div class="rail-foot">
 <p id="client-capabilities-error" class="footnote" role="status" hidden></p>
 <button id="client-capabilities-retry" class="text-button" type="button" hidden>Retry integration status</button>
@@ -58,12 +89,11 @@ export const HOST_PAGE = `<!doctype html>
 </aside>
 <main id="chat-main">
 <header>
-<button id="open-nav" aria-label="Open navigation" aria-expanded="false">
-<span class="menu" aria-hidden="true">☰</span><span class="nav-memory-label">Memory</span>
+<button id="open-nav" type="button" aria-label="Open navigation" aria-controls="rail" aria-expanded="false">
+<span class="menu" aria-hidden="true">☰</span><span id="nav-knowledge-label" hidden></span>
 </button>
 <nav id="status-list" aria-label="Session status">
 </nav>
-<button id="library-open" class="icon" type="button" aria-label="Browse library" title="Browse library" aria-haspopup="dialog">▤</button>
 <button id="new-mobile" class="icon" type="button" aria-label="New conversation">＋</button>
 </header>
 <div class="notice-area">
@@ -144,35 +174,6 @@ export const HOST_PAGE = `<!doctype html>
 <p class="footnote">Disconnecting leaves your work running on the host.</p>
 </dialog>
 <dialog id="image-dialog" aria-labelledby="image-title"><div class="panel-heading"><h2 id="image-title">Image</h2><button id="close-image" class="icon" type="button" aria-label="Close image preview">×</button></div><img id="preview-image" alt=""></dialog>
-<dialog id="library-dialog" aria-labelledby="library-title">
-<div class="handle"></div>
-<div class="panel-heading">
-<div><h2 id="library-title">Current library</h2><p id="library-session-label" class="footnote"></p></div>
-<button id="close-library" class="icon" type="button" aria-label="Close library">×</button>
-</div>
-<form id="library-search-form" class="library-search">
-<label class="sr-only" for="library-query">Search saved content</label>
-<input id="library-query" type="search" maxlength="200" placeholder="Search saved content…" autocomplete="off">
-<button id="library-search" class="action" type="submit">Search</button>
-</form>
-<p id="library-error" class="feedback" role="status"></p>
-<section class="library-section">
-<h3 id="library-references-title">Attached to this session</h3>
-<div id="library-references"></div>
-</section>
-<section class="library-section">
-<h3 id="library-items-title">Latest items</h3>
-<div id="library-items"></div>
-</section>
-<section id="library-reader" class="library-reader" hidden>
-<div class="panel-heading"><div><h3 id="library-reader-title"></h3><p id="library-reader-meta" class="footnote"></p></div></div>
-<a id="library-source-link" rel="noreferrer noopener" target="_blank">Open original source ↗</a>
-<p id="library-summary" class="library-summary"></p>
-<pre id="library-text"></pre>
-<p id="library-completeness" class="footnote"></p>
-<button id="library-reference-action" class="action" type="button" disabled>Select a session to attach</button>
-</section>
-</dialog>
 </body>
 </html>`;
 
@@ -210,7 +211,6 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-vi
 #extensions:empty{display:none}
 #extensions button{font:10px var(--mono);padding:8px 0;min-height:38px}
 #extensions span{color:var(--teal);margin-right:5px}
-.nav-memory-label{display:none}
 main{flex:1;min-width:0;display:flex;flex-direction:column}
 header{display:flex;align-items:center}
 #desktop-context{font:10px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -902,11 +902,13 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 .history-retry{min-height:28px;padding:0 4px;font:inherit;color:var(--dark)}
 .history-entry-anchor{display:block;height:0}
 .markdown>.history-entry-anchor:first-child+*{margin-top:0}
-#library-dialog{width:min(620px,calc(100vw - 32px));padding:18px;box-shadow:4px 4px var(--lilac)}
-#library-dialog .panel-heading{margin-bottom:12px;gap:12px;align-items:flex-start}
-#library-dialog h2{font:600 18px/1.4 var(--sans);letter-spacing:0;margin:0}
-#library-dialog .footnote{margin:4px 0 0}
-#library-dialog #close-library{width:32px;height:32px}
+#app.with-knowledge #rail{background:var(--paper);--muted:#797267}
+#knowledge-tabs{display:flex;gap:18px;border-bottom:1px solid var(--line);margin-bottom:8px}
+#knowledge-tabs button{min-height:38px;padding:2px 3px;color:var(--muted);border-bottom:2px solid transparent;font:600 14px var(--sans)}
+#knowledge-tabs [aria-selected=true]{color:var(--ink);border-color:currentColor}
+#knowledge-tabs:not([hidden])+ #memory-view .memory-heading,#knowledge-tabs:not([hidden])~ #library-view>h2{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+#library-title{margin:0 4px 6px;font:600 17px/1.5 var(--mono)}
+#library-session-label{margin:4px 0 0}
 .library-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:12px 0}
 .library-search input{min-width:0;height:40px;border:1px solid var(--line);background:var(--paper);padding:8px;font:13px var(--mono)}
 .library-search .action{min-height:40px;padding:8px 12px;font:11px var(--mono)}
@@ -928,18 +930,15 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #library-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:38dvh;overflow:auto;padding:12px;background:var(--paper);font:12px/1.7 var(--sans)}
 #library-reference-action{min-height:38px;padding:8px 12px;font:11px var(--mono);margin-top:8px}
 #library-reference-action:disabled{opacity:.6}
-#library-open{display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:36px;height:36px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--dark);font:17px var(--mono)}
-@media(max-width:760px){
- #library-dialog{width:100%;max-width:none;padding:12px 16px max(18px,env(safe-area-inset-bottom));box-shadow:0 -3px var(--lilac)}
- #library-dialog .handle{margin-bottom:12px}
- #library-text{max-height:34dvh}
+#library-reader-close{width:30px;height:32px}
+@media(min-width:761px){
+ #app.sidebar-collapsed #open-nav{display:block}
+ #close-nav{display:block;width:36px;min-height:36px;color:var(--muted)}
 }
-
-/* Distill replaces the sidebar conversation list while the selected Pi session stays active. */
-#app.with-memory #session-list,#session-list[hidden]{display:none}
-#app.with-memory .section-head{display:none}
-#memory-view{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;gap:0;overflow-y:auto}
-#memory-view[hidden]{display:none}
+#open-nav{color:#797267}
+#app.with-knowledge #open-nav{width:auto;min-width:0;padding:0 6px;font:600 13px var(--sans)}
+#app.with-knowledge #open-nav .menu{display:none}
+.knowledge-view{flex:1 1 auto;min-height:0}
 #memory-view .memory-heading{margin:0 8px 6px}
 #memory-view .memory-heading h2{margin:0;font:600 17px/1.5 var(--mono);letter-spacing:-.5px}
 #memory-view .memory-caption{margin:4px 8px 10px;font:10px/1.6 var(--sans);color:var(--muted)}
@@ -951,6 +950,8 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #memory-search-error,#memory-read-error{margin:4px 0;padding:0 2px;font-size:10px}
 #memory-results{display:grid;gap:0;min-width:0}
 .memory-result{display:block;width:100%;min-width:0;padding:10px 4px;text-align:left;border:0;border-top:1px solid var(--line);background:none;box-shadow:none;font:12px/1.6 var(--sans);color:var(--ink);overflow-wrap:anywhere}
+.memory-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
+.memory-result time{display:block;margin-top:4px;color:var(--muted);font:11px/1.5 var(--mono)}
 .memory-empty{margin:10px 4px;padding:8px 0;border-top:1px solid var(--line);font:10px/1.6 var(--sans);color:var(--muted)}
 .memory-more{min-height:34px;align-self:flex-start;margin:3px 0;padding:7px 4px;font:10px/1.5 var(--mono);color:var(--dark)}
 #memory-reader{margin-top:12px;padding:11px 0 0;border-top:1px solid var(--line)}
@@ -964,9 +965,9 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #app.with-memory #status-list .status-tab .tab-select{grid-column:1;display:flex;justify-content:center;padding:0}
 #app.with-memory #status-list .status-tab .tab-close{grid-column:1;justify-content:center;width:100%;padding:0}
 @media(max-width:760px){
- #app.with-memory #open-nav{width:auto;height:36px;min-height:36px;padding:0 8px;border:1px solid var(--line);background:var(--surface);color:var(--dark)}
- #app.with-memory #open-nav .menu{display:none}
- #app.with-memory #open-nav .nav-memory-label{display:block}
+ #rail{visibility:hidden;transition:transform 160ms ease,visibility 160ms}
+ #rail.open{visibility:visible}
+ @media(prefers-reduced-motion:reduce){#rail{transition:none}}
  #memory-view .memory-heading{margin:0 4px 6px}
  #memory-search-form{gap:5px}
  #memory-query{height:36px}
@@ -974,7 +975,7 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  #app.with-memory #status-list .status-tab{width:36px;flex-basis:36px;height:34px}
 }
 
-#memory-view :is(input,button):focus-visible{outline-offset:-2px}
+.knowledge-view :is(input,button):focus-visible{outline-offset:-2px}
 
 @media(min-width:761px){
  :root{--type-reading:17px;--type-ui:15px;--type-meta:13px}
@@ -1010,9 +1011,8 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  dialog{width:min(520px,calc(100vw - 40px));padding:24px}
  #new-dialog{width:min(480px,calc(100vw - 40px));padding:22px}
  #model-dialog{width:min(460px,calc(100vw - 40px));padding:22px}
- #library-dialog{width:min(760px,calc(100vw - 40px));padding:24px}
  #close-session-dialog{width:min(420px,calc(100vw - 40px))}
- #new-dialog h2,#model-dialog h2,#library-dialog h2,#close-session-title{font-size:22px}
+ #new-dialog h2,#model-dialog h2,#close-session-title{font-size:22px}
  #image-dialog h2{font-size:var(--type-ui)}
  .form label,.gate label,#new-dialog label,#close-session-number{font-size:var(--type-meta);line-height:1.5}
  .form input,.form select,#new-dialog #directory,#model-dialog #model-search,.library-search input{font-size:var(--type-ui);height:44px}
@@ -1028,7 +1028,7 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  .library-result strong,.library-result span,.library-summary{font-size:var(--type-ui)}
  .library-reader h3{font-size:var(--type-reading)}
  #library-text{font-size:var(--type-reading);line-height:1.75;padding:16px}
- #memory-view .memory-heading h2{font-size:22px;letter-spacing:-.3px}
+ #memory-view .memory-heading h2,#library-title{font-size:22px;letter-spacing:-.3px}
  #memory-view .memory-caption,.memory-empty,#memory-search-error,#memory-read-error{font-size:var(--type-meta)}
  #memory-search-form{gap:8px;margin:10px 0 6px}
  #memory-query{font-size:var(--type-ui);height:44px;padding:9px}

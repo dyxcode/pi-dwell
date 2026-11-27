@@ -31,6 +31,32 @@ test("authenticated memory routes page search and revision-pinned reads", async 
     },
   );
 
+  const list = (body: unknown, authenticated = true) =>
+    fetch(`${host.url}/api/v1/memory/list`, {
+      method: "POST",
+      headers: { ...(authenticated ? cliHeaders : {}), "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  assert.equal((await list({}, false)).status, 403);
+  const recent = await list({ limit: 1 });
+  assert.equal(recent.status, 200);
+  assert.deepEqual(await recent.json(), {
+    items: [
+      { id: "memory-a", revision: 7, preview: "recent", updatedAt: "2026-11-17T00:00:00.000Z" },
+    ],
+    nextCursor: "opaque/list-next",
+  });
+  assert.deepEqual(await (await list({ cursor: "opaque/list-next" })).json(), { items: [] });
+  for (const [body, status, code] of [
+    [{ limit: 21 }, 400, "invalid_input"],
+    [{ cursor: "tampered" }, 400, "invalid_cursor"],
+    [{ cursor: "malformed-response" }, 503, "memory_unavailable"],
+  ] as const) {
+    const response = await list(body);
+    assert.equal(response.status, status);
+    assert.equal(responseErrorCode(await response.json()), code);
+  }
+
   const search = await fetch(`${host.url}/api/v1/memory/search`, {
     method: "POST",
     headers: { ...cliHeaders, "Content-Type": "application/json" },
@@ -347,6 +373,27 @@ test("the actual Distill reader preserves partial search pages, NUL text, revisi
     content: `${content} updated`,
     updatedAt: "2026-11-17T00:01:00.000Z",
   });
+  const recent = await fetch(`${host.url}/api/v1/memory/list`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ limit: 1 }),
+  });
+  assert.equal(recent.status, 200);
+  const recentPage = objectValue(await recent.json());
+  const newest = objectValue(arrayValue(recentPage.items)[0]);
+  assert.equal(newest.id, "z-reader");
+  assert.equal(newest.revision, 2);
+  assert.equal(newest.updatedAt, "2026-11-17T00:01:00.000Z");
+  const nextRecent = await fetch(`${host.url}/api/v1/memory/list`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ limit: 1, cursor: stringValue(recentPage.nextCursor) }),
+  });
+  assert.equal(nextRecent.status, 200);
+  assert.equal(
+    objectValue(arrayValue(objectValue(await nextRecent.json()).items)[0]).id,
+    "a-noise-000",
+  );
   const changed = await fetch(`${host.url}/api/v1/memory/read`, {
     method: "POST",
     headers,
@@ -384,6 +431,11 @@ async function configureMemory(
       "  if (databasePath.includes('unavailable')) throw new Error('reader unavailable');",
       "  return {",
       "    version: 1,",
+      "    list({ cursor }) {",
+      "      if (cursor === 'opaque/list-next') return { items: [] };",
+      "      if (cursor === 'tampered') throw Object.assign(new Error('cursor'), { code: 'invalid_cursor' });",
+      "      return { items: [{ id: 'memory-a', revision: 7, preview: 'recent', updatedAt: cursor ? 'not a date' : '2026-11-17T00:00:00.000Z' }], nextCursor: 'opaque/list-next' };",
+      "    },",
       "    search({ query, cursor }) {",
       "      if (query === 'corrupt') return { items: [{ id: '', revision: -1, preview: 4 }] };",
       "      if (query === 'nul') return { items: [{ id: 'memory-a', revision: 7, preview: 'nul\\0preview' }] };",

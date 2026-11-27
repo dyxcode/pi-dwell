@@ -41,6 +41,33 @@ test("Memory uses the authenticated client API and ships its controller module",
   assert.match(client, /MemoryPanel/);
 });
 
+test("an empty query pages recent memories and does not reuse a search cursor", async () => {
+  const requests: { path: string; body: unknown }[] = [];
+  const updatedAt = "2026-11-17T00:00:00.000Z";
+  const panel = new MemoryPanel(async (path, body) => {
+    requests.push({ path, body });
+    if (path.endsWith("/search")) return { items: [], nextCursor: "search-next" };
+    if (requests.length === 2)
+      return {
+        items: [{ id: "recent", revision: 2, preview: "Updated", updatedAt }],
+        nextCursor: "recent-next",
+      };
+    return { items: [{ id: "older", revision: 1, preview: "Older", updatedAt }] };
+  });
+  await panel.search("literal");
+  await panel.search("  ");
+  await panel.continueSearch();
+  assert.deepEqual(requests.slice(1), [
+    { path: "/api/v1/memory/list", body: { limit: 20 } },
+    { path: "/api/v1/memory/list", body: { cursor: "recent-next", limit: 20 } },
+  ]);
+  assert.deepEqual(panel.state.items, [
+    { id: "recent", revision: 2, preview: "Updated", updatedAt },
+    { id: "older", revision: 1, preview: "Older", updatedAt },
+  ]);
+  assert.equal(panel.state.nextCursor, null);
+});
+
 test("Memory search scans continue across empty batches and reads append bounded pages", async () => {
   const requests: { path: string; body: unknown }[] = [];
   const panel = new MemoryPanel(async (path, body) => {

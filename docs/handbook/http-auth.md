@@ -50,6 +50,7 @@ All API paths below are relative to `/api/v1`. **Either** means a local CLI bear
 | `GET /models` | Either | Global isolated discovery result wrapped in `models` |
 | `POST /model-capabilities` | Either | Provider/model → thinking levels and image support |
 | `GET /client-capabilities` | Either | Memory and Current Library configured/ready/unavailable states |
+| `POST /memory/list` | Either | `{cursor?, limit?}` → recently updated Distill records with revision, preview, UTC `updatedAt` and optional next cursor |
 | `POST /memory/search` | Either | `{query, cursor?, limit?}` → bounded Distill matches, revisions, previews and optional next cursor |
 | `POST /memory/read` | Either | `{id, expectedRevision, cursor?}` → bounded text page for that exact revision |
 | `POST /library/search` | Either | `{query, source?, limit?}` → saved item or discovery-candidate views |

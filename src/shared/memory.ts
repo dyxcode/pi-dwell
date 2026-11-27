@@ -15,10 +15,13 @@ export const MEMORY_ERROR_CODES = [
 
 export type MemoryErrorCode = (typeof MEMORY_ERROR_CODES)[number];
 
-export interface MemorySearchRequest {
-  query: string;
+export interface MemoryListRequest {
   cursor?: string;
   limit?: number;
+}
+
+export interface MemorySearchRequest extends MemoryListRequest {
+  query: string;
 }
 
 export interface MemorySearchItem {
@@ -29,6 +32,15 @@ export interface MemorySearchItem {
 
 export interface MemorySearchResponse {
   items: MemorySearchItem[];
+  nextCursor?: string;
+}
+
+export interface MemoryListItem extends MemorySearchItem {
+  updatedAt: string;
+}
+
+export interface MemoryListResponse {
+  items: MemoryListItem[];
   nextCursor?: string;
 }
 
@@ -121,17 +133,29 @@ export function isMemoryErrorCode(value: unknown): value is MemoryErrorCode {
   return typeof value === "string" && MEMORY_ERROR_CODES.some((code) => code === value);
 }
 
-export function isMemorySearchRequest(value: unknown): value is MemorySearchRequest {
+function optionalPageRequest(value: Record<string, unknown>): boolean {
   return (
-    record(value) &&
-    keysWithOptional(value, ["query"], ["cursor", "limit"]) &&
-    text(value.query, MEMORY_QUERY_CODEPOINTS, false, true) &&
     (value.cursor === undefined || cursor(value.cursor)) &&
     (value.limit === undefined ||
       (typeof value.limit === "number" &&
         Number.isSafeInteger(value.limit) &&
         value.limit >= 1 &&
         value.limit <= MEMORY_SEARCH_LIMIT))
+  );
+}
+
+export function isMemoryListRequest(value: unknown): value is MemoryListRequest {
+  return (
+    record(value) && keysWithOptional(value, [], ["cursor", "limit"]) && optionalPageRequest(value)
+  );
+}
+
+export function isMemorySearchRequest(value: unknown): value is MemorySearchRequest {
+  return (
+    record(value) &&
+    keysWithOptional(value, ["query"], ["cursor", "limit"]) &&
+    text(value.query, MEMORY_QUERY_CODEPOINTS, false, true) &&
+    optionalPageRequest(value)
   );
 }
 
@@ -145,24 +169,42 @@ export function isMemoryReadRequest(value: unknown): value is MemoryReadRequest 
   );
 }
 
-function isMemorySearchItem(value: unknown): value is MemorySearchItem {
+function memoryPreview(value: Record<string, unknown>): boolean {
   return (
-    record(value) &&
-    exact(value, ["id", "revision", "preview"]) &&
     memoryId(value.id) &&
     revision(value.revision) &&
     text(value.preview, MEMORY_PREVIEW_CODEPOINTS, true)
   );
 }
 
-export function isMemorySearchResponse(value: unknown): value is MemorySearchResponse {
+function memoryPage(value: unknown, isItem: (item: unknown) => boolean): boolean {
   return (
     record(value) &&
     keysWithOptional(value, ["items"], ["nextCursor"]) &&
     Array.isArray(value.items) &&
     value.items.length <= MEMORY_SEARCH_LIMIT &&
-    value.items.every(isMemorySearchItem) &&
+    value.items.every(isItem) &&
     (value.nextCursor === undefined || cursor(value.nextCursor))
+  );
+}
+
+export function isMemorySearchResponse(value: unknown): value is MemorySearchResponse {
+  return memoryPage(
+    value,
+    (item) => record(item) && exact(item, ["id", "revision", "preview"]) && memoryPreview(item),
+  );
+}
+
+export function isMemoryListResponse(value: unknown): value is MemoryListResponse {
+  return memoryPage(
+    value,
+    (item) =>
+      record(item) &&
+      exact(item, ["id", "revision", "preview", "updatedAt"]) &&
+      memoryPreview(item) &&
+      typeof item.updatedAt === "string" &&
+      Number.isFinite(Date.parse(item.updatedAt)) &&
+      new Date(item.updatedAt).toISOString() === item.updatedAt,
   );
 }
 

@@ -12,6 +12,7 @@ import { SessionError, SessionService, type SessionServiceOptions } from "../ses
 import type { LibraryLatestRequest } from "../shared/library.ts";
 import {
   type ClientCapabilities,
+  isMemoryListRequest,
   isMemoryReadRequest,
   isMemorySearchRequest,
 } from "../shared/memory.ts";
@@ -262,6 +263,7 @@ export async function startHost({
       const librarySearchPath = path === "/api/v1/library/search";
       const libraryReadMatch =
         /^\/api\/v1\/library\/([^/]+)\/items\/([^/]+)\/versions\/([^/]+)$/.exec(path);
+      const memoryListPath = path === "/api/v1/memory/list";
       const memorySearchPath = path === "/api/v1/memory/search";
       const memoryReadPath = path === "/api/v1/memory/read";
       const clientCapabilitiesPath = path === "/api/v1/client-capabilities";
@@ -329,7 +331,8 @@ export async function startHost({
         libraryReadMatch !== null ||
         sessionLibraryReferencesMatch !== null ||
         sessionLibraryReferenceMatch !== null;
-      const memoryRoute = memorySearchPath || memoryReadPath || clientCapabilitiesPath;
+      const memoryRoute =
+        memoryListPath || memorySearchPath || memoryReadPath || clientCapabilitiesPath;
       const protectedRoute = sessionRoute || libraryRoute || memoryRoute;
       let method: string | undefined;
       if (protectedRoute) {
@@ -346,7 +349,7 @@ export async function startHost({
           method = "POST";
         } else if (librarySearchPath) {
           method = "POST";
-        } else if (memorySearchPath || memoryReadPath) {
+        } else if (memoryListPath || memorySearchPath || memoryReadPath) {
           method = "POST";
         } else if (sessionLibraryReferencesMatch) {
           method = request.method === "POST" ? "POST" : "GET";
@@ -424,6 +427,11 @@ export async function startHost({
               },
             };
             send(response, 200, capabilities);
+          } else if (memoryListPath) {
+            if (!isMemoryListRequest(body))
+              fail(400, "invalid_input", "Provide optional memory list cursor and limit.");
+            if (!memory) throw new MemoryReaderError("memory_unavailable");
+            send(response, 200, await memory.list(body));
           } else if (memorySearchPath) {
             if (!isMemorySearchRequest(body))
               fail(400, "invalid_input", "Provide query and optional cursor and limit.");

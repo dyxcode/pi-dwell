@@ -719,7 +719,7 @@
 
 [Open source](../../../../tests/library-web.test.ts)
 
-- [the browser exposes one library dialog with desktop and mobile entry points](../../../../tests/library-web.test.ts#L6)
+- [the browser exposes Library in the Knowledge rail, not a separate modal](../../../../tests/library-web.test.ts#L6)
 - [the browser reads exact library references and keeps attach actions out of turn submission](../../../../tests/library-web.test.ts#L23)
 - [library reference mutations stay serialized and reload saved state after writes](../../../../tests/library-web.test.ts#L42)
 
@@ -728,9 +728,9 @@
 [查看源码](../../../../tests/memory-http.test.ts)
 
 - [authenticated memory routes page search and revision-pinned reads](../../../../tests/memory-http.test.ts#L9)
-- [memory routes use browser authentication and validate request and reader results](../../../../tests/memory-http.test.ts#L88)
-- [reader opening failures are nonfatal and capabilities retain configured state](../../../../tests/memory-http.test.ts#L178)
-- [the actual Distill reader preserves partial search pages, NUL text, revisions, and errors](../../../../tests/memory-http.test.ts#L211)
+- [memory routes use browser authentication and validate request and reader results](../../../../tests/memory-http.test.ts#L114)
+- [reader opening failures are nonfatal and capabilities retain configured state](../../../../tests/memory-http.test.ts#L204)
+- [the actual Distill reader preserves partial search pages, NUL text, revisions, and errors](../../../../tests/memory-http.test.ts#L237)
 
 ## tests/memory-web.test.ts
 
@@ -738,13 +738,14 @@
 
 - [the browser exposes a real Memory search and reader surface](../../../../tests/memory-web.test.ts#L13)
 - [Memory uses the authenticated client API and ships its controller module](../../../../tests/memory-web.test.ts#L36)
-- [Memory search scans continue across empty batches and reads append bounded pages](../../../../tests/memory-web.test.ts#L44)
-- [a newer query and disconnect fence delayed search and read responses](../../../../tests/memory-web.test.ts#L88)
-- [a changed memory revision reports that the user should search again](../../../../tests/memory-web.test.ts#L126)
-- [invalid search cursors stop offering continuation](../../../../tests/memory-web.test.ts#L142)
-- [changed reading cursors clear partial text and stop offering continuation](../../../../tests/memory-web.test.ts#L156)
-- [invalid reading cursors clear partial text and stop offering continuation](../../../../tests/memory-web.test.ts#L175)
-- [temporary memory failures keep cursors and already read text for retry](../../../../tests/memory-web.test.ts#L199)
+- [an empty query pages recent memories and does not reuse a search cursor](../../../../tests/memory-web.test.ts#L44)
+- [Memory search scans continue across empty batches and reads append bounded pages](../../../../tests/memory-web.test.ts#L71)
+- [a newer query and disconnect fence delayed search and read responses](../../../../tests/memory-web.test.ts#L115)
+- [a changed memory revision reports that the user should search again](../../../../tests/memory-web.test.ts#L153)
+- [invalid search cursors stop offering continuation](../../../../tests/memory-web.test.ts#L169)
+- [changed reading cursors clear partial text and stop offering continuation](../../../../tests/memory-web.test.ts#L183)
+- [invalid reading cursors clear partial text and stop offering continuation](../../../../tests/memory-web.test.ts#L202)
+- [temporary memory failures keep cursors and already read text for retry](../../../../tests/memory-web.test.ts#L226)
 
 ## tests/storage-composition.test.ts
 

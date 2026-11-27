@@ -357,8 +357,9 @@ function toolRun(
 
   const body = node("div", "", "tool-run-body");
   if (call && !shell) {
-    body.append(node("div", "Input", "tool-caption"));
-    body.append(node("pre", call.text, "tool-output tool-input"));
+    const input = node("pre", call.text, "tool-output tool-input");
+    input.setAttribute("aria-label", "Tool input");
+    body.append(input);
   }
   if (options.shell) {
     const output = owner.blocks.filter((block) => block !== call);
@@ -524,15 +525,6 @@ function renderContext(
     ),
   );
   const body = node("div", "", "session-details-body");
-  body.append(node("p", "Instructions saved in Pi's system context.", "session-details-caption"));
-  if (truncated)
-    body.append(
-      node(
-        "p",
-        "Part of the saved instruction context is omitted from this preview.",
-        "session-details-caption",
-      ),
-    );
   for (const source of sources) {
     const item = keyed(node("details"), `context:${source.path}`);
     item.className = "context-source";

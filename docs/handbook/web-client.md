@@ -64,6 +64,14 @@ session close, directory-based creation, model selection, host details, and
 image preview. IDs in `page.ts` are the DOM contract consumed by
 `client.ts`; `el()` validates each required ID and its expected element class.
 
+The Knowledge sidebar keeps the search controls in the same place when switching
+between Memory and Library. Results scroll separately beneath those controls.
+The reader and chat share the main stage but have separate scrollports. When reading, the
+client makes chat inert without removing it from layout or resetting session
+state. Focus goes to **Back** for Memory or the article heading for Library;
+only keyboard navigation shows an outline. Returning restores focus to the
+result or the mobile drawer button. Selecting a session tab keeps focus in the tab bar.
+
 Status tabs expose Ready, Working, Needs attention, Stopped, or Opening.
 Their close action appears only after selecting a tab once more; tab slots are
 assigned to currently runtime-open sessions and reused after close.

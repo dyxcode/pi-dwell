@@ -9,7 +9,7 @@ English | [简体中文](../../i18n/zh-CN/handbook/implementation/memory.md)
 
 ## Behavior
 
-Memory is a read-only view in the sidebar. Opening its tab or clearing the search box shows recently updated memories with a preview and date. Selecting a row opens the record in the same sidebar. If both Distill and Current are configured, the sidebar has Memory and Library tabs. With just one integration, the sidebar shows its view directly; without either, it shows Conversations.
+Memory is a read-only view. Opening its tab or clearing the search box shows recently updated memories with a preview and date in the sidebar. Selecting a row opens that revision in the main reading column. The sidebar stays open on desktop so you can select another result; on mobile the drawer closes. The body renders as Markdown without a generated title. The reader shows the update date when the selected result includes one. **More** loads the next page of a long record. **← Back**, **Esc**, and the selected session tab return to the conversation without moving its scroll position or clearing the draft.
 
 If Distill is configured but its Memory reader is unavailable, the sidebar remains in Memory and offers **Retry**. This keeps the navigation consistent with the selected integration while making reader availability visible.
 
@@ -43,7 +43,7 @@ Recent pages contain at most 20 records, newest updates first, with ties ordered
 
 The revision returned by browsing or search is required when reading a result. Distill compares that revision with the stored record before returning each page. If an edit occurs between pages, the read reports a conflict and the browser clears the partial text rather than joining content from different revisions. This ties the read to the record the user selected instead of silently substituting content edited after the result appeared. Search cursors belong to the reader instance and query; reading cursors belong to the selected record revision. Reopening the reader invalidates its cursors, and a cursor cannot be applied to a different query or revision. Opaque continuation cursors keep pagination rules with Distill, which owns the underlying data and search mechanism.
 
-The browser tracks search and read generations. Starting another query invalidates the previous search and any read tied to it; selecting another result or closing the reader invalidates earlier reads. A response is applied only while its generation still matches the active query and selection. Disconnecting clears the view and invalidates pending work. After reconnecting, a newer Host capability response replaces older state only when it belongs to the current authenticated connection and latest capability check.
+Search and reading advance independently. A new query replaces the browse results without closing the open memory. Selecting another record or returning to the conversation invalidates the earlier read. Delayed responses apply only to the search or read that still owns them. Disconnecting clears the view and invalidates pending work. After reconnecting, a newer Host capability response replaces older state only when it belongs to the current authenticated connection and latest capability check.
 
 <a id="technology"></a>
 

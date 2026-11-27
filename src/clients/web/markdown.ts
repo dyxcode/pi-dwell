@@ -39,7 +39,11 @@ export function safeLink(value: string): string | null {
   }
 }
 /** Parse Markdown into explicit DOM nodes. Raw HTML never becomes executable markup. */
-export function renderMarkdown(parent: HTMLElement, source: string): void {
+export function renderMarkdown(
+  parent: HTMLElement,
+  source: string,
+  minimumHeadingLevel: 1 | 2 = 1,
+): void {
   parent.classList.add("markdown");
   let count = 0;
   const append = (target: HTMLElement, values: unknown, depth = 0): void => {
@@ -148,7 +152,10 @@ export function renderMarkdown(parent: HTMLElement, source: string): void {
         "5": "h5",
         "6": "h6",
       };
-      const tag = type === "heading" ? (headings[String(token.depth)] ?? "h2") : tags[type];
+      const tag =
+        type === "heading"
+          ? (headings[String(Math.max(minimumHeadingLevel, Number(token.depth)))] ?? "h2")
+          : tags[type];
       if (tag) {
         const element = document.createElement(tag);
         if (token.tokens) append(element, token.tokens, depth + 1);

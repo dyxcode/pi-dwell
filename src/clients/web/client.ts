@@ -113,12 +113,24 @@ const memoryView = el("memory-view", HTMLElement);
 const memoryQuery = el("memory-query", HTMLInputElement);
 const memoryResults = el("memory-results", HTMLElement);
 const memoryReader = el("memory-reader", HTMLElement);
-const memoryText = el("memory-text", HTMLPreElement);
+const memoryText = el("memory-text", HTMLElement);
+const memoryDate = el("memory-reader-date", HTMLTimeElement);
+let renderedMemorySource = "";
 const memorySearchMore = el("memory-search-more", HTMLButtonElement);
 const memoryReadMore = el("memory-read-more", HTMLButtonElement);
 const memoryRetry = el("memory-retry", HTMLButtonElement);
+const knowledgeReader = el("knowledge-reader", HTMLElement);
+const chatContent = el("chat-content", HTMLElement);
+const libraryReader = el("library-reader", HTMLElement);
+const libraryReaderError = el("library-reader-error", HTMLElement);
+let readerSelection: { kind: "memory" | "library"; key: string } | null = null;
+let librarySearchGeneration = 0;
 let libraryReadGeneration = 0;
 let libraryViewGeneration = 0;
+let libraryReadTitle = "";
+let libraryReadPending = false;
+let libraryResults: LibraryItemView[] = [];
+const libraryReferenceTitles = new Map<string, string>();
 let libraryReferencesSession: string | null = null;
 let libraryReferencesGeneration = 0;
 let libraryReferenceMutationPending = false;
@@ -166,8 +178,8 @@ const older = el("load-older", HTMLButtonElement);
 
 labelWithIcon(el("attach-image", HTMLButtonElement), "Image", "plus", true);
 labelWithIcon(older, "Load earlier messages", "up");
-labelWithIcon(createButton, "Start session", "open");
-labelWithIcon(el("new-session", HTMLButtonElement), "New session", "plus");
+labelWithIcon(createButton, "Start", "open");
+labelWithIcon(el("new-session", HTMLButtonElement), "New conversation", "plus");
 for (const id of [
   "close-nav",
   "close-new",
@@ -256,34 +268,90 @@ function showImage(url: string, name: string): void {
 function sameLibraryReference(a: LibraryReference, b: LibraryReference): boolean {
   return a.binding === b.binding && a.itemId === b.itemId && a.versionId === b.versionId;
 }
-function libraryFailure(error: unknown): void {
+function openKnowledgeReader(kind: "memory" | "library", key: string): void {
+  readerSelection = { kind, key };
+  memoryReader.hidden = kind !== "memory";
+  libraryReader.hidden = kind !== "library";
+  if (viewport.matches) {
+    drawerOpen = false;
+    renderSidebar();
+  }
+  knowledgeReader.hidden = false;
+  chatContent.inert = true;
+  knowledgeReader.scrollTop = 0;
+  el(kind === "memory" ? "knowledge-back" : "library-reader-title", HTMLElement).focus({
+    preventScroll: true,
+  });
+}
+function closeKnowledgeReader(restoreFocus = true): boolean {
+  const reading = readerSelection;
+  if (!reading) return false;
+  readerSelection = null;
+  knowledgeReader.hidden = true;
+  memoryReader.hidden = true;
+  libraryReader.hidden = true;
+  chatContent.inert = false;
+  if (reading.kind === "memory") memoryPanel.closeReader();
+  else {
+    libraryReadGeneration++;
+    currentLibraryItem = null;
+    libraryReadPending = false;
+    libraryReadTitle = "";
+    libraryReaderError.textContent = "";
+    renderLibraryReader();
+  }
+  if (restoreFocus) {
+    const row = Array.from(rail.querySelectorAll<HTMLButtonElement>("[data-reader-key]")).find(
+      (button) =>
+        button.dataset.readerKey === reading.key &&
+        !button.disabled &&
+        button.getClientRects().length > 0,
+    );
+    const query = reading.kind === "memory" ? memoryQuery : libraryQuery;
+    (sidebarOpen() ? (row ?? (query.disabled ? closeNav : query)) : openNav).focus({
+      preventScroll: true,
+    });
+  }
+  return true;
+}
+function libraryFailure(error: unknown, feedback = libraryError): void {
   if (error instanceof ApiError && error.status === 401) showError(error);
-  else libraryError.textContent = message(error);
+  else feedback.textContent = message(error);
+}
+function libraryMetadata(item: LibraryItemView): string {
+  const url = new URL(item.url);
+  const date = item.candidate ? item.discoveredAt : item.retrievedAt;
+  return [
+    item.author,
+    url.hostname,
+    new Date(date).toLocaleDateString(undefined, { dateStyle: "medium" }),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 function renderLibraryReferences(): void {
   libraryReferences.replaceChildren();
-  if (selected === null) {
-    libraryReferences.append(node("p", "Select a session to attach saved content.", "footnote"));
-    return;
-  }
-  if (currentLibraryReferences.length === 0) {
-    libraryReferences.append(node("p", "No saved content is attached.", "footnote"));
-    return;
-  }
-  for (const reference of currentLibraryReferences) {
+  el("library-attached", HTMLElement).hidden = currentLibraryReferences.length === 0;
+  const previousTitles = new Map(libraryReferenceTitles);
+  libraryReferenceTitles.clear();
+  for (const [index, reference] of currentLibraryReferences.entries()) {
+    const key = libraryItemPath(reference);
+    const knownItem = [currentLibraryItem, ...libraryResults].find(
+      (item) => item && sameLibraryReference(item.reference, reference),
+    );
+    const knownTitle = knownItem?.title || previousTitles.get(key);
+    if (knownTitle) libraryReferenceTitles.set(key, knownTitle);
+    const title =
+      knownTitle ?? `Saved article${currentLibraryReferences.length > 1 ? ` ${index + 1}` : ""}`;
     const row = node("div", "", "library-reference-row");
-    const read = node(
-      "button",
-      `${reference.binding} · ${reference.itemId.slice(0, 8)} · ${reference.versionId.slice(0, 8)}`,
-    );
+    const read = node("button", title);
     read.type = "button";
-    read.setAttribute(
-      "aria-label",
-      `Read ${reference.binding} item ${reference.itemId} version ${reference.versionId}`,
-    );
-    read.onclick = () => void readLibraryItem(reference);
+    const rowKey = `attached:${key}`;
+    read.dataset.readerKey = rowKey;
+    read.onclick = () => void readLibraryItem(reference, title, rowKey);
     const remove = node("button", "Remove", "library-remove");
     remove.type = "button";
+    remove.setAttribute("aria-label", `Remove ${title}`);
     remove.disabled = libraryReferenceMutationPending;
     remove.onclick = () => void changeLibraryReference(reference, false);
     row.append(read, remove);
@@ -297,86 +365,63 @@ function renderLibraryItems(items: LibraryItemView[]): void {
     return;
   }
   for (const item of items) {
-    const button = node("button", "", "library-result");
+    const button = node("button", "", "knowledge-item library-result");
     button.type = "button";
-    const candidate = item.candidate === true;
-    const excerpt =
-      item.summary ?? (candidate ? "Article text has not been saved." : item.text.slice(0, 240));
-    const timestamp = candidate ? item.discoveredAt : item.retrievedAt;
-    button.append(
-      node("strong", item.title || "Untitled"),
-      node(
-        "small",
-        `${item.sourceId} · ${candidate ? "Discovered" : "Retrieved"} ${new Date(timestamp).toLocaleDateString()}`,
-      ),
-      node("span", excerpt),
-    );
-    button.onclick = () => void readLibraryItem(item.reference);
+    const title = item.title || "Untitled";
+    const key = libraryItemPath(item.reference);
+    const excerpt = item.summary ?? item.text?.slice(0, 240);
+    button.dataset.readerKey = key;
+    button.append(node("strong", title));
+    if (excerpt) button.append(node("span", excerpt));
+    button.append(node("small", libraryMetadata(item), "knowledge-meta"));
+    button.onclick = () => void readLibraryItem(item.reference, title, key);
     libraryItems.append(button);
   }
 }
 function renderLibraryReader(): void {
-  const reader = el("library-reader", HTMLElement);
-  if (!currentLibraryItem) {
-    reader.hidden = true;
-    return;
-  }
   const item = currentLibraryItem;
-  const candidate = item.candidate === true;
-  reader.hidden = false;
-  el("library-reader-title", HTMLElement).textContent = item.title || "Untitled";
-  el("library-reader-meta", HTMLElement).textContent = [
-    item.sourceId,
-    item.author,
-    candidate
-      ? `Discovered ${new Date(item.discoveredAt).toLocaleString()}`
-      : `Retrieved ${new Date(item.retrievedAt).toLocaleString()}`,
-  ]
-    .filter((value): value is string => Boolean(value))
-    .join(" · ");
-  const link = el("library-source-link", HTMLAnchorElement);
-  link.href = item.url;
-  el("library-summary", HTMLElement).textContent = item.summary ?? "";
-  el("library-text", HTMLPreElement).textContent = candidate
+  el("library-reader-title", HTMLElement).textContent = item?.title || libraryReadTitle;
+  el("library-read-status", HTMLElement).textContent = libraryReadPending ? "Loading…" : "";
+  el("library-reader-actions", HTMLElement).hidden = item === null;
+  el("library-summary", HTMLElement).textContent = item?.candidate ? (item.summary ?? "") : "";
+  el("library-text", HTMLPreElement).textContent = item?.candidate
     ? "Article text has not been saved."
-    : item.text;
+    : (item?.text ?? "");
   const completenessNode = el("library-completeness", HTMLElement);
-  completenessNode.hidden = candidate;
-  if (!candidate) {
-    const completeness =
-      item.sourceCompleteness === "known-partial"
-        ? "Known partial source"
-        : "Source completeness unknown";
-    completenessNode.textContent =
-      item.truncated || item.displayTruncated
-        ? `${completeness} · displayed text is shortened.`
-        : completeness;
-  } else completenessNode.textContent = "";
+  completenessNode.textContent =
+    item && !item.candidate
+      ? [
+          item.sourceCompleteness === "known-partial" ? "Partial source." : "",
+          item.truncated || item.displayTruncated ? "Displayed text is shortened." : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : "";
+  completenessNode.hidden = completenessNode.textContent === "";
+  if (!item) return;
+  el("library-reader-meta", HTMLElement).textContent = libraryMetadata(item);
+  el("library-source-link", HTMLAnchorElement).href = item.url;
   const action = el("library-reference-action", HTMLButtonElement);
   const attached = currentLibraryReferences.some((reference) =>
     sameLibraryReference(reference, item.reference),
   );
   action.disabled =
     selected === null || selected !== libraryReferencesSession || libraryReferenceMutationPending;
-  action.textContent =
-    selected === null
-      ? "Select a session to attach"
-      : attached
-        ? "Remove reference"
-        : "Attach to session";
+  action.hidden = selected === null;
+  action.textContent = attached ? "Attached" : "Attach";
+  action.setAttribute("aria-pressed", String(attached));
   action.onclick = () => void changeLibraryReference(item.reference, !attached);
 }
 async function loadLibraryReferences(): Promise<void> {
   const sessionId = selected;
   const viewAttempt = libraryViewGeneration;
   const attempt = ++libraryReferencesGeneration;
-  libraryReferencesSession = null;
-  currentLibraryReferences = [];
-  renderLibraryReferences();
-  renderLibraryReader();
-  el("library-session-label", HTMLElement).textContent = sessionId
-    ? `Session ${sessionId.slice(0, 8)}`
-    : "Browse saved content without attaching it to a session.";
+  if (libraryReferencesSession !== sessionId) {
+    libraryReferencesSession = null;
+    currentLibraryReferences = [];
+    renderLibraryReferences();
+    renderLibraryReader();
+  }
   if (sessionId === null) return;
   try {
     const value = await api(`/api/v1/sessions/${sessionId}/library-references`);
@@ -397,17 +442,14 @@ async function loadLibraryReferences(): Promise<void> {
   }
 }
 async function loadLibraryItems(query: string): Promise<void> {
-  const attempt = ++libraryReadGeneration;
+  const attempt = ++librarySearchGeneration;
   libraryError.textContent = "";
   libraryItems.replaceChildren();
-  currentLibraryItem = null;
-  renderLibraryReader();
-  el("library-items-title", HTMLElement).textContent = query ? "Search results" : "Latest items";
   try {
     const value = query
       ? await api("/api/v1/library/search", { query })
       : await api("/api/v1/library/latest");
-    if (attempt !== libraryReadGeneration) return;
+    if (attempt !== librarySearchGeneration) return;
     const page = query
       ? isLibraryItemsResponse(value)
         ? value
@@ -416,26 +458,39 @@ async function loadLibraryItems(query: string): Promise<void> {
         ? value
         : null;
     if (!page) throw new Error("Invalid Current library response.");
+    libraryResults = page.items;
     renderLibraryItems(page.items);
+    renderLibraryReferences();
   } catch (error) {
-    if (attempt === libraryReadGeneration) libraryFailure(error);
+    if (attempt === librarySearchGeneration) libraryFailure(error);
   }
 }
-async function readLibraryItem(reference: LibraryReference): Promise<void> {
+async function readLibraryItem(
+  reference: LibraryReference,
+  title: string,
+  key: string,
+): Promise<void> {
   const attempt = ++libraryReadGeneration;
-  libraryError.textContent = "";
+  libraryReaderError.textContent = "";
   currentLibraryItem = null;
+  libraryReadTitle = title;
+  libraryReadPending = true;
   renderLibraryReader();
+  openKnowledgeReader("library", key);
   try {
     const value = await api(libraryItemPath(reference));
     if (attempt !== libraryReadGeneration) return;
     if (!isLibraryItemView(value) || !sameLibraryReference(value.reference, reference))
       throw new Error("The host returned a different saved item version.");
     currentLibraryItem = value;
-    renderLibraryReader();
-    if (sidebarOpen()) el("library-reader-title", HTMLElement).focus();
+    renderLibraryReferences();
   } catch (error) {
-    if (attempt === libraryReadGeneration) libraryFailure(error);
+    if (attempt === libraryReadGeneration) libraryFailure(error, libraryReaderError);
+  } finally {
+    if (attempt === libraryReadGeneration) {
+      libraryReadPending = false;
+      renderLibraryReader();
+    }
   }
 }
 async function changeLibraryReference(reference: LibraryReference, add: boolean): Promise<void> {
@@ -450,7 +505,8 @@ async function changeLibraryReference(reference: LibraryReference, add: boolean)
   libraryReferenceMutationPending = true;
   renderLibraryReferences();
   renderLibraryReader();
-  libraryError.textContent = "";
+  const feedback = readerSelection?.kind === "library" ? libraryReaderError : libraryError;
+  feedback.textContent = "";
   const collection = `/api/v1/sessions/${sessionId}/library-references`;
   const path = add
     ? collection
@@ -471,19 +527,22 @@ async function changeLibraryReference(reference: LibraryReference, add: boolean)
     renderLibraryReader();
   }
   if (failed && viewAttempt === libraryViewGeneration && selected === sessionId)
-    libraryFailure(failure);
+    libraryFailure(
+      failure,
+      readerSelection?.kind === "library" ? libraryReaderError : libraryError,
+    );
 }
 function libraryActive(): boolean {
   return authenticated && sidebarView === "library";
 }
 function clearLibrary(): void {
   libraryViewGeneration++;
-  libraryReadGeneration++;
+  librarySearchGeneration++;
   libraryReferencesSession = null;
   currentLibraryReferences = [];
-  currentLibraryItem = null;
+  libraryResults = [];
   libraryItems.replaceChildren();
-  libraryReferences.replaceChildren();
+  renderLibraryReferences();
   libraryError.textContent = "";
   renderLibraryReader();
 }
@@ -505,7 +564,6 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
   const searchButton = el("memory-search", HTMLButtonElement);
   const searchError = el("memory-search-error", HTMLElement);
   const readError = el("memory-read-error", HTMLElement);
-  const readerTitle = el("memory-reader-title", HTMLElement);
 
   capabilityError.hidden = clientCapabilitiesError === null;
   capabilityError.textContent = clientCapabilitiesError ?? "";
@@ -522,7 +580,7 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
   memoryQuery.disabled = !available;
   searchButton.disabled =
     !available || state.searchPending || state.query.trim().length === 0 || queryTooLong;
-  searchButton.textContent = state.searchPending && !recent ? "Searching…" : "Search";
+  memoryResults.setAttribute("aria-busy", String(state.searchPending));
   searchError.textContent =
     state.searchError ??
     (queryTooLong ? `Search queries can be at most ${MEMORY_QUERY_CODEPOINTS} characters.` : "");
@@ -530,9 +588,9 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
 
   const focusedResult =
     document.activeElement instanceof HTMLButtonElement &&
-    document.activeElement.classList.contains("memory-result")
-      ? `${document.activeElement.dataset.memoryId ?? ""}:${document.activeElement.dataset.revision ?? ""}`
-      : null;
+    memoryResults.contains(document.activeElement)
+      ? document.activeElement.dataset.readerKey
+      : undefined;
   memoryResults.replaceChildren();
   if (state.items.length === 0) {
     const empty =
@@ -546,25 +604,35 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
     if (empty) memoryResults.append(node("p", empty, "memory-empty"));
   } else {
     for (const item of state.items) {
-      const result = node("button", "", "memory-result");
+      const result = node("button", "", "knowledge-item memory-result");
       result.type = "button";
       result.dataset.memoryId = item.id;
       result.dataset.revision = String(item.revision);
-      result.setAttribute("aria-current", String(state.selected?.id === item.id));
+      const key = `memory:${item.id}:${item.revision}`;
+      result.dataset.readerKey = key;
+      result.setAttribute(
+        "aria-current",
+        String(state.selected?.id === item.id && state.selected.revision === item.revision),
+      );
       result.setAttribute("aria-label", `Read memory: ${item.preview}`);
       result.title = item.preview;
-      result.disabled = !available || state.readPending;
+      result.disabled = !available;
       result.append(node("span", item.preview, "memory-preview"));
       if (item.updatedAt !== undefined) {
         const date = node(
           "time",
           new Date(item.updatedAt).toLocaleDateString(undefined, { dateStyle: "medium" }),
+          "knowledge-meta",
         );
         date.dateTime = item.updatedAt;
         result.append(date);
       }
-      result.onclick = () => void memoryPanel.read(item);
+      result.onclick = () => {
+        void memoryPanel.read(item);
+        openKnowledgeReader("memory", key);
+      };
       memoryResults.append(result);
+      if (focusedResult === key) result.focus({ preventScroll: true });
     }
   }
   memorySearchMore.hidden = state.nextCursor === null;
@@ -575,28 +643,25 @@ function renderMemoryPanel(state: MemoryPanelState = memoryPanel.state): void {
       ? "More"
       : "Continue search";
 
-  const hasReader = state.selected !== null;
-  memoryReader.hidden = !hasReader;
-  const selectedItem =
-    state.selected === null
-      ? undefined
-      : state.items.find(
-          (item) => item.id === state.selected?.id && item.revision === state.selected?.revision,
-        );
-  const selectedTitle = selectedItem?.preview.replace(/\s+/g, " ").trim() ?? "Saved memory";
-  readerTitle.textContent = [...selectedTitle].slice(0, 80).join("");
-  readerTitle.title = selectedTitle;
-  readerTitle.setAttribute("aria-label", `Reading memory: ${selectedTitle}`);
-  memoryText.textContent = state.text;
-  memoryReadMore.hidden = !hasReader || state.readCursor === null;
-  memoryReadMore.disabled = !available || state.readPending;
-  memoryReadMore.textContent = state.readPending ? "Reading…" : "Continue reading";
-  if (
-    focusedResult !== null &&
-    state.selected !== null &&
-    focusedResult === `${state.selected.id}:${state.selected.revision}`
-  )
-    readerTitle.focus();
+  const updatedAt = state.selected?.updatedAt;
+  memoryDate.hidden = updatedAt === undefined;
+  memoryDate.dateTime = updatedAt ?? "";
+  memoryDate.textContent =
+    updatedAt === undefined
+      ? ""
+      : new Date(updatedAt).toLocaleDateString("en-GB", { dateStyle: "medium", timeZone: "UTC" });
+  el("memory-read-status", HTMLElement).textContent =
+    state.readPending && state.readCursor === null ? "Loading…" : "";
+  if (renderedMemorySource !== state.text) {
+    renderedMemorySource = state.text;
+    memoryText.replaceChildren();
+    renderMarkdown(memoryText, state.text, 2);
+  }
+  if (state.readCursor === null && document.activeElement === memoryReadMore)
+    (state.text ? memoryText : readError).focus({ preventScroll: true });
+  memoryReadMore.hidden = state.readCursor === null;
+  memoryReadMore.setAttribute("aria-disabled", String(!available || state.readPending));
+  memoryReadMore.textContent = state.readPending ? "Loading…" : "More";
 }
 function loadRecentMemory(refresh = false): void {
   const state = memoryPanel.state;
@@ -612,6 +677,7 @@ function loadRecentMemory(refresh = false): void {
 }
 function setSidebarView(view: SidebarView): void {
   const previous = sidebarView;
+  if (view !== previous) closeKnowledgeReader(false);
   sidebarView = view;
   if (previous === "library" && view !== previous) clearLibrary();
   memoryView.hidden = view !== "memory";
@@ -649,7 +715,6 @@ function updateClientCapabilityView(): void {
   navLabel.hidden = !knowledge;
   navLabel.textContent = label;
   el("session-list", HTMLElement).hidden = knowledge;
-  el("conversations-heading", HTMLElement).hidden = knowledge;
   knowledgeTabs.hidden = !(memory && library);
   if (!memory) {
     memoryQuery.value = "";
@@ -1192,7 +1257,8 @@ function navigation(): void {
     if (!memoryMode) selectButton.append(node("span", number));
     if (!armed) selectButton.append(tabSymbol(symbol));
     selectButton.onclick = () => {
-      if (selectedTab) closeArmedSession = armed ? null : s.id;
+      const wasReading = closeKnowledgeReader(false);
+      if (selectedTab) closeArmedSession = wasReading || armed ? null : s.id;
       else {
         closeArmedSession = null;
         void select(s.id);
@@ -1719,11 +1785,7 @@ function renderConversation(): void {
     }
   }
   const desired = document.createDocumentFragment();
-  if (!selected) {
-    const empty = node("div", "", "empty");
-    empty.append(node("p", "Start a conversation."));
-    desired.append(empty);
-  } else {
+  if (selected) {
     if (activeSession()?.historyState === "retired") {
       const retired = node("p", "Distill removed the saved history.", "feedback");
       retired.setAttribute("role", "status");
@@ -2212,6 +2274,7 @@ async function select(id: string | null): Promise<void> {
   if (selected === id) return;
   if (id !== null && !sessions.some((session) => session.id === id && session.workspaceOpen))
     return;
+  closeKnowledgeReader(false);
   selectionGeneration++;
   closeArmedSession = null;
   modelDialog.close();
@@ -2847,11 +2910,10 @@ memoryQuery.oninput = () => {
   loadRecentMemory();
 };
 memorySearchMore.onclick = () => void memoryPanel.continueSearch();
-memoryReadMore.onclick = () => void memoryPanel.continueReading();
-el("memory-reader-close", HTMLButtonElement).onclick = () => {
-  memoryPanel.closeReader();
-  memoryQuery.focus();
+memoryReadMore.onclick = () => {
+  if (memoryReady()) void memoryPanel.continueReading();
 };
+el("knowledge-back", HTMLButtonElement).onclick = () => closeKnowledgeReader();
 memoryRetry.onclick = async () => {
   await reloadClientCapabilities();
   if (!memoryReady()) return;
@@ -2861,12 +2923,6 @@ memoryRetry.onclick = async () => {
 el("library-search-form", HTMLFormElement).onsubmit = (event) => {
   event.preventDefault();
   void loadLibraryItems(libraryQuery.value.trim());
-};
-el("library-reader-close", HTMLButtonElement).onclick = () => {
-  libraryReadGeneration++;
-  currentLibraryItem = null;
-  renderLibraryReader();
-  libraryQuery.focus();
 };
 el("new-session", HTMLButtonElement).onclick = () => {
   void newSession();
@@ -2963,7 +3019,17 @@ input.onkeydown = (event) => {
   }
 };
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape" || closeDialog.open) return;
+  if (event.key !== "Escape" || document.querySelector("dialog[open]")) return;
+  if (viewport.matches && drawerOpen) {
+    event.preventDefault();
+    nav(false);
+    closeKnowledgeReader();
+    return;
+  }
+  if (closeKnowledgeReader()) {
+    event.preventDefault();
+    return;
+  }
   if (closeArmedSession !== null) {
     const armedSession = closeArmedSession;
     closeArmedSession = null;
@@ -2972,7 +3038,6 @@ document.addEventListener("keydown", (event) => {
       .querySelector<HTMLButtonElement>(`[data-session-id="${armedSession}"] .tab-select`)
       ?.focus();
   }
-  if (drawerOpen && !document.querySelector("dialog[open]")) nav(false);
 });
 document.addEventListener("click", (event) => {
   if (

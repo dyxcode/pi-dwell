@@ -9,7 +9,7 @@
 
 ## 行为
 
-Memory 是侧栏中的只读视图。打开标签或清空搜索框时，会显示最近更新的记忆和各条预览、日期。点击一条即可在侧栏内阅读。同时配置 Distill 和 Current 时，侧栏提供 Memory 与 Library 两个标签；只配置一项时，直接显示该视图；两项都未配置时显示 Conversations。
+Memory 是只读视图。打开标签或清空搜索框时，侧栏会显示最近更新的记忆，以及各条预览和日期。点击一条，即可在主阅读栏打开所选版本。桌面端保留侧栏，方便连续选读；手机端会关闭抽屉。正文按 Markdown 渲染，不另生成标题；所选结果包含更新时间时，阅读栏才显示日期。长记录可用 **More** 加载下一页。用 **← Back**、**Esc** 或当前会话标签返回对话时，滚动位置和草稿均保留。
 
 如果已经配置 Distill，但 Memory reader 暂不可用，sidebar 仍显示 Memory，并提供 **Retry**。这样可以保持集成入口一致，同时让 reader 状态清晰可见。
 
@@ -43,7 +43,7 @@ Search 按一个最多 128 个 Unicode code points 的 literal substring 匹配�
 
 读取结果时必须带上列表或搜索返回的 revision。Distill 会在返回每一页前，将它与存储记录的 revision 比较。如果续页前记录发生修改，读取会报告 conflict，Browser 会清除已读取的部分文本，避免拼接不同 revision 的内容。这样读取对应的是用户选中的记录，而不会悄悄替换成结果出现后编辑的新内容。Search cursor 绑定 reader instance 和 query；read cursor 绑定选中的 record revision。重新打开 reader 会让其 cursor 失效，cursor 也不能用于其他 query 或 revision。Opaque continuation cursor 将分页规则留在 Distill，因为底层数据和搜索机制都由 Distill 管理。
 
-Browser 会跟踪 search 和 read generation。开始新 query 会让之前的 search 及其关联 read 失效；选择其他结果或关闭 reader 会让之前的 read 失效。只有仍对应当前 query 和选中记录的 response 才会更新 view。Disconnect 会清空 view 并让未完成的操作失效。Reconnect 后，只有属于当前 authenticated connection 且来自最新 capability check 的 Host response 才会覆盖集成状态。
+搜索和阅读独立进行。新查询会替换浏览结果，但不会关闭正在阅读的记忆。选择另一条记录或返回对话会让先前的读取失效。迟到的响应只会更新仍在等待该响应的搜索或阅读视图。Disconnect 会清空 view 并让未完成的操作失效。Reconnect 后，只有属于当前 authenticated connection 且来自最新 capability check 的 Host response 才会覆盖集成状态。
 
 <a id="technology"></a>
 

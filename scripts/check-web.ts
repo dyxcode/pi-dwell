@@ -486,9 +486,9 @@ async function assertNewSessionHeading(page: BrowserPage, viewport: string): Pro
     `${viewport} new-session action exposes its label and icon`,
   );
   assert.equal(presentation.tag, "H2", `${viewport} new-session title remains a heading`);
-  assert.equal(presentation.text, "New session", `${viewport} new-session title is concise`);
+  assert.equal(presentation.text, "New conversation", `${viewport} uses the navigation wording`);
   assert.equal(presentation.fontSize, viewport === "desktop" ? "22px" : "18px");
-  assert.equal(presentation.buttonText, "Start session");
+  assert.equal(presentation.buttonText, "Start");
   assert.equal(presentation.iconSize, "12px");
   const label = record(presentation.label);
   const icon = record(presentation.icon);
@@ -1697,13 +1697,14 @@ async function saveCurrentBrowserVersion(
   text: string,
 ): Promise<{ itemId: string; versionId: string }> {
   const now = new Date().toISOString();
+  const sourceId = `feed-${"a".repeat(40)}`;
   const batch = {
     id: randomUUID(),
-    sourceId: "test-source",
+    sourceId,
     collectedAt: now,
     items: [
       {
-        sourceId: "test-source",
+        sourceId,
         externalId,
         url: `https://example.test/${externalId}`,
         title,
@@ -1822,6 +1823,13 @@ async function runCurrentLibraryBrowserAcceptance(
             api: "openai-completions",
             models: [
               { id: "dwell-test", name: "Dwell test model", contextWindow: 8192, maxTokens: 1024 },
+              {
+                id: "dwell-test-image",
+                name: "Dwell Image Fixture",
+                input: ["text", "image"],
+                contextWindow: 8192,
+                maxTokens: 1024,
+              },
             ],
           },
         },
@@ -1858,7 +1866,7 @@ async function runCurrentLibraryBrowserAcceptance(
         requestId: randomUUID(),
         directory: environment.cwd,
         provider: "dwell-test",
-        model: "dwell-test",
+        model: "dwell-test-image",
       }),
     );
     const secondSessionData = record(
@@ -1878,6 +1886,10 @@ async function runCurrentLibraryBrowserAcceptance(
     });
     assert.deepEqual(await request(`/sessions/${firstSession}/library-references`), {
       references: [oldReference],
+    });
+    await request(`/sessions/${firstSession}/turns`, {
+      requestId: randomUUID(),
+      message: `Reader scroll fixture\n${"A line of saved conversation.\n".repeat(90)}`,
     });
 
     const profile = join(environment.root, "browser-current-library");
@@ -1983,26 +1995,24 @@ async function runCurrentLibraryBrowserAcceptance(
     await page.until("window.__firstLibraryResponseWaiting===true");
     await selectSession(secondSession);
     await page.until(
-      "window.__secondLibraryResponseSeen===true && document.querySelector('#library-session-label').textContent==='Session " +
-        secondSession.slice(0, 8) +
-        "' && document.querySelector('#library-references').textContent.includes('No saved content is attached.')",
+      "window.__secondLibraryResponseSeen===true && document.querySelector('#library-attached').hidden",
     );
     await page.evaluate("window.__releaseFirstLibraryResponse()");
     await delay(200);
     assert.equal(
       await page.evaluate('document.querySelector("#library-references").textContent'),
-      "No saved content is attached.",
+      "",
       "a delayed first-session response cannot replace references for the newly selected session",
     );
     console.log("PASS HTTP Chrome ignores a delayed reference response from the previous session");
 
     await selectSession(firstSession);
-    await page.until(
-      'document.querySelector("#library-references").textContent.includes("' +
-        oldVersion.versionId.slice(0, 8) +
-        '")',
+    await page.until('!document.querySelector("#library-attached").hidden');
+    await activateKnowledgeResult(
+      page,
+      "#library-references .library-reference-row > button:first-child",
+      true,
     );
-    await page.click("#library-references .library-reference-row > button:first-child");
     await page.until(
       'document.querySelector("#library-text").textContent.includes(' +
         JSON.stringify(oldText) +
@@ -2013,10 +2023,9 @@ async function runCurrentLibraryBrowserAcceptance(
       "Old Current browser title",
       "the reader opens the saved original version by exact identity",
     );
+    await assertKnowledgeReader(page, "library", false, true);
     await page.click("#library-references .library-reference-row .library-remove");
-    await page.until(
-      'document.querySelector("#library-references").textContent.includes("No saved content is attached.")',
-    );
+    await page.until('document.querySelector("#library-attached").hidden');
     console.log("PASS HTTP Chrome reads and removes an exact older Current version");
 
     await page.type("#library-query", "BrowserSearchToken");
@@ -2024,7 +2033,7 @@ async function runCurrentLibraryBrowserAcceptance(
     await page.until(
       'document.querySelector("#library-items").textContent.includes("Latest Current browser title") && document.querySelector("#library-items").textContent.includes("BrowserSearchToken")',
     );
-    await page.click("#library-items .library-result");
+    await activateKnowledgeResult(page, "#library-items .library-result");
     await page.until(
       'document.querySelector("#library-text").textContent.includes(' +
         JSON.stringify(latestText) +
@@ -2034,11 +2043,20 @@ async function runCurrentLibraryBrowserAcceptance(
       await page.evaluate('document.querySelector("#library-reader-title").textContent'),
       "Latest Current browser title",
     );
+    await assertKnowledgeReader(page, "library");
+    await assertLibraryActions(page, false);
+    assert.equal(
+      await page.evaluate(`(()=>{
+      const row=document.querySelector('#library-items .library-result');
+      const meta=document.querySelector('#library-reader-meta');
+      const link=document.querySelector('#library-source-link');
+      return [row.textContent,meta.textContent].every(text=>!(/feed-[a-f0-9]{40}/.test(text))&&text.includes('Browser fixture author · example.test · ')) && link.textContent==='Source ↗' && link.hostname==='example.test';
+    })()`),
+      true,
+    );
     await page.click("#library-reference-action");
     await page.until(
-      'document.querySelector("#library-reference-action").textContent==="Remove reference" && document.querySelector("#library-references").textContent.includes("' +
-        latestVersion.versionId.slice(0, 8) +
-        '")',
+      'document.querySelector("#library-reference-action").textContent==="Attached" && document.querySelector("#library-reference-action").getAttribute("aria-pressed")==="true" && document.querySelector("#library-references").textContent.includes("Latest Current browser title")',
     );
     const latestReference = {
       binding,
@@ -2049,6 +2067,69 @@ async function runCurrentLibraryBrowserAcceptance(
       references: [latestReference],
     });
     console.log("PASS HTTP Chrome searches, reads, and attaches the latest Current version");
+
+    const resultRow = "#library-items .library-result";
+    await page.click("#knowledge-back");
+    await page.until('document.activeElement.matches("#library-items .library-result")');
+    await page.until(
+      '!document.querySelector("#attach-image").disabled && document.querySelector("#conversation .assistant:not(.live)")?.textContent.includes("Received: reader scroll fixture")',
+    );
+    await page.type("#message", "An unfinished draft");
+    await page.evaluate(`(()=>{
+      const canvas=document.createElement('canvas'), data=new DataTransfer();
+      const png=canvas.toDataURL('image/png').split(',')[1];
+      data.items.add(new File([Uint8Array.from(atob(png),char=>char.charCodeAt(0))],'reader-draft.png',{type:'image/png'}));
+      const input=document.querySelector('#image-files');input.files=data.files;input.dispatchEvent(new Event('change',{bubbles:true}));
+    })()`);
+    await page.until(
+      'document.querySelector(".image-chip-preview")?.textContent==="reader-draft.png"',
+    );
+    const conversationPosition = async () =>
+      page.evaluate(`(()=>{
+      const scroll=document.querySelector('#scroll');
+      return {top:scroll.scrollTop,height:scroll.clientHeight,draft:document.querySelector('#message').value,image:document.querySelector('.image-chip-preview')?.textContent};
+    })()`);
+    await page.evaluate('document.querySelector("#scroll").scrollTop=200');
+    const beforeReading = record(await conversationPosition());
+    assert.equal(beforeReading.top, 200);
+    for (const exit of ["back", "escape", "tab"]) {
+      await page.click(resultRow);
+      await page.until(
+        '!document.querySelector("#knowledge-reader").hidden && document.querySelector("#chat-content").inert',
+      );
+      assert.deepEqual(
+        await conversationPosition(),
+        beforeReading,
+        `${exit}: reading leaves the chat scrollport laid out`,
+      );
+      if (exit === "back") await page.click("#knowledge-back");
+      else if (exit === "escape") await pressEscape(page);
+      else await page.click("#status-list .status-tab.active .tab-select");
+      await page.until(
+        'document.querySelector("#knowledge-reader").hidden && !document.querySelector("#chat-content").inert',
+      );
+      assert.deepEqual(
+        await conversationPosition(),
+        beforeReading,
+        `${exit}: chat scroll, draft and attachments are unchanged`,
+      );
+      assert.equal(
+        await page.evaluate(
+          `document.activeElement.matches(${JSON.stringify(exit === "tab" ? "#status-list .status-tab.active .tab-select" : resultRow)})`,
+        ),
+        true,
+      );
+    }
+    await page.click(resultRow);
+    await page.click(`#status-list [data-session-id="${secondSession}"] .tab-select`);
+    await page.until('document.querySelector("#knowledge-reader").hidden');
+    await selectSession(firstSession);
+    await page.until(
+      'document.querySelector("#message").value==="An unfinished draft" && document.querySelector(".image-chip-preview")?.textContent==="reader-draft.png"',
+    );
+    console.log(
+      "PASS HTTP Chrome returns from the reader without disturbing the conversation scroll or draft",
+    );
 
     await page.type("#library-query", "BrowserCandidateSummaryToken");
     await page.click("#library-search");
@@ -2068,7 +2149,51 @@ async function runCurrentLibraryBrowserAcceptance(
       true,
       "Current candidates do not claim retrieved-body completeness",
     );
+    await page.click("#knowledge-back");
+    await page.call("Emulation.setDeviceMetricsOverride", {
+      width: 320,
+      height: 844,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await page.until('innerWidth===320 && document.querySelector("#rail").inert');
+    await page.click("#open-nav");
+    await activateKnowledgeResult(page, resultRow);
+    await assertKnowledgeReader(page, "library", true);
+    await page.until(
+      'document.querySelector("#library-text").textContent==="Article text has not been saved." && !document.querySelector("#library-reference-action").disabled',
+    );
+    await assertLibraryActions(page, true);
+    await assertBrowserControlReachable(page, "#library-reference-action", "narrow Library reader");
+    await page.click("#library-reference-action");
+    await page.until(
+      'document.querySelector("#library-reference-action").textContent==="Attached" && !document.querySelector("#library-reference-action").disabled',
+    );
+    await page.click("#library-reference-action");
+    await page.until(
+      'document.querySelector("#library-reference-action").textContent==="Attach" && !document.querySelector("#library-reference-action").disabled',
+    );
+    assert.deepEqual(await request(`/sessions/${firstSession}/library-references`), {
+      references: [latestReference],
+    });
+    await pressEscape(page);
+    await page.until(
+      'document.querySelector("#knowledge-reader").hidden && document.activeElement.id==="open-nav"',
+    );
+    await page.call("Emulation.setDeviceMetricsOverride", {
+      width: 1280,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await page.until("innerWidth===1280");
     assert.equal(candidateVersion.itemId.length > 0, true);
+    assert.equal(
+      await page.evaluate(
+        `!(/feed-[a-f0-9]{40}/.test(document.querySelector('#app').innerText)) && document.querySelector('#library-source-link').textContent==='Source ↗'`,
+      ),
+      true,
+    );
     console.log("PASS HTTP Chrome renders a Current API v2 candidate without article text");
 
     await host.close();
@@ -2095,28 +2220,20 @@ async function runCurrentLibraryBrowserAcceptance(
       '!document.querySelector("#app").hidden && !document.querySelector("#library-view").hidden && document.querySelectorAll("#status-list .status-tab").length===2',
     );
     await selectSession(firstSession);
-    await page.until(
-      'document.querySelector("#library-references").textContent.includes("' +
-        latestReference.versionId.slice(0, 8) +
-        '")',
-    );
+    await page.until('!document.querySelector("#library-attached").hidden');
     await page.click("#library-references .library-reference-row > button:first-child");
     await page.until(
-      'document.querySelector("#library-error").textContent.includes("library is unavailable")',
+      'document.querySelector("#library-reader-error").textContent.includes("library is unavailable")',
     );
     assert.equal(
       await page.evaluate(
-        'document.querySelector("#library-references").textContent.includes("' +
-          latestReference.versionId.slice(0, 8) +
-          '")',
+        'document.querySelector("#library-references .library-reference-row button").textContent',
       ),
-      true,
-      "offline content leaves the stored reference visible",
+      "Saved article",
+      "offline content leaves a readable label and removable reference",
     );
     await page.click("#library-references .library-reference-row .library-remove");
-    await page.until(
-      'document.querySelector("#library-references").textContent.includes("No saved content is attached.")',
-    );
+    await page.until('document.querySelector("#library-attached").hidden');
     assert.deepEqual(await request(`/sessions/${firstSession}/library-references`), {
       references: [],
     });
@@ -2188,7 +2305,6 @@ async function assertMemoryBrowserMode(page: BrowserPage, mode: MemoryBrowserMod
     await page.evaluate(`(()=>{
       const select=document.querySelector(".status-tab.active .tab-select");
       return {
-        sidebarHeading:getComputedStyle(document.querySelector(".section-head")).display,
         renameEditor:document.querySelector("#edit-session-name, #session-name-dialog")!==null,
         composer:getComputedStyle(document.querySelector("#composer")).display,
         conversation:getComputedStyle(document.querySelector("#conversation")).display,
@@ -2199,11 +2315,6 @@ async function assertMemoryBrowserMode(page: BrowserPage, mode: MemoryBrowserMod
         tabTitle:select?.title??""
       };
     })()`),
-  );
-  assert.equal(
-    view.sidebarHeading,
-    knowledge ? "none" : "flex",
-    `${mode} toggles the conversation section with Knowledge`,
   );
   assert.equal(view.renameEditor, false, `${mode} has no rename editor`);
   assert.notEqual(view.composer, "none", `${mode} keeps the Pi composer available`);
@@ -2237,6 +2348,174 @@ async function assertBrowserControlReachable(
     result.reachable,
     true,
     `${context} ${selector} receives pointer hits: ${String(result.hit)}`,
+  );
+}
+
+async function pressEscape(page: BrowserPage): Promise<void> {
+  await page.call("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
+  await page.call("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape" });
+}
+
+async function activateKnowledgeResult(
+  page: BrowserPage,
+  selector: string,
+  keyboard = false,
+): Promise<void> {
+  await page.call("Page.bringToFront");
+  const target = `document.querySelector(${JSON.stringify(selector)})`;
+  if (keyboard) {
+    await page.evaluate(`${target}.focus()`);
+    await page.call("Input.dispatchKeyEvent", {
+      type: "keyDown",
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+      text: "\r",
+    });
+    await page.call("Input.dispatchKeyEvent", {
+      type: "keyUp",
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+    });
+    return;
+  }
+  await page.evaluate(`${target}.scrollIntoView({block:'center'})`);
+  await page.until(
+    `(()=>{const row=${target}; const r=row.getBoundingClientRect(); return row.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})()`,
+  );
+  const point = record(
+    await page.evaluate(
+      `(()=>{const r=${target}.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`,
+    ),
+  );
+  const pointer = { x: Number(point.x), y: Number(point.y), button: "left", clickCount: 1 };
+  await page.call("Input.dispatchMouseEvent", { ...pointer, type: "mousePressed" });
+  await page.call("Input.dispatchMouseEvent", { ...pointer, type: "mouseReleased" });
+}
+
+async function assertKnowledgeReader(
+  page: BrowserPage,
+  kind: "memory" | "library",
+  mobile = false,
+  keyboard = false,
+): Promise<void> {
+  const view = await page.evaluate(`(()=>{
+    const reader=document.querySelector('#${kind}-reader');
+    const stage=document.querySelector('#knowledge-reader');
+    const box=reader.getBoundingClientRect(), clip=stage.getBoundingClientRect();
+    const main=document.querySelector('#chat-main');
+    const focus=document.activeElement, bounds=focus.getBoundingClientRect(), style=getComputedStyle(focus);
+    const inset=style.outlineStyle==='none'?0:parseFloat(style.outlineWidth)+parseFloat(style.outlineOffset);
+    return {
+      main:main.contains(reader) && !document.querySelector('#rail').contains(reader) && !main.inert,
+      drawerClosed:document.querySelector('#rail').inert,
+      headings:reader.querySelectorAll('h1').length,
+      focus:focus.id, outline:style.outlineStyle,
+      unclipped:bounds.left-inset>=clip.left && bounds.right+inset<=clip.right && bounds.top-inset>=clip.top && bounds.bottom+inset<=clip.bottom,
+      width:${mobile} ? clip.width===innerWidth : box.width>=550 && box.width<=710 && Math.abs((box.x+box.width/2)-(clip.x+clip.width/2))<=8,
+    };
+  })()`);
+  assert.deepEqual(
+    view,
+    {
+      main: true,
+      drawerClosed: mobile,
+      headings: kind === "library" ? 1 : 0,
+      focus: kind === "library" ? "library-reader-title" : "knowledge-back",
+      outline: keyboard ? "dotted" : "none",
+      unclipped: true,
+      width: true,
+    },
+    `${kind} reader layout and ${keyboard ? "keyboard" : "pointer"} focus (${mobile ? "mobile" : "desktop"})`,
+  );
+}
+
+async function assertLibraryActions(page: BrowserPage, wrap: boolean): Promise<void> {
+  const layout = await page.evaluate(`(()=>{
+    const title=document.querySelector('#library-reader-title').getBoundingClientRect();
+    const meta=document.querySelector('#library-reader-meta').getBoundingClientRect();
+    const source=document.querySelector('#library-source-link').getBoundingClientRect();
+    const action=document.querySelector('#library-reference-action');
+    const rect=action.getBoundingClientRect(), style=getComputedStyle(action);
+    return {
+      aligned:Math.abs(title.right-rect.right)<1 && Math.abs(title.left-meta.left)<1,
+      unclipped:source.left>=title.left && source.right<=rect.left && rect.right<=innerWidth,
+      grouped:Math.abs(source.top-rect.top)<1,
+      wrapped:source.top>=meta.bottom,
+      ink:style.color, weight:style.fontWeight,
+    };
+  })()`);
+  assert.deepEqual(layout, {
+    aligned: true,
+    unclipped: true,
+    grouped: true,
+    wrapped: wrap,
+    ink: "rgb(40, 99, 94)",
+    weight: "500",
+  });
+}
+
+async function assertKnowledgeSearchGeometry(page: BrowserPage, viewport: string): Promise<void> {
+  const bounds = (kind: "memory" | "library") =>
+    page.evaluate(`['#${kind}-query','#${kind}-search'].map(selector=>{
+    const {top,left,width,height}=document.querySelector(selector).getBoundingClientRect();
+    return {top,left,width,height};
+  })`);
+  await page.click("#memory-tab");
+  await page.until(
+    '!document.querySelector("#memory-view").hidden && document.querySelector("#memory-results button")!==null',
+  );
+  const rowStyle = (list: "memory-results" | "library-items") =>
+    page.evaluate(`(()=>{
+    const row=document.querySelector('#${list} .knowledge-item');
+    const {left,width}=row.getBoundingClientRect();
+    const {padding,borderBottomWidth,borderBottomStyle,borderTopWidth}=getComputedStyle(row);
+    const {fontFamily,fontSize,color}=getComputedStyle(row.querySelector('.knowledge-meta'));
+    return {left,width,padding,borderBottomWidth,borderBottomStyle,borderTopWidth,fontFamily,fontSize,color};
+  })()`);
+  const memory = await bounds("memory");
+  const memoryRow = record(await rowStyle("memory-results"));
+  assert.equal(memoryRow.padding, "10px 4px");
+  assert.equal(memoryRow.borderBottomWidth, "1px");
+  assert.equal(memoryRow.borderBottomStyle, "solid");
+  assert.equal(memoryRow.borderTopWidth, "0px");
+  await page.click("#library-tab");
+  await page.until(
+    '!document.querySelector("#library-view").hidden && document.querySelector("#library-items button")!==null',
+  );
+  assert.deepEqual(
+    await bounds("library"),
+    memory,
+    `${viewport} Memory and Library search controls have identical bounds`,
+  );
+  assert.deepEqual(
+    await rowStyle("library-items"),
+    memoryRow,
+    `${viewport} Knowledge rows share horizontal edges, dividers and metadata styling`,
+  );
+  await page.click("#memory-tab");
+  await page.until('document.querySelectorAll("#memory-results button").length>1');
+  await page.evaluate(
+    'document.querySelector("#memory-results button:last-of-type").scrollIntoView({block:"end"})',
+  );
+  assert.ok(
+    Number(
+      await page.evaluate('document.querySelector("#memory-view .knowledge-results").scrollTop'),
+    ) > 0,
+    `${viewport} fixture actually scrolls the results`,
+  );
+  assert.deepEqual(
+    await bounds("memory"),
+    memory,
+    `${viewport} scrolling the results does not move the search controls`,
+  );
+  await page.click("#library-tab");
+  await page.until('document.querySelector("#library-items button")!==null');
+  assert.deepEqual(
+    await bounds("library"),
+    memory,
+    `${viewport} switching from scrolled results keeps search controls in place`,
   );
 }
 
@@ -2476,11 +2755,20 @@ async function runMemoryBrowserAcceptance(
       `document.querySelector('#memory-results').textContent==='No memories saved yet.'`,
     );
     writer = await openDistillBrowserWriter(distillModulePath, distillDatabase);
-    const createdAt = new Date().toISOString();
+    const createdAt = "2026-11-27T12:00:00.000Z";
+    const markdownMemory =
+      "# Fixture heading\n\nRead `health/nutrition/营养日志.md`.\n\n- **Review** the entry.\n\n<span data-review-fixture>plain HTML</span>";
+    const memoryMarkup = `(()=>{
+      const body=document.querySelector('#memory-text');
+      return body.querySelector('h2')?.textContent==='Fixture heading' &&
+        body.querySelector('p code')?.textContent==='health/nutrition/营养日志.md' &&
+        body.querySelector('li strong')?.textContent==='Review' &&
+        !body.querySelector('[data-review-fixture]') && body.textContent.includes('<span data-review-fixture>');
+    })()`;
     for (let index = 0; index < 128; index++) {
       writer.save({
         id: `a-browser-padding-${String(index).padStart(3, "0")}`,
-        content: `unrelated browser fixture record ${index}`,
+        content: index === 0 ? markdownMemory : `unrelated browser fixture record ${index}`,
         createdAt,
       });
     }
@@ -2507,11 +2795,28 @@ async function runMemoryBrowserAcceptance(
     );
     await page.click("#memory-search-more");
     await page.until(`document.querySelectorAll('#memory-results .memory-result').length===40`);
-    await page.click("#memory-results .memory-result");
+    await activateKnowledgeResult(page, "#memory-results .memory-result");
     await page.until(
-      `document.querySelector('#memory-text').textContent==='unrelated browser fixture record 0'`,
+      'document.querySelector("#memory-text").textContent.includes("Fixture heading")',
     );
-    await page.click("#memory-reader-close");
+    await assertKnowledgeReader(page, "memory");
+    assert.equal(
+      await page.evaluate(memoryMarkup),
+      true,
+      "Distill Markdown renders as inert, structured content",
+    );
+    assert.equal(
+      await page.evaluate(`(()=>{
+      const back=document.querySelector('#knowledge-back'), date=document.querySelector('#memory-reader-date');
+      return date.dateTime===${JSON.stringify(createdAt)} && date.textContent==='27 Nov 2026' &&
+        back.parentElement===date.parentElement && date.getBoundingClientRect().right>back.getBoundingClientRect().right;
+    })()`),
+      true,
+    );
+    await page.click("#knowledge-back");
+    await activateKnowledgeResult(page, "#memory-results .memory-result", true);
+    await assertKnowledgeReader(page, "memory", false, true);
+    await page.click("#knowledge-back");
     await page.click("#close-nav");
     await page.until(
       `document.querySelector('#rail').hidden && document.activeElement.id==='open-nav'`,
@@ -2599,7 +2904,11 @@ async function runMemoryBrowserAcceptance(
       "mobile Memory drawer",
     );
     await saveScreenshotIfRequested(page, "memory-mobile-sidebar.png");
-    await page.click("#close-nav");
+    await activateKnowledgeResult(page, "#memory-results .memory-result");
+    await assertKnowledgeReader(page, "memory", true);
+    await page.until(memoryMarkup);
+    await assertBrowserControlReachable(page, "#knowledge-back", "mobile Memory reader");
+    await page.click("#knowledge-back");
     await page.until(
       'document.querySelector("#rail").classList.contains("open")===false && document.activeElement.id==="open-nav"',
     );
@@ -2630,6 +2939,15 @@ async function runMemoryBrowserAcceptance(
       await page.evaluate('Array.from(document.querySelector("#memory-text").textContent).length'),
       8_000,
       "The first Distill read page is bounded by Unicode code points",
+    );
+    assert.equal(
+      await page.evaluate(`document.querySelector('#memory-reader-date').hidden`),
+      true,
+      "search results do not invent an update date",
+    );
+    assert.equal(
+      await page.evaluate(`document.querySelector('#memory-read-more').textContent`),
+      "More",
     );
     await assertBrowserControlReachable(page, "#memory-read-more", "desktop Memory reader");
     await page.click("#memory-read-more");
@@ -2664,7 +2982,7 @@ async function runMemoryBrowserAcceptance(
       id: revisionId,
       expectedRevision: 1,
       content: revisionContent,
-      updatedAt: new Date(Date.now() + 1000).toISOString(),
+      updatedAt: "2026-11-27T12:00:01.000Z",
     });
     await writer.close();
     writer = undefined;
@@ -2678,10 +2996,7 @@ async function runMemoryBrowserAcceptance(
     await page.until(
       `!document.querySelector('#knowledge-tabs').hidden && document.querySelector('#memory-tab').getAttribute('aria-selected')==='true'`,
     );
-    await page.click("#library-tab");
-    await page.until(
-      `!document.querySelector('#library-view').hidden && document.querySelector('#memory-view').hidden && document.querySelector('#library-items').textContent.includes('Memory mode Current candidate')`,
-    );
+    await assertKnowledgeSearchGeometry(page, "desktop");
     await assertBrowserControlReachable(page, "#message", "conversation beside Library");
     await page.call("Emulation.setDeviceMetricsOverride", {
       width: 760,
@@ -2694,6 +3009,10 @@ async function runMemoryBrowserAcceptance(
     await page.until(
       `!document.querySelector('#library-view').hidden && document.querySelector('#chat-main').inert`,
     );
+    await page.evaluate(
+      'Promise.all(document.querySelector("#rail").getAnimations().map(animation=>animation.finished)).then(()=>true)',
+    );
+    await assertKnowledgeSearchGeometry(page, "mobile");
     await assertBrowserControlReachable(
       page,
       "#library-query",

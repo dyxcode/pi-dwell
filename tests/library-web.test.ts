@@ -16,7 +16,14 @@ test("the browser exposes Library in the Knowledge rail, not a separate modal", 
   ])
     assert.match(HOST_PAGE, new RegExp(`id="${id}"`));
   assert.match(HOST_PAGE, /<aside id="rail"[\s\S]*?id="library-view"[\s\S]*?<\/aside>/);
-  assert.doesNotMatch(HOST_PAGE, /id="library-(?:open|dialog)"/);
+  assert.doesNotMatch(HOST_PAGE.split("</aside>")[0] ?? "", /id="library-reader"/);
+  assert.match(HOST_PAGE, /<main id="chat-main"[\s\S]*?id="library-reader"[\s\S]*?<\/main>/);
+  assert.match(HOST_PAGE, /<h1 id="library-reader-title"/);
+  assert.match(
+    HOST_PAGE,
+    /class="reader-action-links"[\s\S]*?>Source ↗<\/a>[\s\S]*?id="library-reference-action"/,
+  );
+  assert.doesNotMatch(HOST_PAGE, /id="library-(?:open|dialog|session-label|items-title)"/);
   assert.match(HOST_PAGE, /aria-controls="library-view"/);
 });
 

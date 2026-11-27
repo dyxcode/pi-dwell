@@ -75,7 +75,7 @@ Assistant 文本使用 Markdown。Tool call 及其结果可以展开；失败的
 
 ## 搜索与阅读 Distill Memory
 
-打开 **Memory** 即可查看最近更新的记录，每条都有预览和日期。点击 **More** 可查看更早的记录，清空搜索框则返回最近更新列表。点击结果可在侧栏阅读该版本。搜索某一页即使没有结果，也可能还有后续内容；只要页面提供继续选项，就可以继续。Reader 暂不可用时，Memory 会提供 **Retry**。
+打开 **Memory** 即可查看最近更新的记录，每条都有预览和日期。点击 **More** 可查看更早的记录，清空搜索框则返回最近更新列表。点击结果可在主阅读栏打开该版本，长记录可用阅读栏内的 **More** 续读。桌面保留侧栏，手机关闭抽屉。用 **← Back**、**Esc** 或当前会话标签返回原对话时，滚动位置、草稿和附件都保留；点击另一个会话标签则切换对话。搜索某一页即使没有结果，也可能还有后续内容；只要页面提供继续选项，就可以继续。Reader 暂不可用时，Memory 会提供 **Retry**。
 
 阅读不会将记忆加入 Pi prompt 或已保存的对话。同一侧栏中的 [Library](#current-library) 用于浏览收集到的外部资料及附加精确版本引用。
 
@@ -138,7 +138,7 @@ Source-access configuration 或 module opening 出错仍会导致 startup 失败
 
 请将两个 path 替换为本机 absolute path。同一个 canonical root 应持续使用相同 binding；Current 打开后，若该 binding 指向不同 root，Dwell 会拒绝启动。配置文件从 Dwell data directory 读取，并需满足现有 private-file permission checks。省略 `current` 时 session host 仍可用，library routes 会返回 `library_unavailable`。
 
-在侧栏打开 **Library** 可查看 latest items、搜索和读取 exact version。Candidate result 会显示 **Article text has not been saved.**、发现时间和原始来源链接。已保存 item 则提供正文供阅读。选中 session 后，使用 **Attach to session** 保存 exact item/version reference，包括已确认的 candidate。该操作不会改变 Pi prompt，也不会获取 candidate text。已配置的 Current 暂不可用时，仍可查看和移除已保存的引用。
+在侧栏浏览或搜索 **Library**，选中条目后在主阅读栏读取其精确版本。候选条目显示 **Article text has not been saved.** 和发现日期。用 **Source ↗** 打开原始页面。选中会话后，用 **Attach** 保存条目的精确版本引用（也支持已确认的候选条目）；用 **Attached** 移除引用。该操作不会改变 Pi prompt，也不会获取 candidate text。已配置的 Current 暂不可用时，仍可查看和移除已保存的引用。
 
 `current` 和 `distill` 可放在同一个 version 1 configuration 中。详见 [Library](implementation/library.md) 与 [历史清理](implementation/history-retirement.md)。
 

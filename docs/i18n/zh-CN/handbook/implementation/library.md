@@ -10,7 +10,7 @@
 
 ## 行为
 
-桌面端的 **Library** 显示在对话旁的侧栏内，手机端则在侧栏抽屉中。同时配置两项集成时，在 Knowledge 侧栏选择 **Memory** 旁的 **Library**。最新内容和搜索结果可能包含已保存内容和 discovery candidate。已保存内容会显示有界 excerpt，并可打开精确版本阅读；candidate 会展示 discovery metadata、**Article text has not been saved.** 提示、发现时间和来源链接。没有选中会话也可以浏览；只有选中 Dwell 会话后才能添加或移除引用。
+在侧栏浏览或搜索 **Library**。同时配置两项集成时，**Library** 位于 **Memory** 旁。选择条目后，主阅读栏会打开其精确版本；桌面保留侧栏，手机关闭抽屉。发现候选条目显示发现日期、可用的摘要，以及 **Article text has not been saved.** 提示。点击 **Source ↗** 可打开原始页面。未选中会话也可以阅读；选中会话后，可用 **Attach** 和 **Attached** 添加或移除引用。
 
 附加到会话的引用包含内容库绑定、条目身份和准确版本。Current 可以确认 candidate reference，也可以确认已保存版本。添加引用会为所选会话保存这些身份，Pi 上下文保持不变；它不会获取 candidate text，也不会将内容加入 prompt。Current 仍管理 discovery metadata 和已保存 article body。Current 不可用时，Host 仍可显示并移除已保存的引用；浏览内容、打开准确版本和添加新引用则必须连接到可用的内容库。
 
@@ -27,9 +27,9 @@ Current 拥有 discovery candidate、采集到的正文、元数据和版本历�
 ## 执行顺序
 
 1. 进入 Library 视图后，客户端读取 Current 最新内容；如果已选中会话，也同时读取该会话已保存的引用。Search 会用匹配 items 替换当前结果列表；latest 和 search 都可能返回已保存版本或 discovery candidate。
-2. 选择已保存版本后，客户端读取该精确版本，并显示标题、来源、采集日期、摘要、正文，以及来源完整度或截断信息。选择 candidate 后则显示其 metadata、发现时间和来源链接。Article body 尚未保存时，Dwell 不会编造正文或采集时间。
+2. 选择已保存版本后，阅读栏显示标题、可用的作者、来源站点、采集日期和正文，并标记已知不完整的来源或已缩短的正文。候选条目显示发现日期，不显示采集日期。
 3. 添加引用前，Host 要求已打开的 Current 内容库确认准确的绑定、条目和版本。已确认的 candidate 也可以关联，但不会将 article text 加入 Pi context。重复添加同一引用不会产生重复记录。移除操作只删除这一条精确身份对应的引用。
-4. 修改引用或切换会话后，Library 会重新读取所选会话已保存的引用。切换会话不会改变正在阅读的文章版本。
+4. 修改引用或切换会话后，Library 会重新读取所选会话已保存的引用。选择会话标签会返回对话。
 
 <a id="mechanisms"></a>
 
@@ -39,7 +39,7 @@ Current 拥有 discovery candidate、采集到的正文、元数据和版本历�
 
 准确引用包含全部三个身份。打开旧版本时不会自动替换为最新版本。如果 Current 后来删除了该版本，已有引用仍会显示并可移除；打开内容时会说明该版本不可用。列出和移除引用只访问 Dwell Catalog，因此 Current 离线时仍可执行。离线时不能新增引用，因为 Current 必须先确认准确的 item 和 version。
 
-离开 Library 或发起较新的读取请求后，浏览器会忽略迟到的搜索或阅读结果。引用响应还必须对应当前会话。写入操作串行执行，完成后重新读取保存列表。
+浏览和阅读各自发起请求。新查询替换旧搜索；返回对话或选择另一篇文章时，之前的读取失效。离开 Library 会让两类请求都失效。引用响应还必须对应当前会话。写入操作串行执行，完成后重新读取保存列表。
 
 <a id="technology"></a>
 

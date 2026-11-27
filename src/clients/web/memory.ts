@@ -6,17 +6,20 @@ import {
   isMemoryReadResponse,
   isMemorySearchRequest,
   isMemorySearchResponse,
+  type MemoryListItem,
   type MemoryListRequest,
   type MemoryReadRequest,
   type MemorySearchItem,
   type MemorySearchRequest,
 } from "../../shared/memory.ts";
 
+type MemoryResult = MemorySearchItem & Partial<Pick<MemoryListItem, "updatedAt">>;
+
 export interface MemoryPanelState {
   query: string;
-  items: (MemorySearchItem & { updatedAt?: string })[];
+  items: MemoryResult[];
   nextCursor: string | null;
-  selected: { id: string; revision: number } | null;
+  selected: Omit<MemoryResult, "preview"> | null;
   text: string;
   readCursor: string | null;
   searchComplete: boolean;
@@ -99,31 +102,30 @@ export class MemoryPanel {
   setQuery(query: string): void {
     if (query === this.#state.query) return;
     this.#searchGeneration++;
-    this.#readGeneration++;
-    this.#state = emptyState(query);
+    this.#resetSearch(query);
     this.#emit();
   }
 
   async search(query = this.#state.query): Promise<void> {
     this.setQuery(query);
     const searchGeneration = ++this.#searchGeneration;
-    this.#readGeneration++;
     const trimmedQuery = query.trim();
     const request: MemorySearchRequest = { query: trimmedQuery, limit: MEMORY_SEARCH_LIMIT };
     if (trimmedQuery && !isMemorySearchRequest(request)) {
-      this.#state = {
-        ...emptyState(query),
-        searchError: `Enter a search query of up to ${MEMORY_QUERY_CODEPOINTS} characters.`,
-      };
+      this.#resetSearch(query);
+      this.#state.searchError = `Enter a search query of up to ${MEMORY_QUERY_CODEPOINTS} characters.`;
       this.#emit();
       return;
     }
-    this.#state = {
-      ...emptyState(query),
-      searchPending: true,
-    };
+    this.#resetSearch(query);
+    this.#state.searchPending = true;
     this.#emit();
     await this.#loadPage(searchGeneration, trimmedQuery);
+  }
+
+  #resetSearch(query: string): void {
+    const { selected, text, readCursor, readPending, readError } = this.#state;
+    this.#state = { ...emptyState(query), selected, text, readCursor, readPending, readError };
   }
 
   async continueSearch(): Promise<void> {
@@ -173,18 +175,17 @@ export class MemoryPanel {
     }
   }
 
-  async read(item: Pick<MemorySearchItem, "id" | "revision">): Promise<void> {
-    const request: MemoryReadRequest = { id: item.id, expectedRevision: item.revision };
+  async read({ id, revision, updatedAt }: MemoryResult): Promise<void> {
+    const request: MemoryReadRequest = { id, expectedRevision: revision };
     if (!isMemoryReadRequest(request)) {
       this.#state = { ...this.#state, readError: "This memory reference is no longer valid." };
       this.#emit();
       return;
     }
-    const queryGeneration = this.#searchGeneration;
     const readGeneration = ++this.#readGeneration;
     this.#state = {
       ...this.#state,
-      selected: { id: item.id, revision: item.revision },
+      selected: { id, revision, ...(updatedAt === undefined ? {} : { updatedAt }) },
       text: "",
       readCursor: null,
       readPending: true,
@@ -193,11 +194,10 @@ export class MemoryPanel {
     this.#emit();
     try {
       const value = await this.#request("/api/v1/memory/read", request);
-      if (queryGeneration !== this.#searchGeneration || readGeneration !== this.#readGeneration)
-        return;
+      if (readGeneration !== this.#readGeneration) return;
       if (!isMemoryReadResponse(value))
         throw new Error("The host returned an invalid memory page.");
-      if (value.id !== item.id || value.revision !== item.revision)
+      if (value.id !== id || value.revision !== revision)
         throw Object.assign(new Error("This memory changed while it was being read."), {
           code: "memory_changed",
         });
@@ -209,8 +209,7 @@ export class MemoryPanel {
       };
       this.#emit();
     } catch (error) {
-      if (queryGeneration !== this.#searchGeneration || readGeneration !== this.#readGeneration)
-        return;
+      if (readGeneration !== this.#readGeneration) return;
       const terminalRead = ["invalid_cursor", "memory_changed", "memory_not_found"].includes(
         errorCode(error) ?? "",
       );
@@ -238,14 +237,12 @@ export class MemoryPanel {
       this.#emit();
       return;
     }
-    const queryGeneration = this.#searchGeneration;
     const readGeneration = ++this.#readGeneration;
     this.#state = { ...this.#state, readPending: true, readError: null };
     this.#emit();
     try {
       const value = await this.#request("/api/v1/memory/read", request);
-      if (queryGeneration !== this.#searchGeneration || readGeneration !== this.#readGeneration)
-        return;
+      if (readGeneration !== this.#readGeneration) return;
       if (!isMemoryReadResponse(value))
         throw new Error("The host returned an invalid memory page.");
       if (value.id !== selected.id || value.revision !== selected.revision)
@@ -260,8 +257,7 @@ export class MemoryPanel {
       };
       this.#emit();
     } catch (error) {
-      if (queryGeneration !== this.#searchGeneration || readGeneration !== this.#readGeneration)
-        return;
+      if (readGeneration !== this.#readGeneration) return;
       const terminalRead = ["invalid_cursor", "memory_changed", "memory_not_found"].includes(
         errorCode(error) ?? "",
       );

@@ -26,9 +26,6 @@ export const HOST_PAGE = `<!doctype html>
 </div>
 <button class="new" id="new-session">New conversation <span>＋</span>
 </button>
-<div class="section-head" id="conversations-heading">
-<span>Conversations</span>
-</div>
 <nav id="session-list" class="session-names" aria-label="Conversations">
 </nav>
 <div id="knowledge-tabs" role="tablist" aria-label="Knowledge" hidden>
@@ -36,50 +33,35 @@ export const HOST_PAGE = `<!doctype html>
 <button id="library-tab" type="button" role="tab" aria-controls="library-view" aria-selected="false" tabindex="-1">Library</button>
 </div>
 <section id="memory-view" class="knowledge-view" aria-labelledby="memory-title" hidden>
-<div class="memory-heading"><h2 id="memory-title">Memory</h2></div>
-<p id="memory-capability-status" class="memory-caption" role="status" hidden></p>
-<form id="memory-search-form" class="memory-search">
+<h2 class="knowledge-title" id="memory-title">Memory</h2>
+<form id="memory-search-form" class="knowledge-search">
 <label class="sr-only" for="memory-query">Search memory</label>
 <input id="memory-query" type="search" autocomplete="off">
 <button id="memory-search" class="action" type="submit">Search</button>
 </form>
+<p id="memory-capability-status" class="feedback" role="status" hidden></p>
 <p id="memory-search-error" class="feedback" role="status"></p>
+<div class="knowledge-results">
 <div id="memory-results" aria-live="polite"></div>
 <button id="memory-search-more" class="text-button memory-more" type="button" hidden>Continue search</button>
-<section id="memory-reader" aria-labelledby="memory-reader-title" hidden>
-<div class="memory-reader-heading"><h3 id="memory-reader-title" tabindex="-1"></h3><button id="memory-reader-close" class="icon" type="button" aria-label="Close memory">×</button></div>
-<p id="memory-read-error" class="feedback" role="status"></p>
-<pre id="memory-text"></pre>
-<button id="memory-read-more" class="text-button memory-more" type="button" hidden>Continue reading</button>
-</section>
 <button id="memory-retry" class="text-button memory-more" type="button" hidden>Retry Memory</button>
+</div>
 </section>
 <section id="library-view" class="knowledge-view" aria-labelledby="library-title" hidden>
-<h2 id="library-title">Library</h2>
-<p id="library-session-label" class="footnote"></p>
-<form id="library-search-form" class="library-search">
-<label class="sr-only" for="library-query">Search saved content</label>
-<input id="library-query" type="search" maxlength="200" placeholder="Search saved content…" autocomplete="off">
+<h2 class="knowledge-title" id="library-title">Library</h2>
+<form id="library-search-form" class="knowledge-search">
+<label class="sr-only" for="library-query">Search Library</label>
+<input id="library-query" type="search" maxlength="200" autocomplete="off">
 <button id="library-search" class="action" type="submit">Search</button>
 </form>
 <p id="library-error" class="feedback" role="status"></p>
-<section class="library-section">
-<h3 id="library-references-title">Attached to this session</h3>
+<div class="knowledge-results">
+<section id="library-attached" class="library-section" aria-labelledby="library-references-title" hidden>
+<h3 id="library-references-title">Attached</h3>
 <div id="library-references"></div>
 </section>
-<section class="library-section">
-<h3 id="library-items-title">Latest items</h3>
 <div id="library-items"></div>
-</section>
-<section id="library-reader" class="library-reader" aria-labelledby="library-reader-title" hidden>
-<div class="memory-reader-heading"><h3 id="library-reader-title" tabindex="-1"></h3><button id="library-reader-close" class="icon" type="button" aria-label="Close article">×</button></div>
-<p id="library-reader-meta" class="footnote"></p>
-<a id="library-source-link" rel="noreferrer noopener" target="_blank">Open original source ↗</a>
-<p id="library-summary" class="library-summary"></p>
-<pre id="library-text"></pre>
-<p id="library-completeness" class="footnote"></p>
-<button id="library-reference-action" class="action" type="button" disabled>Select a session to attach</button>
-</section>
+</div>
 </section>
 <div class="rail-foot">
 <p id="client-capabilities-error" class="footnote" role="status" hidden></p>
@@ -101,6 +83,8 @@ export const HOST_PAGE = `<!doctype html>
 </p>
 <button id="dismiss-notice" type="button" aria-label="Dismiss notice">×</button>
 </div>
+<div id="main-stage">
+<div id="chat-content">
 <div id="scroll">
 <div class="history-controls">
 <button id="load-older" class="text-button" hidden>Load earlier messages ↑</button>
@@ -122,6 +106,37 @@ export const HOST_PAGE = `<!doctype html>
 <button id="send" type="submit" aria-label="Send message" disabled>Send ↑</button></div>
 </form>
 </footer>
+</div>
+<div id="knowledge-reader" hidden>
+<div class="reader-column">
+<div class="reader-toolbar">
+<button id="knowledge-back" class="text-button reader-control" type="button">← Back</button>
+<time id="memory-reader-date" hidden></time>
+</div>
+<section id="memory-reader" aria-label="Memory" hidden>
+<p id="memory-read-status" class="reader-meta" role="status"></p>
+<p id="memory-read-error" class="feedback" role="status" tabindex="-1"></p>
+<div id="memory-text" tabindex="-1"></div>
+<button id="memory-read-more" class="text-button reader-control" type="button" hidden>More</button>
+</section>
+<section id="library-reader" aria-labelledby="library-reader-title" hidden>
+<h1 id="library-reader-title" tabindex="-1"></h1>
+<p id="library-read-status" class="reader-meta" role="status"></p>
+<div id="library-reader-actions" class="reader-actions" hidden>
+<p id="library-reader-meta" class="reader-meta"></p>
+<div class="reader-action-links">
+<a id="library-source-link" class="reader-control" rel="noreferrer noopener" target="_blank">Source ↗</a>
+<button id="library-reference-action" class="text-button reader-control" type="button" aria-pressed="false" disabled>Attach</button>
+</div>
+</div>
+<p id="library-reader-error" class="feedback" role="status"></p>
+<p id="library-summary"></p>
+<pre id="library-text" class="reader-text"></pre>
+<p id="library-completeness" class="reader-meta"></p>
+</section>
+</div>
+</div>
+</div>
 </main>
 </div>
 <dialog id="close-session-dialog" aria-labelledby="close-session-title" aria-describedby="close-session-copy">
@@ -136,7 +151,7 @@ export const HOST_PAGE = `<!doctype html>
 </div>
 <div class="panel-heading">
 <div>
-<h2 id="new-title">New session</h2>
+<h2 id="new-title">New conversation</h2>
 </div>
 <button id="close-new" class="icon" aria-label="Close panel">×</button>
 </div>
@@ -150,7 +165,7 @@ export const HOST_PAGE = `<!doctype html>
 </div>
 <p id="create-error" class="feedback" role="status">
 </p>
-<button id="create-button" class="action" type="submit">Start session</button>
+<button id="create-button" class="action" type="submit">Start</button>
 </form>
 </dialog>
 <dialog id="model-dialog" aria-labelledby="model-title">
@@ -166,12 +181,11 @@ export const HOST_PAGE = `<!doctype html>
 </dialog>
 <dialog id="host-dialog" aria-labelledby="host-title">
 <div class="panel-heading">
-<h2 id="host-title">Your host.</h2>
+<h2 id="host-title">Host</h2>
 <button id="close-host" class="icon" aria-label="Close host details">×</button>
 </div>
 <p id="host-info">
 </p>
-<p class="footnote">Disconnecting leaves your work running on the host.</p>
 </dialog>
 <dialog id="image-dialog" aria-labelledby="image-title"><div class="panel-heading"><h2 id="image-title">Image</h2><button id="close-image" class="icon" type="button" aria-label="Close image preview">×</button></div><img id="preview-image" alt=""></dialog>
 </body>
@@ -604,7 +618,6 @@ button:disabled{opacity:.55;cursor:default}
 .session-details[open]>summary::before,.session-details[open]>summary::after{transform:none}
 .session-details[open]>summary{color:var(--dark)}
 .session-details-body{padding:8px 14px 10px;background:#eee8dd;border-radius:2px}
-.session-details-caption{font:10px/1.5 var(--mono);color:var(--muted);margin:6px 0}
 .session-details .context-source{margin:0;border:0;background:none}
 .context-source>summary{padding:8px 0;gap:9px;min-height:44px;color:var(--dark);font:11px/1.7 var(--mono)}
 .context-source>summary span{overflow-wrap:anywhere;min-width:0}
@@ -761,7 +774,6 @@ button:disabled{opacity:.55;cursor:default}
 .thinking-run,.history-diagnostic{margin:8px 0;color:var(--muted);font-size:13px}
 .thinking-run>summary,.history-diagnostic>summary{cursor:pointer;font-family:var(--mono);padding:6px 0}
 .thinking-content{padding:4px 0 8px}
-.tool-caption{padding:0 14px 4px 34px;font:10px/1.6 var(--mono);color:var(--muted)}
 .tool-run.error{border-left:2px solid var(--danger,#a65b51)}
 
 /* Open sessions share one status strip on mobile and desktop. */
@@ -840,7 +852,6 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #conversation :is(.activity-group,.thinking-run,.tool-run)>summary:focus-visible{outline:1px dotted #797267;outline-offset:2px;text-decoration:none}
 @media(max-width:760px){#conversation .thinking-run>summary{min-height:40px}}
 
-#conversation .tool-run .tool-caption{padding:0 0 4px;font:11px/1.6 var(--mono);color:#797267}
 
 /* Proportional sidebar and tighter conversation spacing. */
 #rail{width:min(280px,25vw)}
@@ -906,31 +917,50 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #knowledge-tabs{display:flex;gap:18px;border-bottom:1px solid var(--line);margin-bottom:8px}
 #knowledge-tabs button{min-height:38px;padding:2px 3px;color:var(--muted);border-bottom:2px solid transparent;font:600 14px var(--sans)}
 #knowledge-tabs [aria-selected=true]{color:var(--ink);border-color:currentColor}
-#knowledge-tabs:not([hidden])+ #memory-view .memory-heading,#knowledge-tabs:not([hidden])~ #library-view>h2{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-#library-title{margin:0 4px 6px;font:600 17px/1.5 var(--mono)}
-#library-session-label{margin:4px 0 0}
-.library-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:12px 0}
-.library-search input{min-width:0;height:40px;border:1px solid var(--line);background:var(--paper);padding:8px;font:13px var(--mono)}
-.library-search .action{min-height:40px;padding:8px 12px;font:11px var(--mono)}
-#library-error:empty{display:none}
+#knowledge-tabs:not([hidden])~.knowledge-view .knowledge-title{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.knowledge-view{display:flex;flex:1 1 auto;flex-direction:column;min-height:0}
+.knowledge-title{margin:0 4px 6px;font:600 17px/1.5 var(--mono);letter-spacing:-.5px}
+.knowledge-search{display:grid;flex:none;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:6px 0}
+.knowledge-search input{width:100%;min-width:0;height:40px;padding:8px;border:1px solid var(--line);border-radius:0;background:var(--surface);color:var(--ink);font:13px var(--sans)}
+.knowledge-search .action{min-height:40px;padding:8px 10px;font:11px var(--mono)}
+.knowledge-view .feedback{margin:4px 0;padding:0 4px;font-size:12px}
+.knowledge-view .feedback:empty{display:none}
+.knowledge-view :is(input,button):focus-visible{outline-offset:-2px}
+.knowledge-results{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable}
+.knowledge-item{display:block;width:100%;min-height:48px;padding:10px 4px;text-align:left;border-bottom:1px solid var(--line);font:12px/1.6 var(--sans);overflow-wrap:anywhere}
+.knowledge-item strong,.knowledge-item span{display:block}
+.knowledge-item strong{color:var(--dark);font-weight:600}
+.knowledge-item .knowledge-meta{display:block;margin-top:4px;color:var(--muted);font:11px/1.5 var(--mono)}
+.knowledge-item .memory-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
 .library-section{margin:15px 0}
-.library-section h3,.library-reader h3{font:10px/1.6 var(--mono);letter-spacing:.5px;color:var(--muted);margin:0 0 7px}
-.library-result{display:block;width:100%;min-height:48px;padding:10px;text-align:left;border-bottom:1px solid var(--line)}
-.library-result strong,.library-result small,.library-result span{display:block;overflow-wrap:anywhere}
-.library-result strong{font:600 12px/1.5 var(--sans);color:var(--dark)}
-.library-result small,.library-reference-row small{font:9px/1.6 var(--mono);color:var(--muted)}
-.library-result span{font:12px/1.6 var(--sans);color:var(--ink);margin-top:3px}
+.library-section h3{font:10px/1.6 var(--mono);letter-spacing:.5px;color:var(--muted);margin:0 0 7px}
 .library-reference-row{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);min-height:42px}
 .library-reference-row>button:first-child{flex:1;min-width:0;text-align:left;padding:7px 2px;font:10px/1.5 var(--mono);overflow-wrap:anywhere}
 .library-reference-row .library-remove{min-height:36px;padding:5px;color:var(--muted);font:10px var(--mono)}
-.library-reader{border-top:1px solid var(--line);margin-top:16px;padding-top:14px}
-.library-reader .panel-heading{margin-bottom:8px!important}
-#library-source-link{font:10px/1.6 var(--mono);color:var(--dark);overflow-wrap:anywhere}
-.library-summary{font:12px/1.7 var(--sans);color:var(--muted);margin:12px 0}
-#library-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:38dvh;overflow:auto;padding:12px;background:var(--paper);font:12px/1.7 var(--sans)}
-#library-reference-action{min-height:38px;padding:8px 12px;font:11px var(--mono);margin-top:8px}
+/* Keep chat laid out while reading so its scrollport and draft stay in place. */
+#main-stage{position:relative;display:flex;flex:1;min-height:0}
+#chat-content{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0}
+#chat-content[inert]{visibility:hidden}
+#knowledge-reader{position:absolute;inset:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent;--muted:#797267}
+.reader-column{box-sizing:content-box;max-width:70ch;margin-inline:auto;padding:clamp(16px,4vw,44px) clamp(16px,4vw,40px) max(44px,env(safe-area-inset-bottom));font:17px/1.75 var(--sans)}
+.reader-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+#memory-reader-date{color:var(--muted);font:12px/1.5 var(--mono)}
+#memory-reader{margin-top:14px}
+#memory-text{overflow-wrap:anywhere}
+#library-reader-title{margin:10px 0 14px;font:500 clamp(23px,3.2vw,32px)/1.3 Georgia,serif;overflow-wrap:anywhere}
+:is(#library-reader-title,#memory-text,#memory-read-error,.reader-control):focus-visible{outline:1px dotted var(--muted);outline-offset:3px}
+:is(#library-reader-title,#memory-text,#memory-read-error):focus:not(:focus-visible){outline:none}
+.reader-actions{display:flex;flex-wrap:wrap;align-items:center;gap:0 16px;margin:0 0 16px;border-bottom:1px solid var(--line)}
+.reader-meta{font:13px/1.5 var(--sans);color:var(--muted);margin:0}
+#library-reader-meta{min-width:0;overflow-wrap:anywhere}
+.reader-action-links{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0 16px;margin-inline-start:auto;max-width:100%}
+.reader-action-links .reader-control{white-space:nowrap}
+.reader-control{display:inline-flex;align-items:center;min-height:40px;padding:0;color:var(--muted);font:14px/1.5 var(--sans)}
+.reader-control:hover,#library-reference-action{color:var(--dark)}
+#library-reference-action{font-weight:500}
 #library-reference-action:disabled{opacity:.6}
-#library-reader-close{width:30px;height:32px}
+.reader-text{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0 0 14px}
+.reader-column p:empty,.reader-text:empty{display:none}
 @media(min-width:761px){
  #app.sidebar-collapsed #open-nav{display:block}
  #close-nav{display:block;width:36px;min-height:36px;color:var(--muted)}
@@ -938,29 +968,9 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
 #open-nav{color:#797267}
 #app.with-knowledge #open-nav{width:auto;min-width:0;padding:0 6px;font:600 13px var(--sans)}
 #app.with-knowledge #open-nav .menu{display:none}
-.knowledge-view{flex:1 1 auto;min-height:0}
-#memory-view .memory-heading{margin:0 8px 6px}
-#memory-view .memory-heading h2{margin:0;font:600 17px/1.5 var(--mono);letter-spacing:-.5px}
-#memory-view .memory-caption{margin:4px 8px 10px;font:10px/1.6 var(--sans);color:var(--muted)}
-#memory-search-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin:6px 0 4px}
-#memory-query{width:100%;min-width:0;height:36px;padding:7px;border:1px solid var(--line);border-radius:0;background:var(--surface);color:var(--ink);font:11px var(--sans)}
-#memory-search{min-height:36px;padding:6px 8px;font:10px var(--mono)}
-#memory-search:disabled,#memory-query:disabled,#memory-retry:disabled,#memory-search-more:disabled,#memory-read-more:disabled{opacity:.55;cursor:wait}
-#memory-search-error:empty,#memory-read-error:empty{display:none}
-#memory-search-error,#memory-read-error{margin:4px 0;padding:0 2px;font-size:10px}
-#memory-results{display:grid;gap:0;min-width:0}
-.memory-result{display:block;width:100%;min-width:0;padding:10px 4px;text-align:left;border:0;border-top:1px solid var(--line);background:none;box-shadow:none;font:12px/1.6 var(--sans);color:var(--ink);overflow-wrap:anywhere}
-.memory-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
-.memory-result time{display:block;margin-top:4px;color:var(--muted);font:11px/1.5 var(--mono)}
+.knowledge-search :disabled,.memory-more:disabled{opacity:.55;cursor:wait}
 .memory-empty{margin:10px 4px;padding:8px 0;border-top:1px solid var(--line);font:10px/1.6 var(--sans);color:var(--muted)}
 .memory-more{min-height:34px;align-self:flex-start;margin:3px 0;padding:7px 4px;font:10px/1.5 var(--mono);color:var(--dark)}
-#memory-reader{margin-top:12px;padding:11px 0 0;border-top:1px solid var(--line)}
-#memory-reader[hidden]{display:none}
-.memory-reader-heading{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.memory-reader-heading h3{min-width:0;margin:0;font:600 11px/1.6 var(--mono);overflow-wrap:anywhere}
-#memory-reader-close{flex:0 0 28px;width:28px;height:28px;min-height:28px}
-#memory-reader-revision{margin:3px 0 7px;font-size:9px}
-#memory-text{margin:0;padding:8px;background:var(--paper);max-height:36dvh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.7 var(--sans)}
 #app.with-memory #status-list .status-tab{display:grid;grid-template-columns:1fr;column-gap:0;padding:0;width:40px;flex:0 0 40px}
 #app.with-memory #status-list .status-tab .tab-select{grid-column:1;display:flex;justify-content:center;padding:0}
 #app.with-memory #status-list .status-tab .tab-close{grid-column:1;justify-content:center;width:100%;padding:0}
@@ -968,14 +978,9 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  #rail{visibility:hidden;transition:transform 160ms ease,visibility 160ms}
  #rail.open{visibility:visible}
  @media(prefers-reduced-motion:reduce){#rail{transition:none}}
- #memory-view .memory-heading{margin:0 4px 6px}
- #memory-search-form{gap:5px}
- #memory-query{height:36px}
  #app.with-memory #status-list{gap:6px}
  #app.with-memory #status-list .status-tab{width:36px;flex-basis:36px;height:34px}
 }
-
-.knowledge-view :is(input,button):focus-visible{outline-offset:-2px}
 
 @media(min-width:761px){
  :root{--type-reading:17px;--type-ui:15px;--type-meta:13px}
@@ -993,12 +998,12 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  .markdown h1{font-size:28px}.markdown h2{font-size:24px}.markdown h3{font-size:20px}
  .markdown h4,.markdown h5,.markdown h6{font-size:18px}
  .markdown code,.code-block pre code{font-size:14px}
- .code-block figcaption,.session-details>summary,.session-details-caption,.context-source>summary{font-size:var(--type-meta)}
+ .code-block figcaption,.session-details>summary,.context-source>summary{font-size:var(--type-meta)}
  .markdown table,.context-content{font-size:var(--type-ui)}
  .context-content.markdown h1,.context-content.markdown h2{font-size:var(--type-reading)}
  #conversation :is(.activity-group,.thinking-run,.tool-run)>summary,#conversation .tool-run .tool-output,#conversation .tool-run .tool-command-full{font-size:14px}
  #conversation .thinking-content,#conversation .thinking-content :is(h1,h2,h3){font-size:var(--type-ui)}
- #conversation .tool-run :is(.tool-status,.tool-caption,.tool-command-lines),.history-recovery{font-size:var(--type-meta)}
+ #conversation .tool-run :is(.tool-status,.tool-command-lines),.history-recovery{font-size:var(--type-meta)}
  #composer #message,#composer.expanded #message{font-size:var(--type-reading);line-height:28px;min-height:32px}
  #message::placeholder{font-size:var(--type-ui)}
  .text-editor{padding:9px 12px}
@@ -1015,7 +1020,7 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  #new-dialog h2,#model-dialog h2,#close-session-title{font-size:22px}
  #image-dialog h2{font-size:var(--type-ui)}
  .form label,.gate label,#new-dialog label,#close-session-number{font-size:var(--type-meta);line-height:1.5}
- .form input,.form select,#new-dialog #directory,#model-dialog #model-search,.library-search input{font-size:var(--type-ui);height:44px}
+ .form input,.form select,#new-dialog #directory,#model-dialog #model-search{font-size:var(--type-ui);height:44px}
  #new-dialog #browse,#new-dialog .directory-row,#new-dialog #create-button,.directory-choice{font-size:var(--type-ui);min-height:44px}
  #model-dialog .model-option{min-height:56px;padding:10px}
  #model-dialog .model-option strong,#thinking-model{font-size:var(--type-ui)}
@@ -1023,21 +1028,12 @@ main>header{display:flex;height:46px;min-height:46px;padding:0 16px;gap:8px;bord
  .close-actions button{font-size:14px;min-height:40px}
  #close-session-copy{font-size:var(--type-reading)}
  .gate-card{max-width:520px}.gate p,.empty p{font-size:var(--type-reading)}
- .library-search .action,#library-reference-action{font-size:var(--type-ui);min-height:44px}
- .library-section h3,.library-reader h3,.library-result small,.library-reference-row small,.library-reference-row>button:first-child,.library-reference-row .library-remove,#library-source-link{font-size:var(--type-meta)}
- .library-result strong,.library-result span,.library-summary{font-size:var(--type-ui)}
- .library-reader h3{font-size:var(--type-reading)}
- #library-text{font-size:var(--type-reading);line-height:1.75;padding:16px}
- #memory-view .memory-heading h2,#library-title{font-size:22px;letter-spacing:-.3px}
- #memory-view .memory-caption,.memory-empty,#memory-search-error,#memory-read-error{font-size:var(--type-meta)}
- #memory-search-form{gap:8px;margin:10px 0 6px}
- #memory-query{font-size:var(--type-ui);height:44px;padding:9px}
- #memory-search{font-size:14px;min-height:44px;padding:8px 10px}
- .memory-result{padding:14px 4px}
- .memory-result,.memory-reader-heading h3{font-size:var(--type-ui);line-height:1.65}
- .memory-reader-heading h3{font-size:var(--type-reading)}
+ .knowledge-title{font-size:22px;letter-spacing:-.3px}
+ .knowledge-search{margin:10px 0 6px}
+ .knowledge-search input{font-size:var(--type-ui);height:44px;padding:9px}
+ .knowledge-search .action{font-size:14px;min-height:44px}
+ .knowledge-item{font-size:var(--type-ui);line-height:1.65}
+ .knowledge-view .feedback,.knowledge-item .knowledge-meta,.library-section h3,.library-reference-row>button:first-child,.library-reference-row .library-remove,.memory-empty{font-size:var(--type-meta)}
  .memory-more{font-size:14px;min-height:40px}
- #memory-reader-close{width:32px;height:32px;min-height:32px;flex-basis:32px}
- #memory-text{font-size:var(--type-reading);line-height:1.75;padding:10px}
 }
 `;

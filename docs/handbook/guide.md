@@ -113,7 +113,7 @@ or omitted. It is not a complete view of the prompt sent to a model.
 
 Open **Memory** to see recently updated records, with a preview and date for
 each. Select **More** for older records or clear the search box to return to
-recents. Selecting a result opens that revision in the sidebar. Search pages
+recents. Selecting a result opens that revision in the main reading column. The desktop sidebar stays open; the mobile drawer closes. Use **More** in the reader for a long memory. **← Back**, **Esc**, or the current session tab returns you to the same spot in the conversation with your draft and attachments intact. Use another session tab to switch conversations. Search pages
 can be empty and still have more results, so continue while the page offers
 that option. If the reader is temporarily unavailable, Memory offers **Retry**.
 
@@ -187,7 +187,7 @@ Run `npm run build:library` in the Current checkout, then add a `current` object
 Replace both paths with the absolute paths on this host. Keep the same binding for the same canonical root; when Current opens, Dwell rejects a binding that points at a different root. The configuration file is read from Dwell's data directory and must satisfy its private-file permission checks. Omitting `current` leaves the session host available and library routes report `library_unavailable`.
 
 
-Open **Library** in the sidebar to browse latest items, search, and read an exact version. Candidate results show **Article text has not been saved.**, their discovery time, and a link to the original source. Saved items provide article text for reading. With a session selected, use **Attach to session** to save the exact item/version reference, including a confirmed candidate. This leaves the Pi prompt unchanged and does not fetch candidate text. Saved references remain available for listing and removal when Current is configured but temporarily unavailable.
+Browse or search **Library** in the sidebar, then select an item to read its exact version in the main column. Candidates show **Article text has not been saved.** and a discovery date. Use **Source ↗** to open the original page. With a session selected, use **Attach** to save the exact item/version reference, including a confirmed candidate. Select **Attached** to remove it. This leaves the Pi prompt unchanged and does not fetch candidate text. Saved references remain available for listing and removal when Current is configured but temporarily unavailable.
 
 `current` and `distill` may share one version 1 configuration. See [Library access](implementation/library.md) and [history cleanup](implementation/history-retirement.md).
 

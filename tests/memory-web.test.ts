@@ -29,6 +29,13 @@ test("the browser exposes a real Memory search and reader surface", () => {
   assert.match(HOST_PAGE, /<label class="sr-only" for="memory-query">Search memory<\/label>/);
   assert.doesNotMatch(HOST_PAGE, /not added to Pi context/i);
   assert.ok(HOST_PAGE.indexOf('id="memory-view"') < HOST_PAGE.indexOf("</aside>"));
+  assert.ok(HOST_PAGE.indexOf('id="memory-reader"') > HOST_PAGE.indexOf("<main id="));
+  assert.doesNotMatch(
+    HOST_PAGE.match(/<section id="memory-reader"[\s\S]*?<\/section>/)?.[0] ?? "",
+    /<h1\b/,
+  );
+  assert.match(HOST_PAGE, /<time id="memory-reader-date"[^>]*hidden/);
+  assert.match(HOST_PAGE, /id="knowledge-back"[^>]*>← Back<\/button>/);
   assert.ok(HOST_PAGE.indexOf('id="conversation"') > HOST_PAGE.indexOf("<main id="));
   assert.match(HOST_PAGE, /id="composer"/);
 });
@@ -148,6 +155,25 @@ test("a newer query and disconnect fence delayed search and read responses", asy
   assert.deepEqual(panel.state.items, []);
   assert.equal(panel.state.text, "");
   assert.equal(panel.state.selected, null);
+});
+
+test("browsing a new Memory query does not cancel the open read", async () => {
+  let finishRead: (value: unknown) => void = () => {};
+  const panel = new MemoryPanel(async (path) => {
+    if (path.endsWith("/read"))
+      return new Promise((resolve) => {
+        finishRead = resolve;
+      });
+    return { items: [] };
+  });
+  const updatedAt = "2026-11-27T12:00:00.000Z";
+  const recent = { id: "memory-a", revision: 2, preview: "A saved note", updatedAt };
+  const reading = panel.read(recent);
+  await panel.search("different query");
+  finishRead({ id: "memory-a", revision: 2, text: "Still reading" });
+  await reading;
+  assert.deepEqual(panel.state.selected, { id: "memory-a", revision: 2, updatedAt });
+  assert.equal(panel.state.text, "Still reading");
 });
 
 test("a changed memory revision reports that the user should search again", async () => {

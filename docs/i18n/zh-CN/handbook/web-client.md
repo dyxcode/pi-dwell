@@ -50,6 +50,8 @@ Web client 是面向浏览器的对话界面，连接由 host 所拥有的 Pi se
 
 Shell 包含 connection screen 和默认隐藏的 application shell。连接后，application 包含 conversation sidebar、open-session status tab、notice 区域、可滚动 conversation 和 composer。Dialog 用于 session close、按目录创建、model 选择、host 详情和 image 预览。`page.ts` 中的 ID 是 `client.ts` 使用的 DOM contract；`el()` 会检查必需 ID 是否存在以及元素 class 是否符合预期。
 
+在 Knowledge 侧栏切换 Memory 与 Library 时，搜索栏保持原位，结果列表在下方独立滚动。阅读栏与对话共用中央区域，但各有滚动区。阅读时，客户端暂停对话区域的交互，但保留它的布局和会话状态。打开 Memory 时焦点移到 **Back**，打开 Library 时则移到文章标题；鼠标点击不显示焦点框，键盘导航仍保留。返回时焦点恢复到结果行（手机上则回到抽屉按钮）。从会话标签返回时，焦点留在标签栏。
+
 Status tab 显示 Ready、Working、Needs attention、Stopped 或 Opening。再次选择某个 tab 后才会显示其 close 操作；Tab slot 分配给当前 runtime-open session，并在关闭后重用。
 
 Stylesheet 与 HTML template 放在一起。宽度不超过 760 px 时，sidebar 会变成 drawer，composer 也会适配较小 viewport。Viewport declaration 请求 `interactive-widget=resizes-content`；如果键盘仍遮住内容，composer code 还会检查 `VisualViewport`。Page/client 中实现了 focus-visible style、semantic label、status text、native dialog 和 reduced-motion 规则。

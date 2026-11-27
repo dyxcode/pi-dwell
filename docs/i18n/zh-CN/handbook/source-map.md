@@ -983,7 +983,7 @@ Local dependencies： [shared/events.ts](../../../../src/shared/events.ts).
 
 功能背景：[Run and manage the Host](implementation/host-service.md)
 
-[查看源码](../../../../src/service/service.ts) · 1005 行
+[查看源码](../../../../src/service/service.ts) · 1012 行
 
 Local dependencies： [local/paths.ts](../../../../src/local/paths.ts), [shared/protocol.ts](../../../../src/shared/protocol.ts), [clients/cli/status.ts](../../../../src/clients/cli/status.ts).
 

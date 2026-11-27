@@ -715,3 +715,51 @@ test("uninstall disable failure preserves the unit and user data and reports par
   );
   assert.equal(reloadCount, 1, "failed disable must not continue to remove/reload the unit");
 });
+
+test("linux service restart uses atomic systemctl restart instead of separate stop then start", async (t) => {
+  const options = await createLinuxOptions(t);
+  const calls: Call[] = [];
+  let installed = false;
+  let active = true;
+  options.readiness = async (processId) => ({
+    processId,
+    instanceId: "inst-restart-atomic",
+    mode: "production",
+  });
+  options.runner = async (command, args) => {
+    recordCalls(calls, command, args);
+    if (isUnitFileStateQuery(command, args)) return success("enabled\n");
+    if (isLingerQuery(command, args)) return success("yes\n");
+    if (command === SYSTEMCTL && args[1] === "show") {
+      return installed
+        ? managerState(options, active ? 4242 : 0, active ? "active" : "inactive")
+        : {
+            code: 0,
+            stdout:
+              "LoadState=not-found\nActiveState=inactive\nSubState=dead\nMainPID=0\nFragmentPath=\n",
+            stderr: "",
+          };
+    }
+    if (command === SYSTEMCTL && args[1] === "stop") active = false;
+    if (command === SYSTEMCTL && (args[1] === "start" || args[1] === "restart")) active = true;
+    return success();
+  };
+
+  await runServiceCommand("install", options);
+  installed = true;
+  calls.length = 0;
+
+  const output = await runServiceCommand("restart", options);
+  assert.match(output, /^Restarted pi-dwell service \(PID 4242, instance inst-restart-atomic\)\.$/);
+  const systemctlActions = calls
+    .filter(({ command }) => command === SYSTEMCTL)
+    .map(({ args }) => args[1]);
+  assert.ok(
+    systemctlActions.includes("restart"),
+    `expected atomic systemctl restart, got: ${systemctlActions.join(", ")}`,
+  );
+  assert.ok(
+    !systemctlActions.includes("stop"),
+    `must not call separate systemctl stop before start, got: ${systemctlActions.join(", ")}`,
+  );
+});

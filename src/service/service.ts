@@ -998,6 +998,13 @@ export async function runServiceCommand(
   if (action === "restart") {
     if (!(await verifyRegistration(paths)))
       throw new Error("Install the pi-dwell service before restarting it.");
+    if (paths.platform === "linux") {
+      await reloadLinuxManager(paths);
+      const deadline = Date.now() + paths.startupTimeoutMs;
+      await runRequired(paths, "/usr/bin/systemctl", ["--user", "restart", SYSTEMD_UNIT]);
+      const ready = await waitForReady(paths, deadline);
+      return `Restarted pi-dwell service (PID ${ready.processId}, instance ${ready.instanceId}).`;
+    }
     await stopService(paths);
     return startService(paths).then((result) => result.replace(/^Started/, "Restarted"));
   }

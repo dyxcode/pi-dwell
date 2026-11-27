@@ -981,7 +981,7 @@ Local dependencies: [shared/events.ts](../../src/shared/events.ts).
 
 Feature context: [Run and manage the Host](implementation/host-service.md)
 
-[Open source](../../src/service/service.ts) · 1005 lines
+[Open source](../../src/service/service.ts) · 1012 lines
 
 Local dependencies: [local/paths.ts](../../src/local/paths.ts), [shared/protocol.ts](../../src/shared/protocol.ts), [clients/cli/status.ts](../../src/clients/cli/status.ts).
 
